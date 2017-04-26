@@ -21,8 +21,3 @@ Use the left and right arrow keys to browse images.
 
 Use the Esc key to exit.
 
-
-License
--------
-
-Public domain.
