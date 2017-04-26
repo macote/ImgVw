@@ -1,15 +1,15 @@
 ImgVw
 =====
 
-ImgVw is a simple image viewer for Windows
+ImgVw is a simple and fast image viewer for Windows
 
 
 How to build
 ------------
 
 This project is compatible with:
-- Visual Studio 2013
-- Eclipse Luna CDT with MinGW (GCC 4.8.1)
+- Visual Studio 2017
+- Eclipse Neon CDT with MinGW (GCC 6.3.0)
 
 
 Usage

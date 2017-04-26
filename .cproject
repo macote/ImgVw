@@ -39,16 +39,20 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.debug.223724342" name="MinGW C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug.778390294" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug">
-								<option id="gnu.cpp.link.option.flags.1379394346" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="-static -mwindows" valueType="string"/>
-								<option id="gnu.cpp.link.option.userobjs.1507009136" name="Other objects" superClass="gnu.cpp.link.option.userobjs" valueType="userObjs">
+								<option id="gnu.cpp.link.option.flags.1379394346" name="Linker flags" superClass="gnu.cpp.link.option.flags" useByScannerDiscovery="false" value="-static -mwindows" valueType="string"/>
+								<option id="gnu.cpp.link.option.userobjs.1507009136" name="Other objects" superClass="gnu.cpp.link.option.userobjs" useByScannerDiscovery="false" valueType="userObjs">
 									<listOptionValue builtIn="false" value="Debug\resource.o"/>
 								</option>
-								<option id="gnu.cpp.link.option.libs.109316457" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+								<option id="gnu.cpp.link.option.libs.109316457" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="comctl32"/>
 									<listOptionValue builtIn="false" value="shlwapi"/>
 									<listOptionValue builtIn="false" value="ole32"/>
 									<listOptionValue builtIn="false" value="gdiplus"/>
 									<listOptionValue builtIn="false" value="uxtheme"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="turbojpeg"/>
+								</option>
+								<option id="gnu.cpp.link.option.paths.1981421865" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
+									<listOptionValue builtIn="false" value="../libjpeg-turbo"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1851156384" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -100,17 +104,21 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.release.221308893" name="MinGW C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.release"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.release.1671425636" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.release">
-								<option id="gnu.cpp.link.option.flags.2092716378" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="-static -mwindows" valueType="string"/>
-								<option id="gnu.cpp.link.option.userobjs.1119100108" name="Other objects" superClass="gnu.cpp.link.option.userobjs" valueType="userObjs">
+								<option id="gnu.cpp.link.option.flags.2092716378" name="Linker flags" superClass="gnu.cpp.link.option.flags" useByScannerDiscovery="false" value="-static -mwindows" valueType="string"/>
+								<option id="gnu.cpp.link.option.userobjs.1119100108" name="Other objects" superClass="gnu.cpp.link.option.userobjs" useByScannerDiscovery="false" valueType="userObjs">
 									<listOptionValue builtIn="false" value="&quot;Release\resource.o&quot;"/>
 								</option>
-								<option id="gnu.cpp.link.option.strip.1903154219" name="Omit all symbol information (-s)" superClass="gnu.cpp.link.option.strip" value="true" valueType="boolean"/>
-								<option id="gnu.cpp.link.option.libs.1401985270" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+								<option id="gnu.cpp.link.option.strip.1903154219" name="Omit all symbol information (-s)" superClass="gnu.cpp.link.option.strip" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+								<option id="gnu.cpp.link.option.libs.1401985270" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="comctl32"/>
 									<listOptionValue builtIn="false" value="shlwapi"/>
 									<listOptionValue builtIn="false" value="ole32"/>
 									<listOptionValue builtIn="false" value="gdiplus"/>
 									<listOptionValue builtIn="false" value="uxtheme"/>
+									<listOptionValue builtIn="false" value="turbojpeg"/>
+								</option>
+								<option id="gnu.cpp.link.option.paths.1603664866" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
+									<listOptionValue builtIn="false" value="../libjpeg-turbo"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.206988463" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -152,4 +160,5 @@
 		</configuration>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 </cproject>

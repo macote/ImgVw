@@ -1,19 +1,41 @@
 #pragma once
 
 #include <Windows.h>
+#include <utility>
 
-class CountSemaphore
+class CountingSemaphore
 {
 public:
-	explicit CountSemaphore(LONG maximumcount = 0);
-	CountSemaphore(const CountSemaphore&) = delete;
-	CountSemaphore& operator=(const CountSemaphore&) = delete;
-	~CountSemaphore()
+	CountingSemaphore()
+	{
+	}
+	CountingSemaphore(LONG maximumcount) : maximumcount_(maximumcount)
+	{
+		if (maximumcount > 0)
+		{
+			SetupSemaphore();
+		}
+	}
+	~CountingSemaphore()
 	{
 		if (semaphore_ != INVALID_HANDLE_VALUE)
 		{
 			CloseHandle(semaphore_);
 		}
+	}
+	CountingSemaphore(CountingSemaphore&& other)
+	{
+		*this = std::move(other);
+	}
+	CountingSemaphore& operator=(CountingSemaphore&& other)
+	{
+		if (this != &other)
+		{
+			semaphore_ = other.semaphore_;
+			other.semaphore_ = INVALID_HANDLE_VALUE;
+		}
+
+		return *this;
 	}
 	void Notify();
 	void Wait();
@@ -21,25 +43,17 @@ public:
 	void set_maximumcount(LONG maximumcount);
 private:
 	void SetupSemaphore();
-	LONG maximumcount_;
+	LONG maximumcount_{};
 	HANDLE semaphore_{ INVALID_HANDLE_VALUE };
 };
 
-inline CountSemaphore::CountSemaphore(LONG maximumcount) : maximumcount_{ maximumcount }
-{
-	if (maximumcount_ > 0)
-	{
-		SetupSemaphore();
-	}
-}
-
-inline void CountSemaphore::set_maximumcount(LONG maximumcount)
+inline void CountingSemaphore::set_maximumcount(LONG maximumcount)
 {
 	maximumcount_ = maximumcount;
 	SetupSemaphore();
 }
 
-inline void CountSemaphore::SetupSemaphore()
+inline void CountingSemaphore::SetupSemaphore()
 {
 	semaphore_ = CreateSemaphore(NULL, maximumcount_, maximumcount_, NULL);
 	if (semaphore_ == NULL)
@@ -48,7 +62,7 @@ inline void CountSemaphore::SetupSemaphore()
 	}
 }
 
-inline void CountSemaphore::Notify()
+inline void CountingSemaphore::Notify()
 {
 	if (!ReleaseSemaphore(semaphore_, 1, NULL))
 	{
@@ -56,7 +70,7 @@ inline void CountSemaphore::Notify()
 	}
 }
 
-inline void CountSemaphore::Wait()
+inline void CountingSemaphore::Wait()
 {
 	auto waitresult = WaitForSingleObject(semaphore_, INFINITE);
 	switch (waitresult)
@@ -64,7 +78,7 @@ inline void CountSemaphore::Wait()
 	case WAIT_OBJECT_0:
 		break;
 	case WAIT_TIMEOUT:
-		// TODO: handle unhandle case
+		// TODO: handle unhandled case
 		break;
 	}
 }

@@ -1,10 +1,12 @@
 #pragma once
 
 #include "ImgItem.h"
+#include "CountingSemaphore.h"
 #include <Windows.h>
-#include <string>
-#include <functional>
 #include <deque>
+#include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 
 class LoaderItem
@@ -37,9 +39,6 @@ class ImgLoader
 public:
 	ImgLoader()
 	{
-#if _DEBUG && LOG2
-		kLogger.WriteLine(L"Start");
-#endif
 		if (!InitializeCriticalSectionAndSpinCount(&queuecriticalsection_, 0x00000400))
 		{
 			// TODO: handle error
@@ -47,8 +46,7 @@ public:
 
 		cancelevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
 		workevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
-		// TODO: increase once GDI+ gets replaced
-		loaders_.set_maximumcount(1);
+		loadersemaphore_.set_maximumcount(kMaximumLoaderCount);
 		StartLoop();
 	}
 	~ImgLoader()
@@ -61,13 +59,12 @@ public:
 		{
 			CloseHandle(loopthread_);
 		}
-#if _DEBUG && LOG2
-		kLogger.WriteLine(L"End");
-#endif
 	}
 	void LoadAsync(ImgItem* imgitem);
 	void LoadNextAsync(ImgItem* imgitem);
 	void StopLoading();
+private:
+	static const INT kMaximumLoaderCount = 2;	// TODO: adjust logic around this limit once GDI+ gets replaced completely
 private:
 	void StartLoop();
 	DWORD Loop();
@@ -83,10 +80,6 @@ private:
 	HANDLE cancelevent_;
 	HANDLE loopthread_{ NULL };
 	BOOL cancellationflag_{};
-	CountSemaphore loaders_;
+	CountingSemaphore loadersemaphore_;
 	CRITICAL_SECTION queuecriticalsection_;
-#if _DEBUG && LOG2
-	static void ThreadLogLine(std::wstring line);
-	static TimestampLogger kLogger;
-#endif
 };

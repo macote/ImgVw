@@ -31,9 +31,9 @@ LRESULT ImgVwWindow::OnCreate()
 #else
 	nonclientmetrics.cbSize = sizeof(NONCLIENTMETRICS);
 #endif
-	if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, 0, &nonclientmetrics, 0))
+	if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &nonclientmetrics, 0))
 	{
-		captionfont_ = CreateFontIndirectW(&nonclientmetrics.lfMessageFont);
+		captionfont_ = CreateFontIndirect(&nonclientmetrics.lfMessageFont);
 	}
 
 	QueryPerformanceFrequency(&frequency_);
@@ -68,7 +68,8 @@ BOOL ImgVwWindow::DisplayImage(HDC dc, ImgItem* item)
 	}
 
 	auto memorydc = CreateCompatibleDC(dc);
-	auto replacedobject = SelectObject(memorydc, item->displaybitmap());
+	auto imgbitmap = item->GetDisplayBitmap();
+	auto replacedobject = SelectObject(memorydc, imgbitmap.bitmap());
 
 	ExcludeClipRect(dc, item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(), item->offsety() + item->displayheight());
 	if (FillRect(dc, &windowrectangle, backgroundbrush_) == 0)
@@ -132,17 +133,10 @@ void ImgVwWindow::MoveMouse()
 	input->mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
 	input->mi.time = 0;
 	input->mi.dwExtraInfo = 0;
-
 	SendInput(1, input, sizeof(INPUT));
 
-	input->type = INPUT_MOUSE;
 	input->mi.dx = (LONG)(p.x * (65536.0f / GetSystemMetrics(SM_CXSCREEN)));
 	input->mi.dy = (LONG)(p.y * (65536.0f / GetSystemMetrics(SM_CYSCREEN)));
-	input->mi.mouseData = 0;
-	input->mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
-	input->mi.time = 0;
-	input->mi.dwExtraInfo = 0;
-
 	SendInput(1, input, sizeof(INPUT));
 }
 
@@ -190,7 +184,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 		switch (LOWORD(wParam))
 		{
 		case IDM_ABOUT:
-			DialogBoxW(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, (DLGPROC)AboutDialogProc);
+			DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, (DLGPROC)AboutDialogProc);
 			break;
 		case IDR_NEXT:
 			if (browser_.MoveToNext())
@@ -208,7 +202,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 		case IDM_EXIT:
 		case IDR_ESCAPE:
-			if (!PostMessageW(hwnd_, WM_CLOSE, 0, 0))
+			if (!PostMessage(hwnd_, WM_CLOSE, 0, 0))
 			{
 				// TODO: handle error
 			}
@@ -220,7 +214,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_SYSCOMMAND:
 		if (LOWORD(wParam) == SC_CLOSE)
 		{
-			if (!PostMessageW(hwnd_, WM_CLOSE, 0, 0))
+			if (!PostMessage(hwnd_, WM_CLOSE, 0, 0))
 			{
 				// TODO: handle error
 			}
@@ -247,16 +241,3 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	return Window::HandleMessage(uMsg, wParam, lParam);
 }
-
-#if _DEBUG && FALSE
-TimestampLogger ImgVwWindow::kLogger(L"C:\\Temp\\ImgVwWindow.log", TRUE);
-
-std::wstring ImgVwWindow::FormatWindowMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	std::wstringstream wss;
-	wss << L"message: " << std::setw(12) << std::setfill(L'0') << std::hex << uMsg << L"; ";
-	wss << L"wParam: " << std::setw(12) << std::setfill(L'0') << std::hex << wParam << L"; ";
-	wss << L"lParam: " << std::setw(18) << std::setfill(L'0') << std::hex << lParam << L"; ";
-	return wss.str();
-}
-#endif

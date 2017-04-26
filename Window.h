@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Windows.h>
 #include "resource.h"
+#include <Windows.h>
 
 class Window
 {

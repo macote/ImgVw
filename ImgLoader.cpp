@@ -63,17 +63,17 @@ DWORD ImgLoader::Loop()
 
 		if (ItemPending())
 		{
-			loaders_.Wait();
+			loadersemaphore_.Wait();
 			auto imgitem = GetNextItem();
 			if (imgitem != NULL && imgitem->status() == ImgItem::Status::Queued)
 			{
-				auto loaderitem = std::make_unique<LoaderItem>(imgitem, [this]() { loaders_.Notify(); });
+				auto loaderitem = std::make_unique<LoaderItem>(imgitem, [this]() { loadersemaphore_.Notify(); });
 				loaderitem->set_loaderitemthread(CreateThread(NULL, 0, StaticThreadLoad, (void*)loaderitem.get(), 0, NULL));
 				loaderitems_.push_back(std::move(loaderitem));
 			}
 			else
 			{
-				loaders_.Notify();
+				loadersemaphore_.Notify();
 			}
 		}
 	}
@@ -97,6 +97,7 @@ void ImgLoader::QueueItem(ImgItem* imgitem, BOOL pushfront)
 	{
 		queue_.push_back(imgitem);
 	}
+
 	LeaveCriticalSection(&queuecriticalsection_);
 	SetEvent(workevent_);
 }
@@ -134,14 +135,3 @@ DWORD WINAPI ImgLoader::StaticThreadLoad(void* loaderiteminstance)
 	loaderitem->LoadComplete();
 	return 0;
 }
-
-#if _DEBUG && LOG2
-TimestampLogger ImgLoader::kLogger(L"C:\\Temp\\ImgLoader.log", TRUE);
-
-void ImgLoader::ThreadLogLine(std::wstring line)
-{
-	std::wstringstream wss;
-	wss << L"[" << GetCurrentThreadId() << L"] " << line;
-	kLogger.WriteLine(wss.str());
-}
-#endif

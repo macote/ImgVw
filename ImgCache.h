@@ -1,11 +1,9 @@
 #pragma once
 
-#include "ImgItem.h"
+#include "ImgItemFactory.h"
 #include <Windows.h>
 #include <string>
-#include <vector>
 #include <map>
-#include <memory>
 
 class ImgCache
 {
@@ -22,14 +20,16 @@ public:
 		map_.clear();
 	}
 	void Add(std::wstring filepath, INT targetwidth, INT targetheight);
+	void set_temppath(std::wstring temppath) { temppath_ = temppath; }
 	std::shared_ptr<ImgItem> Get(std::wstring filepath) const;
 private:
+	std::wstring temppath_;
 	std::map<std::wstring, std::shared_ptr<ImgItem>, std::less<std::wstring>> map_;
 };
 
 inline void ImgCache::Add(std::wstring filepath, INT targetwidth, INT targetheight)
 {
-	auto imgitem = std::make_shared<ImgItem>(filepath, targetwidth, targetheight);
+	auto imgitem = ImgItemFactory::Create(filepath, temppath_, targetwidth, targetheight);
 	map_.emplace(std::pair<std::wstring, std::shared_ptr<ImgItem>>(filepath, std::move(imgitem)));
 }
 
