@@ -58,7 +58,10 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;libjpeg-turbo\turbojpeg-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\turbojpeg-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ShowProgress>NotSet</ShowProgress>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -76,7 +79,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;libjpeg-turbo\turbojpeg-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\turbojpeg-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -92,7 +95,7 @@
     <ClInclude Include="ImgLoader.h" />
     <ClInclude Include="ImgVw.h" />
     <ClInclude Include="ImgVwWindow.h" />
-    <ClInclude Include="libjpeg-turbo\turbojpeg.h" />
+    <ClInclude Include="3rd-party\libjpeg-turbo\turbojpeg.h" />
     <ClInclude Include="FileMapView.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Window.h" />

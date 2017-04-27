@@ -33,7 +33,7 @@
     <ClInclude Include="ImgLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="libjpeg-turbo\turbojpeg.h">
+    <ClInclude Include="3rd-party\libjpeg-turbo\turbojpeg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ImgItemFactory.h">

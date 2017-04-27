@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ImgItem.h"
-#include "libjpeg-turbo\turbojpeg.h"
+#include "3rd-party\libjpeg-turbo\turbojpeg.h"
 #include <Windows.h>
 #include <string>
 

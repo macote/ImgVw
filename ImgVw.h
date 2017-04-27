@@ -41,9 +41,9 @@ inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 
 			while (GetMessage(&msg, NULL, 0, 0))
 			{
-				if (!TranslateAccelerator(imgvwwindow->hwnd(), hacc, &msg) ||
-					imgvwwindow->dlgcurrent() == NULL ||
-					!IsDialogMessage(imgvwwindow->dlgcurrent(), &msg))
+				if (!TranslateAccelerator(imgvwwindow->hwnd(), hacc, &msg) 
+					|| imgvwwindow->dlgcurrent() == NULL 
+					|| !IsDialogMessage(imgvwwindow->dlgcurrent(), &msg))
 				{
 					TranslateMessage(&msg);
 					DispatchMessage(&msg);

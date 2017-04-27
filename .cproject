@@ -52,7 +52,7 @@
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="turbojpeg"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1981421865" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
-									<listOptionValue builtIn="false" value="../libjpeg-turbo"/>
+									<listOptionValue builtIn="false" value="../3rd-party/libjpeg-turbo"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1851156384" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -118,7 +118,7 @@
 									<listOptionValue builtIn="false" value="turbojpeg"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1603664866" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
-									<listOptionValue builtIn="false" value="../libjpeg-turbo"/>
+									<listOptionValue builtIn="false" value="../3rd-party/libjpeg-turbo"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.206988463" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
