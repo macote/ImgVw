@@ -1,13 +1,12 @@
-High Priority
--------------
-- Auto-rotate according to EXIF orientation information
-- Delete image (send to recycle bin, Shift + Delete for permanent suppression)
+## High Priority
+
 - Error handling
 - Storage management
   - Check remaining temp space, use page file, use memory, etc.
 
-Medium Priority
----------------
+## Medium Priority
+
+- Delete image permanently (Shift + Delete)
 - Create .editorconfig file
 - Pan & Zoom
 - Navigate through folders
@@ -21,7 +20,7 @@ Medium Priority
   - Rotate
   - Resize
 
-Low Priority
-------------
+## Low Priority
+
 - UI for operations
   - Print

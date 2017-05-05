@@ -35,6 +35,7 @@ public:
 	ImgItem* GetCurrentItem();
 	BOOL MoveToNext();
 	BOOL MoveToPrevious();
+	void RemoveCurrentItem();
 private:
 	ImgCache cache_;
 	ImgLoader loader_;

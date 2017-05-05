@@ -17,5 +17,5 @@ public:
 private:
 	INT scalingfactorcount_{};
 	tjscalingfactor* scalingfactors_{ nullptr };
-	INT GetScalingFactorIndex(INT width, INT height);
+	INT GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight);
 };

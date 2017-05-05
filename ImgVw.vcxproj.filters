@@ -63,6 +63,9 @@
     <ClInclude Include="CountingSemaphore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="3rd-party\easyexif\exif.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Program.cpp">
@@ -87,6 +90,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ImgItemHelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rd-party\easyexif\exif.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

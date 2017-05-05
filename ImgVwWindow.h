@@ -28,6 +28,7 @@ public:
 private:
 	virtual void PaintContent(PAINTSTRUCT* pps);
 	void MoveMouse();
+	void DeleteCurrentItem();
 	LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnCreate();
 	void InitializeBrowser(std::wstring path);

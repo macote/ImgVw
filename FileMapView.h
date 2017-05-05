@@ -17,12 +17,28 @@ public:
 public:
 	FileMapView(std::wstring filepath, Mode mode) : filepath_(filepath), mode_(mode)
 	{
-		OpenFile();
-		InitializeMapping();
+		try
+		{
+			OpenFile();
+			InitializeMapping();
+		}
+		catch (const std::exception&)
+		{
+			CloseFileMapView();
+			throw;
+		}
 	}
 	FileMapView(HANDLE file, Mode mode) : mode_(mode), file_(file)
 	{
-		InitializeMapping();
+		try
+		{
+			InitializeMapping();
+		}
+		catch (const std::exception&)
+		{
+			CloseFileMapView();
+			throw;
+		}
 	}
 	~FileMapView()
 	{

@@ -148,6 +148,36 @@ void ImgVwWindow::DisplayFileInformation(HDC dc, std::wstring filepath)
 	TextOut(dc, 0, 0, filepath.c_str(), filepath.size());
 }
 
+void ImgVwWindow::DeleteCurrentItem()
+{
+	SHFILEOPSTRUCT shfileopstruct{};
+	TCHAR deletepaths[4096];
+	size_t pathlen = browser_.GetCurrentFilePath().size();
+	wcsncpy_s(deletepaths, 4096, browser_.GetCurrentFilePath().c_str(), pathlen);
+	deletepaths[pathlen + 1] = 0;
+	shfileopstruct.hwnd = hwnd_;
+	shfileopstruct.wFunc = FO_DELETE;
+	shfileopstruct.pFrom = deletepaths;
+	shfileopstruct.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI
+		| FOF_NOCONFIRMMKDIR | FOF_WANTNUKEWARNING;
+	if (!SHFileOperation(&shfileopstruct) && !shfileopstruct.fAnyOperationsAborted)
+	{
+		browser_.RemoveCurrentItem();
+		if (browser_.GetCurrentItem() == nullptr)
+		{
+			if (!browser_.MoveToPrevious())
+			{
+				if (!PostMessage(hwnd_, WM_CLOSE, 0, 0))
+				{
+					// TODO: handle error
+				}
+			}
+		}
+
+		InvalidateRect(hwnd_, NULL, false);
+	}
+}
+
 void ImgVwWindow::OnNCDestroy()
 {
 	browser_.StopBrowsing();
@@ -197,6 +227,13 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 			if (browser_.MoveToPrevious())
 			{
 				InvalidateRect(hwnd_, NULL, false);
+			}
+
+			break;
+		case IDR_DELETE:
+			if (browser_.GetCurrentItem() != nullptr)
+			{
+				DeleteCurrentItem();
 			}
 
 			break;

@@ -59,7 +59,6 @@ protected:
 	void SetupRGBColorsBITMAPINFO(WORD bitCount, INT width, INT height);
 	void CreateTempFile();
 	void WriteTempFile(PBYTE buffer, INT buffersize);
-	void ReadTempFile(PBYTE buffer, INT buffersize);
 	INT buffersize() const { return buffersize_; }
 	INT stride() const { return stride_; }
 protected:
@@ -136,13 +135,6 @@ inline void ImgItem::WriteTempFile(PBYTE buffer, INT buffersize)
 		ss << GetLastError();
 		throw std::runtime_error(ss.str());
 	}
-}
-
-inline void ImgItem::ReadTempFile(PBYTE buffer, INT buffersize)
-{
-	DWORD bytesread;
-	SetFilePointerEx(tempfile_, LARGE_INTEGER{ 0 }, NULL, FILE_BEGIN);
-	ReadFile(tempfile_, buffer, buffersize, &bytesread, NULL);
 }
 
 inline void ImgItem::DeleteTempFile()

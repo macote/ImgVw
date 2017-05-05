@@ -1,6 +1,7 @@
 #include "ImgJPEGItem.h"
 #include "ImgBitmap.h"
 #include "ImgItemHelper.h"
+#include "3rd-party\easyexif\exif.h"
 #include <memory>
 
 void ImgJPEGItem::Load()
@@ -8,8 +9,10 @@ void ImgJPEGItem::Load()
 	status_ = Status::Loading;
 	tjhandle jpegdecompressor = NULL;
 	INT decompressflags{ TJFLAG_FASTDCT };
+	INT targetwidth, targetheight;
 	PBYTE buffer = NULL;
 	BOOL resize = FALSE;
+	Gdiplus::RotateFlipType rotateflip = Gdiplus::RotateNoneFlipNone;
 
 	try
 	{
@@ -28,6 +31,25 @@ void ImgJPEGItem::Load()
 			goto done;
 		}
 
+		easyexif::EXIFInfo result;
+		if (result.parseFrom(jpegfilemap.view(), jpegfilemap.filesize().LowPart, TRUE) == 0)
+		{
+			switch (result.Orientation)
+			{
+			case 3:
+				rotateflip = Gdiplus::Rotate180FlipNone;
+				break;
+			case 6:
+				rotateflip = Gdiplus::Rotate270FlipNone;
+				break;
+			case 8:
+				rotateflip = Gdiplus::Rotate90FlipNone;
+				break;
+			default:
+				break;
+			}
+		}
+
 		INT jpegSubsamp, jpegColorspace;
 		if (tjDecompressHeader3(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart, &width_, &height_, &jpegSubsamp, &jpegColorspace))
 		{
@@ -42,9 +64,20 @@ void ImgJPEGItem::Load()
 			goto done;
 		}
 
-		if (width_ > targetwidth_ || height_ > targetheight_)
+		if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone)
 		{
-			auto scalingfactorindex = GetScalingFactorIndex(width_, height_);
+			targetwidth = targetheight_;
+			targetheight = targetwidth_;
+		}
+		else
+		{
+			targetwidth = targetwidth_;
+			targetheight = targetheight_;
+		}
+
+		if (width_ > targetwidth || height_ > targetheight)
+		{
+			auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
 			if (scalingfactorindex >= scalingfactorcount_)
 			{
 				resize = TRUE;
@@ -53,11 +86,11 @@ void ImgJPEGItem::Load()
 			{
 				displaywidth_ = TJSCALED(width_, scalingfactors_[scalingfactorindex]);
 				displayheight_ = TJSCALED(height_, scalingfactors_[scalingfactorindex]);
-				auto widthdiff = targetwidth_ - displaywidth_;
-				auto heightdiff = targetheight_ - displayheight_;
+				auto widthdiff = targetwidth - displaywidth_;
+				auto heightdiff = targetheight - displayheight_;
 
-				if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight_))
-					|| (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth_)))
+				if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight))
+					|| (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth)))
 				{
 					resize = TRUE;
 				}
@@ -91,16 +124,22 @@ void ImgJPEGItem::Load()
 			goto done;
 		}
 
+		auto bufferhandler = [&](Gdiplus::BitmapData& data)
+		{
+			buffersize_ = data.Height * data.Stride;
+			displaywidth_ = data.Width;
+			displayheight_ = data.Height;
+			this->WriteTempFile((PBYTE)data.Scan0, buffersize_);
+		};
+
 		if (resize)
 		{
-			ImgItemHelper::Resize24bppRGBImage(displaywidth_, displayheight_, buffer, targetwidth_, targetheight_,
-				[&](Gdiplus::BitmapData& data)
-			{
-				buffersize_ = data.Height * data.Stride;
-				displaywidth_ = data.Width;
-				displayheight_ = data.Height;
-				this->WriteTempFile((PBYTE)data.Scan0, buffersize_);
-			});
+			ImgItemHelper::ResizeAndRotate24bppRGBImage(displaywidth_, displayheight_, buffer, targetwidth, targetheight,
+				rotateflip, bufferhandler);
+		}
+		else if (rotateflip != Gdiplus::RotateNoneFlipNone)
+		{
+			ImgItemHelper::Rotate24bppRGBImage(displaywidth_, displayheight_, buffer, rotateflip, bufferhandler);
 		}
 		else
 		{
@@ -135,7 +174,7 @@ done:
 	SetEvent(loadedevent_);
 }
 
-INT ImgJPEGItem::GetScalingFactorIndex(INT width, INT height)
+INT ImgJPEGItem::GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight)
 {
 	INT i{}, scaledwidth, scaledheight;
 
@@ -143,7 +182,7 @@ INT ImgJPEGItem::GetScalingFactorIndex(INT width, INT height)
 	{
 		scaledwidth = TJSCALED(width, scalingfactors_[i]);
 		scaledheight = TJSCALED(height, scalingfactors_[i]);
-		if (scaledwidth <= targetwidth_ && scaledheight <= targetheight_)
+		if (scaledwidth <= targetwidth && scaledheight <= targetheight)
 		{
 			break;
 		}

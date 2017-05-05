@@ -217,6 +217,18 @@ BOOL ImgBrowser::MoveToPrevious()
 	return moveSuccess;
 }
 
+void ImgBrowser::RemoveCurrentItem()
+{
+	EnterCriticalSection(&browsecriticalsection_);
+	if (currentfileiterator_ != files_.end())
+	{
+		cache_.Remove(*currentfileiterator_);
+		files_.erase(currentfileiterator_++);
+	}
+
+	LeaveCriticalSection(&browsecriticalsection_);
+}
+
 DWORD WINAPI ImgBrowser::StaticThreadCollect(void* browserinstance)
 {
 	ImgBrowser* browser = (ImgBrowser*)browserinstance;
