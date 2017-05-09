@@ -22,6 +22,7 @@ Pass a file or folder as an argument.
 | Left Arrow | Browse backward |
 | Right Arrow | Browse forward |
 | Delete | Move to recycle bin if possible or delete |
+| Shift + Delete | Delete |
 | Escape | Exit |
 
 ## 3rd-party libraries

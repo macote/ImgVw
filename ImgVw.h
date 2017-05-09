@@ -8,60 +8,60 @@
 class ImgVw
 {
 public:
-	static INT Run(HINSTANCE hInstance, INT nShowCmd);
+    static INT Run(HINSTANCE hInstance, INT nShowCmd);
 };
 
 inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 {
-	int argscount;
-	auto args = CommandLineToArgvW(GetCommandLine(), &argscount);
-	std::vector<std::wstring> argsvector;
-	for (int i = 0; i < argscount; ++i)
-	{
-		argsvector.push_back(args[i]);
-	}
+    int argscount;
+    auto args = CommandLineToArgvW(GetCommandLine(), &argscount);
+    std::vector<std::wstring> argsvector;
+    for (int i = 0; i < argscount; ++i)
+    {
+        argsvector.push_back(args[i]);
+    }
 
-	LocalFree(args);
+    LocalFree(args);
 
-	if (SUCCEEDED(CoInitialize(NULL)))
-	{
-		InitCommonControls();
+    if (SUCCEEDED(CoInitialize(NULL)))
+    {
+        InitCommonControls();
 
-		Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-		ULONG_PTR gdiplusToken;
-		Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+        Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+        ULONG_PTR gdiplusToken;
+        Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
-		auto imgvwwindow = ImgVwWindow::Create(hInstance, argsvector);
-		if (imgvwwindow)
-		{
-			ShowWindow(imgvwwindow->hwnd(), nShowCmd);
+        auto imgvwwindow = ImgVwWindow::Create(hInstance, argsvector);
+        if (imgvwwindow)
+        {
+            ShowWindow(imgvwwindow->hwnd(), nShowCmd);
 
-			auto hacc = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_IMGVW));
-			MSG msg;
+            auto hacc = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_IMGVW));
+            MSG msg;
 
-			while (GetMessage(&msg, NULL, 0, 0))
-			{
-				if (!TranslateAccelerator(imgvwwindow->hwnd(), hacc, &msg) 
-					|| imgvwwindow->dlgcurrent() == NULL 
-					|| !IsDialogMessage(imgvwwindow->dlgcurrent(), &msg))
-				{
-					TranslateMessage(&msg);
-					DispatchMessage(&msg);
-				}
+            while (GetMessage(&msg, NULL, 0, 0))
+            {
+                if (!TranslateAccelerator(imgvwwindow->hwnd(), hacc, &msg)
+                    || imgvwwindow->dlgcurrent() == NULL
+                    || !IsDialogMessage(imgvwwindow->dlgcurrent(), &msg))
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                }
 
-				if (msg.message == WM_CLOSE)
-				{
-					break;
-				}
-			}
+                if (msg.message == WM_CLOSE)
+                {
+                    break;
+                }
+            }
 
-			DestroyAcceleratorTable(hacc);
-		}
+            DestroyAcceleratorTable(hacc);
+        }
 
-		Gdiplus::GdiplusShutdown(gdiplusToken);
+        Gdiplus::GdiplusShutdown(gdiplusToken);
 
-		CoUninitialize();
-	}
+        CoUninitialize();
+    }
 
-	return 0;
+    return 0;
 }

@@ -6,8 +6,7 @@
 
 ## Medium Priority
 
-- Delete image permanently (Shift + Delete)
-- Create .editorconfig file
+- Load progress indicator for large files
 - Pan & Zoom
 - Navigate through folders
 - UI for error management

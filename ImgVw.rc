@@ -17,8 +17,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_ICON                 ICON                    "ImgVw.ico"
-IDI_SMALL                ICON                    "small.ico"
+IDI_ICON ICON "ImgVw.ico"
+IDI_SMALL ICON "small.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -27,14 +27,14 @@ IDI_SMALL                ICON                    "small.ico"
 
 IDC_IMGVW MENU
 BEGIN
-POPUP "&File"
-BEGIN
-MENUITEM "E&xit", IDM_EXIT
-END
-POPUP "&Help"
-BEGIN
-MENUITEM "&About ...", IDM_ABOUT
-END
+    POPUP "&File"
+    BEGIN
+        MENUITEM "E&xit", IDM_EXIT
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About ...", IDM_ABOUT
+    END
 END
 
 
@@ -50,7 +50,8 @@ BEGIN
 VK_ESCAPE, IDR_ESCAPE, VIRTKEY
 VK_LEFT, IDR_PREVIOUS, VIRTKEY
 VK_RIGHT, IDR_NEXT, VIRTKEY
-VK_DELETE, IDR_DELETE, VIRTKEY
+VK_DELETE, IDR_RECYCLE, VIRTKEY
+VK_DELETE, IDR_DELETE, VIRTKEY, SHIFT
 END
 
 
@@ -64,10 +65,10 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSM
 CAPTION "About ImgVw"
 FONT 8, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
-ICON            IDI_ICON, IDC_STATIC, 14, 14, 21, 20
-LTEXT           "ImgVw, Version 1.0", IDC_STATIC, 42, 14, 114, 8, SS_NOPREFIX
-LTEXT           "", IDC_STATIC, 42, 26, 114, 8
-DEFPUSHBUTTON   "OK", IDOK, 113, 41, 50, 14, WS_GROUP
+    ICON IDI_ICON, IDC_STATIC, 14, 14, 21, 20
+    LTEXT "ImgVw, Version 1.0", IDC_STATIC, 42, 14, 114, 8, SS_NOPREFIX
+    LTEXT "", IDC_STATIC, 42, 26, 114, 8
+    DEFPUSHBUTTON "OK", IDOK, 113, 41, 50, 14, WS_GROUP
 END
 
 
@@ -76,7 +77,7 @@ END
 // RT_MANIFEST
 //
 
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST             "application.manifest"
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "application.manifest"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -84,17 +85,17 @@ CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST             "application.manifest
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,1,0,0
- PRODUCTVERSION 1,1,0,0
- FILEFLAGSMASK 0x3fL
+    FILEVERSION 1,1,0,0
+    PRODUCTVERSION 1,1,0,0
+    FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
- FILEFLAGS 0x1L
+    FILEFLAGS 0x1L
 #else
- FILEFLAGS 0x0L
+    FILEFLAGS 0x0L
 #endif
- FILEOS 0x4L
- FILETYPE 0x2L
- FILESUBTYPE 0x0L
+    FILEOS 0x4L
+    FILETYPE 0x2L
+    FILESUBTYPE 0x0L
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
@@ -121,8 +122,8 @@ END
 
 STRINGTABLE
 BEGIN
-IDS_APP_TITLE           "ImgVw"
-IDC_IMGVW               "IMGVW"
+    IDS_APP_TITLE "ImgVw"
+    IDC_IMGVW "IMGVW"
 END
 
 #endif    // English (United States) resources

@@ -6,36 +6,36 @@
 class Window
 {
 public:
-	Window(HINSTANCE hinst) : hinst_(hinst)
-	{
-	}
-	HWND hwnd() const { return hwnd_; }
+    Window(HINSTANCE hinst) : hinst_(hinst)
+    {
+    }
+    HWND hwnd() const { return hwnd_; }
 protected:
-	virtual LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
-	virtual void PaintContent(PAINTSTRUCT* pps) = 0;
-	virtual LPCWSTR ClassName() = 0;
-	virtual BOOL WinRegisterClass(WNDCLASSEX* pwc)
-	{
-		return RegisterClassEx(pwc);
-	}
-	virtual ~Window()
-	{
-	}
-	HWND WinCreateWindow(DWORD dwExStyle, LPCWSTR pszName, DWORD dwStyle,
-		int x, int y, int cx, int cy, HWND hwndParent, HMENU hmenu)
-	{
-		Register();
-		return CreateWindowEx(dwExStyle, ClassName(), pszName, dwStyle,
-			x, y, cx, cy, hwndParent, hmenu, hinst_, this);
-	}
-	HINSTANCE hinst_;
-	HWND hwnd_{ NULL };
-	HBRUSH backgroundbrush_{ nullptr };
-	BOOL manualcursor_{};
-	BOOL dontfillbackground_{};
+    virtual LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    virtual void PaintContent(PAINTSTRUCT* pps) = 0;
+    virtual LPCWSTR ClassName() = 0;
+    virtual BOOL WinRegisterClass(WNDCLASSEX* pwc)
+    {
+        return RegisterClassEx(pwc);
+    }
+    virtual ~Window()
+    {
+    }
+    HWND WinCreateWindow(DWORD dwExStyle, LPCWSTR pszName, DWORD dwStyle,
+        int x, int y, int cx, int cy, HWND hwndParent, HMENU hmenu)
+    {
+        Register();
+        return CreateWindowEx(dwExStyle, ClassName(), pszName, dwStyle,
+            x, y, cx, cy, hwndParent, hmenu, hinst_, this);
+    }
+    HINSTANCE hinst_;
+    HWND hwnd_{ NULL };
+    HBRUSH backgroundbrush_{ nullptr };
+    BOOL manualcursor_{};
+    BOOL dontfillbackground_{};
 private:
-	void Register();
-	void OnPaint();
-	void OnPrintClient(HDC hdc);
-	static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    void Register();
+    void OnPaint();
+    void OnPrintClient(HDC hdc);
+    static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 };

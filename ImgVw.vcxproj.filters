@@ -13,12 +13,15 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\3rd-party">
+      <UniqueIdentifier>{2fdc4020-9962-4747-9393-06c9014b2b5e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\3rd-party">
+      <UniqueIdentifier>{81c417ca-ce3c-48a0-9fe2-be143bb70a77}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ImgVwWindow.h">
@@ -31,9 +34,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ImgLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="3rd-party\libjpeg-turbo\turbojpeg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ImgItemFactory.h">
@@ -64,6 +64,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="3rd-party\easyexif\exif.h">
+      <Filter>Header Files\3rd-party</Filter>
+    </ClInclude>
+    <ClInclude Include="3rd-party\libjpeg-turbo\turbojpeg.h">
+      <Filter>Header Files\3rd-party</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -93,7 +99,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="3rd-party\easyexif\exif.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\3rd-party</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

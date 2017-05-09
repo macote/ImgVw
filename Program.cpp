@@ -28,11 +28,11 @@ extern "C" FILE * __cdecl __iob_func(void) { return _iob; }
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, INT nShowCmd)
 {
-	auto returnvalue = ImgVw::Run(hInstance, nShowCmd);
+    auto returnvalue = ImgVw::Run(hInstance, nShowCmd);
 
 #if _DEBUG
-	_CrtDumpMemoryLeaks();
+    _CrtDumpMemoryLeaks();
 #endif
 
-	return returnvalue;
+    return returnvalue;
 }
