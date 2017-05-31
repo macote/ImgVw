@@ -18,9 +18,11 @@ This project is compatible with:
 Pass a file or folder as an argument.
 
 | Shortcut | Description |
-|:-:|-|
+|:-:|:-|
 | Left Arrow | Browse backward |
+| Mouse Wheel Up | Browse backward |
 | Right Arrow | Browse forward |
+| Mouse Wheel Down | Browse forward |
 | Delete | Move to recycle bin if possible or delete |
 | Shift + Delete | Delete |
 | Escape | Exit |

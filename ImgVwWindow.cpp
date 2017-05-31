@@ -148,8 +148,49 @@ void ImgVwWindow::DisplayFileInformation(HDC dc, std::wstring filepath)
     TextOut(dc, 0, 0, filepath.c_str(), filepath.size());
 }
 
+void ImgVwWindow::BrowseNext()
+{
+    if (browser_.MoveToNext())
+    {
+        InvalidateRect(hwnd_, NULL, false);
+    }
+}
+
+void ImgVwWindow::BrowsePrevious()
+{
+    if (browser_.MoveToPrevious())
+    {
+        InvalidateRect(hwnd_, NULL, false);
+    }
+}
+
+void ImgVwWindow::HandleMouseWheel(WORD distance)
+{
+    if (distance & 0x8000)
+    {
+        BrowseNext();
+    }
+    else
+    {
+        BrowsePrevious();
+    }
+}
+
+void ImgVwWindow::CloseWindow()
+{
+    if (!PostMessage(hwnd_, WM_CLOSE, 0, 0))
+    {
+        // TODO: handle error
+    }
+}
+
 void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
 {
+    if (browser_.GetCurrentItem() == nullptr)
+    {
+        return;
+    }
+
     SHFILEOPSTRUCT shfileopstruct{};
     TCHAR deletepaths[4096];
     size_t pathlen = browser_.GetCurrentFilePath().size();
@@ -204,10 +245,6 @@ BOOL CALLBACK ImgVwWindow::AboutDialogProc(HWND hwndDlg, UINT message, WPARAM wP
 
 LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-#if _DEBUG && LOG1
-    kLogger.WriteLine(FormatWindowMessage(uMsg, wParam, lParam));
-#endif
-
     switch (uMsg)
     {
     case WM_ACTIVATE:
@@ -222,45 +259,29 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, (DLGPROC)AboutDialogProc);
             break;
         case IDR_NEXT:
-            if (browser_.MoveToNext())
-            {
-                InvalidateRect(hwnd_, NULL, false);
-            }
-
+            BrowseNext();
             break;
         case IDR_PREVIOUS:
-            if (browser_.MoveToPrevious())
-            {
-                InvalidateRect(hwnd_, NULL, false);
-            }
-
+            BrowsePrevious();
             break;
         case IDR_RECYCLE:
         case IDR_DELETE:
-            if (browser_.GetCurrentItem() != nullptr)
-            {
-                DeleteCurrentItem(LOWORD(wParam) == IDR_RECYCLE);
-            }
-
+            DeleteCurrentItem(LOWORD(wParam) == IDR_RECYCLE);
             break;
         case IDM_EXIT:
         case IDR_ESCAPE:
-            if (!PostMessage(hwnd_, WM_CLOSE, 0, 0))
-            {
-                // TODO: handle error
-            }
-
+            CloseWindow();
             break;
         }
 
         return FALSE;
+    case WM_MOUSEWHEEL:
+        HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+        return FALSE;
     case WM_SYSCOMMAND:
         if (LOWORD(wParam) == SC_CLOSE)
         {
-            if (!PostMessage(hwnd_, WM_CLOSE, 0, 0))
-            {
-                // TODO: handle error
-            }
+            CloseWindow();
         }
 
         return FALSE;

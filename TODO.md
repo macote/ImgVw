@@ -1,11 +1,14 @@
 ## High Priority
 
-- Error handling
+- Review error handling
 - Storage management
   - Check remaining temp space, use page file, use memory, etc.
 
 ## Medium Priority
 
+- Right-Click context menu
+  - About
+  - Exit
 - Load progress indicator for large files
 - Pan & Zoom
 - Navigate through folders

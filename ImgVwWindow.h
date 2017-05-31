@@ -32,8 +32,12 @@ private:
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
     LRESULT OnCreate();
     void InitializeBrowser(std::wstring path);
+    void BrowseNext();
+    void BrowsePrevious();
+    void HandleMouseWheel(WORD distance);
     BOOL DisplayImage(HDC dc, ImgItem* item);
     void DisplayFileInformation(HDC dc, std::wstring filepath);
+    void CloseWindow();
     void OnNCDestroy();
     static BOOL CALLBACK AboutDialogProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam);
 private:
