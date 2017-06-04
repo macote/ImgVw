@@ -194,7 +194,7 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
     SHFILEOPSTRUCT shfileopstruct{};
     TCHAR deletepaths[4096];
     size_t pathlen = browser_.GetCurrentFilePath().size();
-    wcsncpy_s(deletepaths, 4096, browser_.GetCurrentFilePath().c_str(), pathlen);
+    wcsncpy(deletepaths, browser_.GetCurrentFilePath().c_str(), pathlen);
     deletepaths[pathlen + 1] = 0;
     shfileopstruct.hwnd = hwnd_;
     shfileopstruct.wFunc = FO_DELETE;
