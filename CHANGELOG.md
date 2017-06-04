@@ -1,7 +1,7 @@
-## 1.2.0 (xxxx-xx-xx)
+## 1.2.0 (2017-06-04)
 
 - Delete current file permanently with Shift + Delete
-- Add mouse wheel browsing
+- Browse with mouse wheel
 
 ## 1.1.0 (2017-05-05)
 
