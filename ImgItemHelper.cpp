@@ -25,36 +25,31 @@ ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(std::wstring filepath)
     return ImgItem::Format::Unsupported;
 }
 
-void ImgItemHelper::Resize24bppRGBImage(INT width, INT height, PBYTE buffer, INT targetwidth, INT targetheight,
-    std::function<void(Gdiplus::BitmapData&)> bufferhandler)
+void ImgItemHelper::Resize24bppRGBImage(ImgItem& imgitem, INT width, INT height, PBYTE buffer, INT targetwidth, INT targetheight)
 {
-    ResizeAndRotate24bppRGBImage(width, height, buffer, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone, bufferhandler);
+    ResizeAndRotate24bppRGBImage(imgitem, width, height, buffer, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone);
 }
 
-void ImgItemHelper::ResizeAndRotate24bppRGBImage(INT width, INT height, PBYTE buffer, INT targetwidth, INT targetheight,
-    Gdiplus::RotateFlipType rotateflip,
-    std::function<void(Gdiplus::BitmapData&)> bufferhandler)
+void ImgItemHelper::ResizeAndRotate24bppRGBImage(ImgItem& imgitem, INT width, INT height, PBYTE buffer, INT targetwidth, INT targetheight,
+    Gdiplus::RotateFlipType rotateflip)
 {
     auto bitmaptoresize = Get24bppRGBBitmap(width, height, buffer);
-    ResizeAndRotateImage(bitmaptoresize.get(), targetwidth, targetheight, rotateflip, bufferhandler);
+    ResizeAndRotateImage(imgitem, bitmaptoresize.get(), targetwidth, targetheight, rotateflip);
 }
 
-void ImgItemHelper::Rotate24bppRGBImage(INT width, INT height, PBYTE buffer, Gdiplus::RotateFlipType rotateflip,
-    std::function<void(Gdiplus::BitmapData&)> bufferhandler)
+void ImgItemHelper::Rotate24bppRGBImage(ImgItem& imgitem, INT width, INT height, PBYTE buffer, Gdiplus::RotateFlipType rotateflip)
 {
     auto bitmaptorotate = Get24bppRGBBitmap(width, height, buffer);
-    RotateImage(bitmaptorotate.get(), rotateflip, bufferhandler);
+    RotateImage(imgitem, bitmaptorotate.get(), rotateflip);
 }
 
-void ImgItemHelper::ResizeImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
-    std::function<void(Gdiplus::BitmapData&)> bufferhandler)
+void ImgItemHelper::ResizeImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight)
 {
-    ResizeAndRotateImage(bitmap, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone, bufferhandler);
+    ResizeAndRotateImage(imgitem, bitmap, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone);
 }
 
-void ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
-    Gdiplus::RotateFlipType rotateflip,
-    std::function<void(Gdiplus::BitmapData&)> bufferhandler)
+void ImgItemHelper::ResizeAndRotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
+    Gdiplus::RotateFlipType rotateflip)
 {
     auto percentWidth = (float)targetwidth / bitmap->GetWidth();
     auto percentHeight = (float)targetheight / bitmap->GetHeight();
@@ -72,12 +67,11 @@ void ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targetwidt
         newheight = resizedbitmap->GetHeight();
     }
 
-    HandleBuffer(resizedbitmap.get(), bufferhandler);
+    HandleBuffer(imgitem, resizedbitmap.get());
     ImgItemHelper::kGDIOperationSemaphore.Notify();
 }
 
-void ImgItemHelper::RotateImage(Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip,
-    std::function<void(Gdiplus::BitmapData&)> bufferhandler)
+void ImgItemHelper::RotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip)
 {
     ImgItemHelper::kGDIOperationSemaphore.Wait();
     if (rotateflip != Gdiplus::RotateNoneFlipNone)
@@ -85,7 +79,7 @@ void ImgItemHelper::RotateImage(Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType
         bitmap->RotateFlip(rotateflip);
     }
 
-    HandleBuffer(bitmap, bufferhandler);
+    HandleBuffer(imgitem, bitmap);
     ImgItemHelper::kGDIOperationSemaphore.Notify();
 }
 
@@ -101,11 +95,11 @@ std::unique_ptr<Gdiplus::Bitmap> ImgItemHelper::Get24bppRGBBitmap(INT width, INT
     return std::make_unique<Gdiplus::Bitmap>(&bitmapinfo, buffer);
 }
 
-void ImgItemHelper::HandleBuffer(Gdiplus::Bitmap* bitmap, std::function<void(Gdiplus::BitmapData&)> bufferhandler)
+void ImgItemHelper::HandleBuffer(ImgItem& imgitem, Gdiplus::Bitmap* bitmap)
 {
     Gdiplus::BitmapData data{};
     Gdiplus::Rect rect(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
     bitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat24bppRGB, &data);
-    bufferhandler(data);
+    imgitem.HandleBuffer(data.Width, data.Height, data.Stride, (PBYTE)data.Scan0);
     bitmap->UnlockBits(&data);
 }

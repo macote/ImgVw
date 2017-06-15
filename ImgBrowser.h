@@ -35,6 +35,8 @@ public:
     ImgItem* GetCurrentItem();
     BOOL MoveToNext();
     BOOL MoveToPrevious();
+    BOOL MoveToFirst();
+    BOOL MoveToLast();
     void RemoveCurrentItem();
 private:
     ImgCache cache_;

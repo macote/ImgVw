@@ -1,3 +1,8 @@
+## 1.3.0 (xxxx-xx-xx)
+
+- Browse to first and last with Home and End
+- Fix cleanup issue at program exit
+
 ## 1.2.0 (2017-06-04)
 
 - Delete current file permanently with Shift + Delete

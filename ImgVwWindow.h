@@ -22,11 +22,11 @@ public:
     ~ImgVwWindow()
     {
     }
-    virtual LPCWSTR ClassName() { return L"ImgVwWindow"; }
+    LPCWSTR ClassName() { return L"ImgVwWindow"; }
     static ImgVwWindow* Create(HINSTANCE hInst, std::vector<std::wstring> args);
     HWND dlgcurrent() const { return dlgcurrent_; }
 private:
-    virtual void PaintContent(PAINTSTRUCT* pps);
+    void PaintContent(PAINTSTRUCT* pps);
     void MoveMouse();
     void DeleteCurrentItem(BOOL allowundo);
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -34,6 +34,8 @@ private:
     void InitializeBrowser(std::wstring path);
     void BrowseNext();
     void BrowsePrevious();
+    void BrowseFirst();
+    void BrowseLast();
     void HandleMouseWheel(WORD distance);
     BOOL DisplayImage(HDC dc, ImgItem* item);
     void DisplayFileInformation(HDC dc, std::wstring filepath);

@@ -25,12 +25,19 @@ void ImgLoader::StopLoading()
         std::vector<HANDLE> threads;
         for (auto it = loaderitems_.begin(); it != loaderitems_.end(); ++it)
         {
-            threads.push_back((*it)->loaderitemthread());
+            auto status = (*it)->imgitem()->status();
+            if (!(status == ImgItem::Status::Error || status == ImgItem::Status::Ready))
+            {
+                threads.push_back((*it)->loaderitemthread());
+            }
         }
 
-        if (WaitForMultipleObjects(threads.size(), &threads[0], TRUE, INFINITE) == WAIT_FAILED)
+        if (threads.size() > 0)
         {
-            // TODO: handle error
+            if (WaitForMultipleObjects(threads.size(), &threads[0], TRUE, INFINITE) == WAIT_FAILED)
+            {
+                // TODO: handle error
+            }
         }
 
         loaderitems_.clear();
@@ -67,7 +74,7 @@ DWORD ImgLoader::Loop()
             auto imgitem = GetNextItem();
             if (imgitem != NULL && imgitem->status() == ImgItem::Status::Queued)
             {
-                auto loaderitem = std::make_unique<LoaderItem>(imgitem, [this]() { loadersemaphore_.Notify(); });
+                auto loaderitem = std::make_unique<LoaderItem>(imgitem, [&]() { loadersemaphore_.Notify(); });
                 loaderitem->set_loaderitemthread(CreateThread(NULL, 0, StaticThreadLoad, (void*)loaderitem.get(), 0, NULL));
                 loaderitems_.push_back(std::move(loaderitem));
             }

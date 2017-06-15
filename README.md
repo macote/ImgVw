@@ -4,7 +4,7 @@ ImgVw is a simple and fast image viewer for Windows.
 
 ## Features
 
-- Fast disk-based display caching
+- Fast display caching
 - Auto-rotate JPEG images based on EXIF information
 
 ## How to build
@@ -19,10 +19,10 @@ Pass a file or folder as an argument.
 
 | Shortcut | Description |
 |:-:|:-|
-| Left Arrow | Browse backward |
-| Mouse Wheel Up | Browse backward |
-| Right Arrow | Browse forward |
-| Mouse Wheel Down | Browse forward |
+| Left Arrow \| Mouse Wheel Up | Browse backward |
+| Right Arrow \| Mouse Wheel Down | Browse forward |
+| Home | Go to first |
+| End | Go to last |
 | Delete | Move to recycle bin if possible or delete |
 | Shift + Delete | Delete |
 | Escape | Exit |

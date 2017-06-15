@@ -25,24 +25,14 @@ void ImgGDIItem::Load()
     height_ = bitmap->GetHeight();
     if (width_ > targetwidth_ || height_ > targetheight_)
     {
-        ImgItemHelper::ResizeImage(bitmap.get(), targetwidth_, targetheight_,
-            [&](Gdiplus::BitmapData& data)
-        {
-            displaywidth_ = data.Width;
-            displayheight_ = data.Height;
-            buffersize_ = data.Height * data.Stride;
-            this->WriteTempFile((PBYTE)data.Scan0, buffersize_);
-        });
+        ImgItemHelper::ResizeImage(*this, bitmap.get(), targetwidth_, targetheight_);
     }
     else
     {
         Gdiplus::BitmapData data{};
         Gdiplus::Rect rect(0, 0, width_, height_);
         bitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat24bppRGB, &data);
-        displaywidth_ = data.Width;
-        displayheight_ = data.Height;
-        buffersize_ = data.Height * data.Stride;
-        this->WriteTempFile((PBYTE)data.Scan0, buffersize_);
+        HandleBuffer(data.Width, data.Height, data.Stride, (PBYTE)data.Scan0);
         bitmap->UnlockBits(&data);
     }
 

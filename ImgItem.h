@@ -54,6 +54,7 @@ public:
     INT offsetx() const { return offsetx_; }
     INT offsety() const { return offsety_; }
     HANDLE loadedevent() const { return loadedevent_; }
+    void HandleBuffer(INT width, INT height, INT stride, PBYTE buffer);
     ImgBitmap GetDisplayBitmap();
 protected:
     void SetupRGBColorsBITMAPINFO(WORD bitCount, INT width, INT height);
@@ -101,6 +102,14 @@ inline void ImgItem::SetupRGBColorsBITMAPINFO(WORD bitCount, INT width, INT heig
     pbitmapinfo_->bmiHeader.biHeight = height;
     pbitmapinfo_->bmiHeader.biPlanes = 1;
     pbitmapinfo_->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+}
+
+inline void ImgItem::HandleBuffer(INT width, INT height, INT stride, PBYTE buffer)
+{
+    displaywidth_ = width;
+    displayheight_ = height;
+    buffersize_ = height * stride;
+    WriteTempFile(buffer, buffersize_);
 }
 
 inline void ImgItem::CreateTempFile()

@@ -192,7 +192,7 @@ BOOL ImgBrowser::MoveToNext()
 {
     BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (currentfileiterator_ != files_.end() && std::next(currentfileiterator_) != files_.end())
+    if (std::next(currentfileiterator_) != files_.end())
     {
         ++currentfileiterator_;
         moveSuccess = TRUE;
@@ -209,6 +209,34 @@ BOOL ImgBrowser::MoveToPrevious()
     if (currentfileiterator_ != files_.begin())
     {
         --currentfileiterator_;
+        moveSuccess = TRUE;
+    }
+
+    LeaveCriticalSection(&browsecriticalsection_);
+    return moveSuccess;
+}
+
+BOOL ImgBrowser::MoveToFirst()
+{
+    BOOL moveSuccess = FALSE;
+    EnterCriticalSection(&browsecriticalsection_);
+    if (currentfileiterator_ != files_.begin())
+    {
+        currentfileiterator_ = files_.begin();
+        moveSuccess = TRUE;
+    }
+
+    LeaveCriticalSection(&browsecriticalsection_);
+    return moveSuccess;
+}
+
+BOOL ImgBrowser::MoveToLast()
+{
+    BOOL moveSuccess = FALSE;
+    EnterCriticalSection(&browsecriticalsection_);
+    if (std::next(currentfileiterator_) != files_.end())
+    {
+        currentfileiterator_ = std::prev(files_.end());
         moveSuccess = TRUE;
     }
 

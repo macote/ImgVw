@@ -15,6 +15,8 @@
 #define IDR_PREVIOUS                    111
 #define IDR_RECYCLE                     112
 #define IDR_DELETE                      113
+#define IDR_FIRST                       114
+#define IDR_LAST                        115
 #define IDC_STATIC                      -1
 
 #define WM_PROGRESS_EVENT_DATA			WM_USER + 1

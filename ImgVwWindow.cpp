@@ -164,6 +164,22 @@ void ImgVwWindow::BrowsePrevious()
     }
 }
 
+void ImgVwWindow::BrowseFirst()
+{
+    if (browser_.MoveToFirst())
+    {
+        InvalidateRect(hwnd_, NULL, false);
+    }
+}
+
+void ImgVwWindow::BrowseLast()
+{
+    if (browser_.MoveToLast())
+    {
+        InvalidateRect(hwnd_, NULL, false);
+    }
+}
+
 void ImgVwWindow::HandleMouseWheel(WORD distance)
 {
     if (distance & 0x8000)
@@ -263,6 +279,12 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         case IDR_PREVIOUS:
             BrowsePrevious();
+            break;
+        case IDR_FIRST:
+            BrowseFirst();
+            break;
+        case IDR_LAST:
+            BrowseLast();
             break;
         case IDR_RECYCLE:
         case IDR_DELETE:

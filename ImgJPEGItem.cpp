@@ -124,22 +124,14 @@ void ImgJPEGItem::Load()
             goto done;
         }
 
-        auto bufferhandler = [&](Gdiplus::BitmapData& data)
-        {
-            buffersize_ = data.Height * data.Stride;
-            displaywidth_ = data.Width;
-            displayheight_ = data.Height;
-            this->WriteTempFile((PBYTE)data.Scan0, buffersize_);
-        };
-
         if (resize)
         {
-            ImgItemHelper::ResizeAndRotate24bppRGBImage(displaywidth_, displayheight_, buffer, targetwidth, targetheight,
-                rotateflip, bufferhandler);
+            ImgItemHelper::ResizeAndRotate24bppRGBImage(*this, displaywidth_, displayheight_, buffer, targetwidth, targetheight,
+                rotateflip);
         }
         else if (rotateflip != Gdiplus::RotateNoneFlipNone)
         {
-            ImgItemHelper::Rotate24bppRGBImage(displaywidth_, displayheight_, buffer, rotateflip, bufferhandler);
+            ImgItemHelper::Rotate24bppRGBImage(*this, displaywidth_, displayheight_, buffer, rotateflip);
         }
         else
         {
