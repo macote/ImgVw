@@ -17,6 +17,10 @@
 #define IDR_DELETE                      113
 #define IDR_FIRST                       114
 #define IDR_LAST                        115
+#define IDR_TOGGLESS                    116
+#define IDR_INCSSS                      117
+#define IDR_DECSSS                      118
+#define IDT_SLIDESHOW                   119
 #define IDC_STATIC                      -1
 
 #define WM_PROGRESS_EVENT_DATA			WM_USER + 1

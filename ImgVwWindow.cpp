@@ -8,11 +8,8 @@ ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, std::vector<std::wstring> args
         self->backgroundbrush_ = CreateSolidBrush(RGB(0, 0, 0));
         self->manualcursor_ = TRUE;
         self->dontfillbackground_ = TRUE;
-        if (self->WinCreateWindow(WS_EX_APPWINDOW,
-            L"ImgVw",
-            WS_POPUP,
-            0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
-            NULL, NULL))
+        if (self->WinCreateWindow(WS_EX_APPWINDOW, L"ImgVw", WS_POPUP, 0, 0, 
+            GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), NULL, NULL))
         {
             return self;
         }
@@ -36,11 +33,30 @@ LRESULT ImgVwWindow::OnCreate()
         captionfont_ = CreateFontIndirect(&nonclientmetrics.lfMessageFont);
     }
 
+    ShowCursor(FALSE);
+
     QueryPerformanceFrequency(&frequency_);
 
     InitializeBrowser(path_);
 
     return FALSE;
+}
+
+void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
+{
+    auto imgitem = browser_.GetCurrentItem();
+    if (imgitem != nullptr)
+    {
+        if (!DisplayImage(pps->hdc, imgitem))
+        {
+            DisplayFileInformation(pps->hdc, browser_.GetCurrentFilePath());
+        }
+
+        if (WaitForSingleObject(imgitem->loadedevent(), INFINITE) != WAIT_OBJECT_0)
+        {
+            // TODO: handle error
+        }
+    }
 }
 
 void ImgVwWindow::InitializeBrowser(std::wstring path)
@@ -71,8 +87,11 @@ BOOL ImgVwWindow::DisplayImage(HDC dc, ImgItem* item)
     auto imgbitmap = item->GetDisplayBitmap();
     auto replacedobject = SelectObject(memorydc, imgbitmap.bitmap());
 
-    ExcludeClipRect(dc, item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(), item->offsety() + item->displayheight());
-    if (FillRect(dc, &windowrectangle, backgroundbrush_) == 0)
+    if (ExcludeClipRect(dc, item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(), item->offsety() + item->displayheight()) == RGN_ERROR)
+    {
+        // TODO: handle error
+    }
+    else if (FillRect(dc, &windowrectangle, backgroundbrush_) == 0)
     {
         // TODO: handle error
     }
@@ -91,55 +110,6 @@ BOOL ImgVwWindow::DisplayImage(HDC dc, ImgItem* item)
     return TRUE;
 }
 
-void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
-{
-    auto imgitem = browser_.GetCurrentItem();
-    if (imgitem != nullptr)
-    {
-        if (!DisplayImage(pps->hdc, imgitem))
-        {
-            DisplayFileInformation(pps->hdc, browser_.GetCurrentFilePath());
-        }
-
-        if (WaitForSingleObject(imgitem->loadedevent(), INFINITE) != WAIT_OBJECT_0)
-        {
-            // TODO: handle error
-        }
-    }
-
-    if (!mousemoved_)
-    {
-        MoveMouse();
-        mousemoved_ = TRUE;
-    }
-}
-
-void ImgVwWindow::MoveMouse()
-{
-    POINT p;
-    if (!GetCursorPos(&p))
-    {
-        // TODO: handle error
-    }
-
-    auto x = p.x == 0 ? 1 : p.x - 1;
-    auto y = p.y == 0 ? 1 : p.y - 1;
-
-    INPUT input[1];
-    input->type = INPUT_MOUSE;
-    input->mi.dx = (LONG)(x * (65536.0f / GetSystemMetrics(SM_CXSCREEN)));
-    input->mi.dy = (LONG)(y * (65536.0f / GetSystemMetrics(SM_CYSCREEN)));
-    input->mi.mouseData = 0;
-    input->mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
-    input->mi.time = 0;
-    input->mi.dwExtraInfo = 0;
-    SendInput(1, input, sizeof(INPUT));
-
-    input->mi.dx = (LONG)(p.x * (65536.0f / GetSystemMetrics(SM_CXSCREEN)));
-    input->mi.dy = (LONG)(p.y * (65536.0f / GetSystemMetrics(SM_CYSCREEN)));
-    SendInput(1, input, sizeof(INPUT));
-}
-
 void ImgVwWindow::DisplayFileInformation(HDC dc, std::wstring filepath)
 {
     RECT windowrectangle;
@@ -148,11 +118,20 @@ void ImgVwWindow::DisplayFileInformation(HDC dc, std::wstring filepath)
     TextOut(dc, 0, 0, filepath.c_str(), filepath.size());
 }
 
+void ImgVwWindow::InvalidateScreen()
+{
+    InvalidateRect(hwnd_, NULL, FALSE);
+    if (slideshowrunning_)
+    {
+        RestartSlideShowTimer();
+    }
+}
+
 void ImgVwWindow::BrowseNext()
 {
     if (browser_.MoveToNext())
     {
-        InvalidateRect(hwnd_, NULL, false);
+        InvalidateScreen();
     }
 }
 
@@ -160,7 +139,7 @@ void ImgVwWindow::BrowsePrevious()
 {
     if (browser_.MoveToPrevious())
     {
-        InvalidateRect(hwnd_, NULL, false);
+        InvalidateScreen();
     }
 }
 
@@ -168,7 +147,7 @@ void ImgVwWindow::BrowseFirst()
 {
     if (browser_.MoveToFirst())
     {
-        InvalidateRect(hwnd_, NULL, false);
+        InvalidateScreen();
     }
 }
 
@@ -176,7 +155,7 @@ void ImgVwWindow::BrowseLast()
 {
     if (browser_.MoveToLast())
     {
-        InvalidateRect(hwnd_, NULL, false);
+        InvalidateScreen();
     }
 }
 
@@ -192,11 +171,68 @@ void ImgVwWindow::HandleMouseWheel(WORD distance)
     }
 }
 
-void ImgVwWindow::CloseWindow()
+void ImgVwWindow::ToggleSlideShow()
 {
-    if (!PostMessage(hwnd_, WM_CLOSE, 0, 0))
+    if (!slideshowrunning_)
     {
-        // TODO: handle error
+        StartSlideShow();
+    }
+    else
+    {
+        StopSlideShow();
+    }
+}
+
+void ImgVwWindow::StartSlideShow()
+{
+    if (!slideshowrunning_)
+    {
+        SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, NULL);
+        slideshowrunning_ = TRUE;
+    }
+}
+
+void ImgVwWindow::StopSlideShow()
+{
+    if (slideshowrunning_)
+    {
+        KillTimer(hwnd_, IDT_SLIDESHOW);
+        slideshowrunning_ = FALSE;
+    }
+}
+
+void ImgVwWindow::RestartSlideShowTimer()
+{
+    if (slideshowrunning_)
+    {
+        KillTimer(hwnd_, IDT_SLIDESHOW);
+        SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, NULL);
+    }
+}
+
+void ImgVwWindow::IncreaseSlideShowSpeed()
+{
+    if (slideshowinterval_ > kMinimumSlideShowIntervalInMilliseconds)
+    {
+        slideshowinterval_ -= kSlideShowIntervalIncrementStepInMilliseconds;
+        RestartSlideShowTimer();
+    }
+}
+
+void ImgVwWindow::DecreaseSlideShowSpeed()
+{
+    if (slideshowinterval_ < kMaximumSlideShowIntervalInMilliseconds)
+    {
+        slideshowinterval_ += kSlideShowIntervalIncrementStepInMilliseconds;
+        RestartSlideShowTimer();
+    }
+}
+
+void ImgVwWindow::HandleSlideShow()
+{
+    if (browser_.MoveToNext() || browser_.MoveToFirst())
+    { 
+        InvalidateScreen();
     }
 }
 
@@ -229,49 +265,73 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
         {
             if (!browser_.MoveToPrevious())
             {
-                if (!PostMessage(hwnd_, WM_CLOSE, 0, 0))
-                {
-                    // TODO: handle error
-                }
+                CloseWindow();
             }
         }
 
-        InvalidateRect(hwnd_, NULL, false);
+        InvalidateScreen();
     }
 }
 
-void ImgVwWindow::OnNCDestroy()
+BOOL CALLBACK ImgVwWindow::AboutDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    browser_.StopBrowsing();
-
-    DeleteObject(backgroundbrush_);
-    DeleteObject(captionfont_);
-}
-
-BOOL CALLBACK ImgVwWindow::AboutDialogProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    if (message == WM_COMMAND && (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL))
+    switch (uMsg)
     {
-        EndDialog(hwndDlg, 0);
-        return TRUE;
+    case WM_INITDIALOG:
+        PostMessage(hwndDlg, WM_NEXTDLGCTL, 0, FALSE);
+        break;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hwndDlg, TRUE);
+            ShowCursor(FALSE);
+            return TRUE;
+        }
+
+        break;
+    default:
+        break;
     }
 
     return FALSE;
 }
 
+void ImgVwWindow::CloseWindow()
+{
+    PostMessage(hwnd_, WM_CLOSE, 0, 0);
+}
+
+void ImgVwWindow::OnNCDestroy()
+{
+    StopSlideShow();
+    browser_.StopBrowsing();
+    DeleteObject(backgroundbrush_);
+    DeleteObject(captionfont_);
+}
+
 LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+#if _DEBUG
+    logger_.WriteLine(DebugHelper::FormatWindowMessage(uMsg, wParam, lParam));
+#endif
+
     switch (uMsg)
     {
     case WM_ACTIVATE:
-        dlgcurrent_ = 0 == wParam ? NULL : hwnd_;
+        activeparam_ = LOWORD(wParam);
         return FALSE;
     case WM_CREATE:
         return OnCreate();
+    case WM_ERASEBKGND:
+        return TRUE;
+    case WM_SIZE:
+    case WM_SETFOCUS:
+        return FALSE;
     case WM_COMMAND:
         switch (LOWORD(wParam))
         {
         case IDM_ABOUT:
+            ShowCursor(TRUE);
             DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, (DLGPROC)AboutDialogProc);
             break;
         case IDR_NEXT:
@@ -290,6 +350,15 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDR_DELETE:
             DeleteCurrentItem(LOWORD(wParam) == IDR_RECYCLE);
             break;
+        case IDR_TOGGLESS:
+            ToggleSlideShow();
+            break;
+        case IDR_INCSSS:
+            IncreaseSlideShowSpeed();
+            break;
+        case IDR_DECSSS:
+            DecreaseSlideShowSpeed();
+            break;
         case IDM_EXIT:
         case IDR_ESCAPE:
             CloseWindow();
@@ -307,22 +376,20 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         return FALSE;
-    case WM_SETCURSOR:
-        if (LOWORD(lParam) == HTCLIENT)
+    case WM_TIMER:
+        switch (wParam)
         {
-            SetCursor(NULL);
-            return TRUE;
+        case IDT_SLIDESHOW:
+            HandleSlideShow();
+            return 0;
         }
-
         break;
-    case WM_ERASEBKGND:
-        return TRUE;
     case WM_NCDESTROY:
         OnNCDestroy();
         break;
-    case WM_SIZE:
-    case WM_SETFOCUS:
-        return FALSE;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
     }
 
     return Window::HandleMessage(uMsg, wParam, lParam);

@@ -84,6 +84,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="3rd-party\easyexif\exif.h" />
+    <ClInclude Include="DebugHelper.h" />
+    <ClInclude Include="FileStream.h" />
     <ClInclude Include="ImgBitmap.h" />
     <ClInclude Include="ImgItem.h" />
     <ClInclude Include="ImgBrowser.h" />
@@ -99,10 +101,13 @@
     <ClInclude Include="3rd-party\libjpeg-turbo\turbojpeg.h" />
     <ClInclude Include="FileMapView.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="StreamLineWriter.h" />
+    <ClInclude Include="TimestampLogger.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="3rd-party\easyexif\exif.cpp" />
+    <ClCompile Include="FileStream.cpp" />
     <ClCompile Include="ImgBrowser.cpp" />
     <ClCompile Include="ImgGDIItem.cpp" />
     <ClCompile Include="ImgItemHelper.cpp" />

@@ -1,5 +1,6 @@
 ## 1.3.0 (xxxx-xx-xx)
 
+- Slideshow
 - Browse to first and last with Home and End
 - Fix cleanup issue at program exit
 

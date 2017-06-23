@@ -6,7 +6,7 @@
 
 ## Medium Priority
 
-- Slideshow
+- Thumbnails
 - UI for load status
   - Hold Ctrl key to display image file count / loaded count
 - Right-Click context menu

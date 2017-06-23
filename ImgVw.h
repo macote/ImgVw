@@ -5,6 +5,10 @@
 #include <Windows.h>
 #include <shellapi.h>
 
+#if _DEBUG
+#include "DebugHelper.h"
+#endif
+
 class ImgVw
 {
 public:
@@ -22,6 +26,10 @@ inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
     }
 
     LocalFree(args);
+
+#if _DEBUG
+    TimestampLogger logger(L"C:\\Temp\\ImgVw_" + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE);
+#endif
 
     if (SUCCEEDED(CoInitialize(NULL)))
     {
@@ -41,17 +49,13 @@ inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 
             while (GetMessage(&msg, NULL, 0, 0))
             {
-                if (!TranslateAccelerator(imgvwwindow->hwnd(), hacc, &msg)
-                    || imgvwwindow->dlgcurrent() == NULL
-                    || !IsDialogMessage(imgvwwindow->dlgcurrent(), &msg))
+#if _DEBUG
+                logger.WriteLine(DebugHelper::FormatWindowMessage(msg));
+#endif
+                if (!TranslateAccelerator(imgvwwindow->hwnd(), hacc, &msg))
                 {
                     TranslateMessage(&msg);
                     DispatchMessage(&msg);
-                }
-
-                if (msg.message == WM_CLOSE)
-                {
-                    break;
                 }
             }
 

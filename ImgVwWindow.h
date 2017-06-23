@@ -9,25 +9,32 @@
 #include <string>
 #include <vector>
 
+#if _DEBUG
+#include "DebugHelper.h"
+#endif
+
 class ImgVwWindow : public Window
 {
 public:
+    static const INT kInitialSlideShowIntervalInMilliseconds = 5000;
+    static const INT kMinimumSlideShowIntervalInMilliseconds = 500;
+    static const INT kMaximumSlideShowIntervalInMilliseconds = 10000;
+    static const INT kSlideShowIntervalIncrementStepInMilliseconds = 500;
+public:
     ImgVwWindow(HINSTANCE hinst, std::vector<std::wstring> args) : Window(hinst)
+#if _DEBUG
+        , logger_(TimestampLogger(L"C:\\Temp\\ImgVwWindow_" + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE))
+#endif
     {
         if (args.size() > 1)
         {
             path_ = args[1];
         }
     }
-    ~ImgVwWindow()
-    {
-    }
     LPCWSTR ClassName() { return L"ImgVwWindow"; }
     static ImgVwWindow* Create(HINSTANCE hInst, std::vector<std::wstring> args);
-    HWND dlgcurrent() const { return dlgcurrent_; }
 private:
     void PaintContent(PAINTSTRUCT* pps);
-    void MoveMouse();
     void DeleteCurrentItem(BOOL allowundo);
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
     LRESULT OnCreate();
@@ -37,6 +44,14 @@ private:
     void BrowseFirst();
     void BrowseLast();
     void HandleMouseWheel(WORD distance);
+    void ToggleSlideShow();
+    void StartSlideShow();
+    void StopSlideShow();
+    void RestartSlideShowTimer();
+    void IncreaseSlideShowSpeed();
+    void DecreaseSlideShowSpeed();
+    void HandleSlideShow();
+    void InvalidateScreen();
     BOOL DisplayImage(HDC dc, ImgItem* item);
     void DisplayFileInformation(HDC dc, std::wstring filepath);
     void CloseWindow();
@@ -45,8 +60,12 @@ private:
 private:
     ImgBrowser browser_;
     std::wstring path_;
-    HWND dlgcurrent_{ NULL };
+    WORD activeparam_{};
     HFONT captionfont_{ nullptr };
     LARGE_INTEGER frequency_{};
-    BOOL mousemoved_{};
+    BOOL slideshowrunning_{};
+    UINT slideshowinterval_{ kInitialSlideShowIntervalInMilliseconds };
+#if _DEBUG
+    TimestampLogger logger_;
+#endif
 };
