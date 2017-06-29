@@ -33,11 +33,9 @@ LRESULT ImgVwWindow::OnCreate()
         captionfont_ = CreateFontIndirect(&nonclientmetrics.lfMessageFont);
     }
 
-    ShowCursor(FALSE);
-
     QueryPerformanceFrequency(&frequency_);
-
     InitializeBrowser(path_);
+    ShowCursor(FALSE);
 
     return FALSE;
 }
@@ -311,7 +309,7 @@ void ImgVwWindow::OnNCDestroy()
 
 LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-#if _DEBUG
+#if _DEBUG && LOGIMGVWWINDOW
     logger_.WriteLine(DebugHelper::FormatWindowMessage(uMsg, wParam, lParam));
 #endif
 

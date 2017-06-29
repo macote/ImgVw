@@ -29,12 +29,11 @@ public:
 		OpenFile();
 	}
 	FileStream(const FileStream& that) = delete;
-	FileStream(FileStream&& other)
-		: filepath_(std::move(other.filepath_)), mode_(other.mode_), buffersize_(other.buffersize_)
-	{
-		*this = std::move(other);
-	}
-	FileStream& operator=(FileStream&& other)
+    FileStream(FileStream&& other)
+    {
+        *this = std::move(other);
+    }
+    FileStream& operator=(FileStream&& other)
 	{
 		if (this != &other)
 		{

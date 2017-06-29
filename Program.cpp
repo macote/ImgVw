@@ -28,11 +28,9 @@ extern "C" FILE * __cdecl __iob_func(void) { return _iob; }
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, INT nShowCmd)
 {
-    auto returnvalue = ImgVw::Run(hInstance, nShowCmd);
-
 #if _DEBUG
-    _CrtDumpMemoryLeaks();
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-    return returnvalue;
+    return ImgVw::Run(hInstance, nShowCmd);
 }

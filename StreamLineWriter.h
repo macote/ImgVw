@@ -18,11 +18,21 @@ public:
         : filestream_(FileStream(filepath, append ? FileStream::Mode::Append : FileStream::Mode::Truncate)), encoding_(encoding)
     {
     }
+    StreamLineWriter(const StreamLineWriter& that) = delete;
     StreamLineWriter(StreamLineWriter&& other)
         : filestream_(std::move(other.filestream_)), encoding_(other.encoding_)
     {
     }
-    StreamLineWriter& operator=(StreamLineWriter&& other);
+    StreamLineWriter& operator=(StreamLineWriter&& other)
+    {
+        if (this != &other)
+        {
+            filestream_ = std::move(other.filestream_);
+            encoding_ = other.encoding_;
+        }
+
+        return *this;
+    }
     ~StreamLineWriter()
     {
         Close();
@@ -44,17 +54,6 @@ private:
     Encoding encoding_;
     BOOL autoflush_{};
 };
-
-inline StreamLineWriter& StreamLineWriter::operator=(StreamLineWriter&& other)
-{
-    if (this != &other)
-    {
-        filestream_ = std::move(other.filestream_);
-        encoding_ = other.encoding_;
-    }
-
-    return *this;
-}
 
 inline void StreamLineWriter::Write(std::wstring line)
 {

@@ -9,7 +9,9 @@
 #include <string>
 #include <vector>
 
-#if _DEBUG
+#define LOGIMGVWWINDOW 0
+#if _DEBUG && LOGIMGVWWINDOW
+#define LOGIMGVWWINDOWPATH L"C:\\Temp\\ImgVwWindow_"
 #include "DebugHelper.h"
 #endif
 
@@ -22,8 +24,8 @@ public:
     static const INT kSlideShowIntervalIncrementStepInMilliseconds = 500;
 public:
     ImgVwWindow(HINSTANCE hinst, std::vector<std::wstring> args) : Window(hinst)
-#if _DEBUG
-        , logger_(TimestampLogger(L"C:\\Temp\\ImgVwWindow_" + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE))
+#if _DEBUG && LOGIMGVWWINDOW
+        , logger_(TimestampLogger(LOGIMGVWWINDOWPATH + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE))
 #endif
     {
         if (args.size() > 1)
@@ -65,7 +67,7 @@ private:
     LARGE_INTEGER frequency_{};
     BOOL slideshowrunning_{};
     UINT slideshowinterval_{ kInitialSlideShowIntervalInMilliseconds };
-#if _DEBUG
+#if _DEBUG && LOGIMGVWWINDOW
     TimestampLogger logger_;
 #endif
 };

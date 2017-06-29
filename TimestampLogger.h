@@ -22,16 +22,6 @@ public:
 
         set_autoflush(autoflush);
     }
-    ~TimestampLogger()
-    {
-        if (pwritecriticalsection_ != nullptr)
-        {
-            DeleteCriticalSection(pwritecriticalsection_);
-            delete pwritecriticalsection_;
-        }
-
-        Close();
-    }
     TimestampLogger(TimestampLogger&& other)
         : streamlinewriter_(std::move(other.streamlinewriter_)), pwritecriticalsection_(other.pwritecriticalsection_)
     {
@@ -47,6 +37,16 @@ public:
         }
 
         return *this;
+    }
+    ~TimestampLogger()
+    {
+        if (pwritecriticalsection_ != nullptr)
+        {
+            DeleteCriticalSection(pwritecriticalsection_);
+            delete pwritecriticalsection_;
+        }
+
+        Close();
     }
     void WriteLine(std::wstring line);
     void Close()
