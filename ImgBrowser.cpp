@@ -9,6 +9,7 @@ void ImgBrowser::CollectFile(std::wstring filepath)
 {
     EnterCriticalSection(&browsecriticalsection_);
     files_.insert(filepath);
+    randomlist_.push_back(filepath);
     cache_.Add(filepath, targetwidth_, targetheight_);
     loader_.LoadAsync(cache_.Get(filepath).get());
     if (currentfileiterator_ == files_.end())
@@ -45,7 +46,8 @@ DWORD ImgBrowser::CollectFolder(std::wstring folderpath)
                     CollectFile(currentfile);
                 }
             }
-        } while (FindNextFile(hFind, &findfiledata) && !cancellationflag_);
+        } 
+        while (FindNextFile(hFind, &findfiledata) && !cancellationflag_);
 
         FindClose(hFind);
     }
@@ -148,6 +150,8 @@ void ImgBrowser::StopBrowsing()
 
 void ImgBrowser::Reset()
 {
+    randomlist_.clear();
+    currentrandomindex_ = 0x80000000;
     files_.clear();
     currentfileiterator_ = files_.end();
 }
@@ -244,6 +248,50 @@ BOOL ImgBrowser::MoveToLast()
     return moveSuccess;
 }
 
+BOOL ImgBrowser::MoveToItem(std::wstring filepath)
+{
+    BOOL moveSuccess = FALSE;
+    EnterCriticalSection(&browsecriticalsection_);
+    currentfileiterator_ = files_.find(filepath);
+    moveSuccess = currentfileiterator_ != files_.end();
+    LeaveCriticalSection(&browsecriticalsection_);
+    return moveSuccess;
+}
+
+BOOL ImgBrowser::MoveToRandom()
+{
+    BOOL moveSuccess = FALSE;
+    EnterCriticalSection(&browsecriticalsection_);
+    if (currentrandomindex_ >= randomlist_.size())
+    {
+        std::wstring last;
+        if (currentrandomindex_ != kIndexPark)
+        {
+            last = randomlist_[currentrandomindex_ - 1];
+        }
+
+        std::shuffle(std::begin(randomlist_), std::end(randomlist_), rnge_);
+        if (last == *randomlist_.begin() && randomlist_.size() > 1)
+        {
+            do
+            {
+                std::shuffle(std::begin(randomlist_), std::end(randomlist_), rnge_);
+            }
+            while (last == *randomlist_.begin());
+        }
+
+        currentrandomindex_ = 0;
+    }
+
+    auto filepath = randomlist_[currentrandomindex_];
+    ++currentrandomindex_;
+
+    moveSuccess = MoveToItem(filepath);
+
+    LeaveCriticalSection(&browsecriticalsection_);
+    return moveSuccess;
+}
+
 void ImgBrowser::RemoveCurrentItem()
 {
     EnterCriticalSection(&browsecriticalsection_);
@@ -267,7 +315,7 @@ void ImgBrowser::InitializeTempPath()
     TCHAR temppathbuffer[MAX_PATH];
 
     auto pathlen = GetTempPath(MAX_PATH, temppathbuffer);
-    if (pathlen > MAX_PATH || (pathlen == 0))
+    if (pathlen > MAX_PATH || pathlen == 0)
     {
         // TODO: handle error.
     }
@@ -308,7 +356,8 @@ void ImgBrowser::InitializeTempPath()
         {
             FindClose(find);
         }
-    } while (folderexists);
+    } 
+    while (folderexists);
 }
 
 void ImgBrowser::DeleteTempPath()

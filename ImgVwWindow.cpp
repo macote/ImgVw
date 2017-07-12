@@ -8,7 +8,7 @@ ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, std::vector<std::wstring> args
         self->backgroundbrush_ = CreateSolidBrush(RGB(0, 0, 0));
         self->manualcursor_ = TRUE;
         self->dontfillbackground_ = TRUE;
-        if (self->WinCreateWindow(WS_EX_APPWINDOW, L"ImgVw", WS_POPUP, 0, 0, 
+        if (self->WinCreateWindow(WS_EX_APPWINDOW, L"ImgVw", WS_POPUP, 0, 0,
             GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), NULL, NULL))
         {
             return self;
@@ -169,8 +169,9 @@ void ImgVwWindow::HandleMouseWheel(WORD distance)
     }
 }
 
-void ImgVwWindow::ToggleSlideShow()
+void ImgVwWindow::ToggleSlideShow(BOOL slideshowrandom)
 {
+    slideshowrandom_ = slideshowrandom;
     if (!slideshowrunning_)
     {
         StartSlideShow();
@@ -228,8 +229,8 @@ void ImgVwWindow::DecreaseSlideShowSpeed()
 
 void ImgVwWindow::HandleSlideShow()
 {
-    if (browser_.MoveToNext() || browser_.MoveToFirst())
-    { 
+    if ((slideshowrandom_ && browser_.MoveToRandom()) || browser_.MoveToNext() || browser_.MoveToFirst())
+    {
         InvalidateScreen();
     }
 }
@@ -349,7 +350,10 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DeleteCurrentItem(LOWORD(wParam) == IDR_RECYCLE);
             break;
         case IDR_TOGGLESS:
-            ToggleSlideShow();
+            ToggleSlideShow(FALSE);
+            break;
+        case IDR_TOGGLESSR:
+            ToggleSlideShow(TRUE);
             break;
         case IDR_INCSSS:
             IncreaseSlideShowSpeed();

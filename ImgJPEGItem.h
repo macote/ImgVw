@@ -17,5 +17,6 @@ public:
 private:
     INT scalingfactorcount_{};
     tjscalingfactor* scalingfactors_{ nullptr };
+    std::string errorstring_;
     INT GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight);
 };

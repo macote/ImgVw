@@ -1,5 +1,6 @@
 ## High Priority
 
+- Support CMYK JPEG images
 - Review error handling
 - Storage management
   - Check remaining temp space, use page file, use memory, etc.

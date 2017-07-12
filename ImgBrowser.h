@@ -4,10 +4,15 @@
 #include "ImgLoader.h"
 #include <Windows.h>
 #include <set>
+#include <vector>
 #include <iterator>
+#include <limits>
+#include <random>
 
 class ImgBrowser
 {
+public:
+    static const DWORD kIndexPark = 0x80000000;
 public:
     ImgBrowser()
     {
@@ -37,6 +42,8 @@ public:
     BOOL MoveToPrevious();
     BOOL MoveToFirst();
     BOOL MoveToLast();
+    BOOL MoveToItem(std::wstring filepath);
+    BOOL MoveToRandom();
     void RemoveCurrentItem();
 private:
     ImgCache cache_;
@@ -46,6 +53,10 @@ private:
     std::wstring temppath_;
     std::set<std::wstring>::iterator currentfileiterator_;
     std::set<std::wstring> files_;
+    std::vector<std::wstring> randomlist_;
+    DWORD currentrandomindex_{ kIndexPark };
+    std::random_device rd_;
+    std::mt19937 rnge_{ rd_() };
     HANDLE collectorthread_{ NULL };
     CRITICAL_SECTION browsecriticalsection_;
     INT targetwidth_{};

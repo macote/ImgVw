@@ -18,7 +18,7 @@
 class ImgVwWindow : public Window
 {
 public:
-    static const INT kInitialSlideShowIntervalInMilliseconds = 5000;
+    static const INT kInitialSlideShowIntervalInMilliseconds = 4000;
     static const INT kMinimumSlideShowIntervalInMilliseconds = 500;
     static const INT kMaximumSlideShowIntervalInMilliseconds = 10000;
     static const INT kSlideShowIntervalIncrementStepInMilliseconds = 500;
@@ -46,7 +46,7 @@ private:
     void BrowseFirst();
     void BrowseLast();
     void HandleMouseWheel(WORD distance);
-    void ToggleSlideShow();
+    void ToggleSlideShow(BOOL slideshowrandom);
     void StartSlideShow();
     void StopSlideShow();
     void RestartSlideShowTimer();
@@ -66,6 +66,7 @@ private:
     HFONT captionfont_{ nullptr };
     LARGE_INTEGER frequency_{};
     BOOL slideshowrunning_{};
+    BOOL slideshowrandom_{};
     UINT slideshowinterval_{ kInitialSlideShowIntervalInMilliseconds };
 #if _DEBUG && LOGIMGVWWINDOW
     TimestampLogger logger_;

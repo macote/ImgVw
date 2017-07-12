@@ -1,4 +1,4 @@
-## 1.3.0 (xxxx-xx-xx)
+## 1.3.0 (2017-07-12)
 
 - Slideshow
 - Browse to first and last with Home and End

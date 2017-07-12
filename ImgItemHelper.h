@@ -19,8 +19,8 @@ public:
     static void ResizeAndRotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
         Gdiplus::RotateFlipType rotateflip);
     static void RotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip);
-private:
     static std::unique_ptr<Gdiplus::Bitmap> Get24bppRGBBitmap(INT width, INT height, PBYTE buffer);
+private:
     static void HandleBuffer(ImgItem& imgitem, Gdiplus::Bitmap* bitmap);
     static const INT kGDIOperationSemaphoreCount = 1;
     static CountingSemaphore kGDIOperationSemaphore;

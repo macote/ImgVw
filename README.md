@@ -26,6 +26,7 @@ Pass a file or folder as an argument.
 | Home | Go to first |
 | End | Go to last |
 | F5 | Toggle slideshow |
+| Shift + F5 | Toggle slideshow (random mode) |
 | F6 | Increase slideshow speed |
 | F7 | Decrease slideshow speed |
 | Delete | Move to recycle bin if possible or delete |

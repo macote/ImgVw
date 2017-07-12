@@ -8,6 +8,7 @@ void ImgJPEGItem::Load()
 {
     status_ = Status::Loading;
     tjhandle jpegdecompressor = NULL;
+    INT pixelformat = TJPF_BGR;
     INT decompressflags{ TJFLAG_FASTDCT };
     INT targetwidth, targetheight;
     PBYTE buffer = NULL;
@@ -53,15 +54,14 @@ void ImgJPEGItem::Load()
         INT jpegSubsamp, jpegColorspace;
         if (tjDecompressHeader3(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart, &width_, &height_, &jpegSubsamp, &jpegColorspace))
         {
+            errorstring_ = tjGetErrorStr();
             status_ = Status::Error;
             goto done;
         }
 
         if (jpegColorspace == TJCS::TJCS_CMYK || jpegColorspace == TJCS::TJCS_YCCK)
         {
-            // TODO: determine if it should be supported
-            status_ = Status::Error;
-            goto done;
+            pixelformat = TJPF_CMYK;
         }
 
         if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone)
@@ -108,7 +108,7 @@ void ImgJPEGItem::Load()
             displayheight_ = height_;
         }
 
-        stride_ = TJPAD(displaywidth_ * tjPixelSize[TJPF_RGB]);
+        stride_ = TJPAD(displaywidth_ * tjPixelSize[pixelformat]);
         buffersize_ = stride_ * displayheight_;
 
         buffer = (PBYTE)HeapAlloc(heap_, 0, buffersize_);
@@ -118,8 +118,16 @@ void ImgJPEGItem::Load()
             decompressflags |= TJFLAG_BOTTOMUP;
         }
 
-        if (tjDecompress2(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart, buffer, displaywidth_, stride_, displayheight_, TJPF_BGR, decompressflags))
+        if (tjDecompress2(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart, buffer, displaywidth_, stride_, displayheight_, pixelformat, decompressflags))
         {
+            errorstring_ = tjGetErrorStr();
+            status_ = Status::Error;
+            goto done;
+        }
+
+        if (pixelformat == TJPF_CMYK)
+        {
+            // TODO: support CMYK JPEG images
             status_ = Status::Error;
             goto done;
         }
