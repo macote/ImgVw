@@ -57,30 +57,31 @@ void ImgItemHelper::ResizeAndRotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitm
     auto newwidth = (int)(bitmap->GetWidth() * percent);
     auto newheight = (int)(bitmap->GetHeight() * percent);
     ImgItemHelper::kGDIOperationSemaphore.Wait();
-    std::unique_ptr<Gdiplus::Bitmap> resizedbitmap = std::make_unique<Gdiplus::Bitmap>(newwidth, newheight, bitmap->GetPixelFormat());
+    std::unique_ptr<Gdiplus::Bitmap> resizedbitmap = std::make_unique<Gdiplus::Bitmap>(newwidth, newheight, PixelFormat24bppRGB);
     Gdiplus::Graphics graphics(resizedbitmap.get());
     graphics.DrawImage(bitmap, 0, 0, newwidth, newheight);
-    if (rotateflip != Gdiplus::RotateNoneFlipNone)
-    {
-        resizedbitmap->RotateFlip(rotateflip);
-        newwidth = resizedbitmap->GetWidth();
-        newheight = resizedbitmap->GetHeight();
-    }
-
-    HandleBuffer(imgitem, resizedbitmap.get());
+    RotateImage(imgitem, resizedbitmap.get(), rotateflip, TRUE);
     ImgItemHelper::kGDIOperationSemaphore.Notify();
 }
 
-void ImgItemHelper::RotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip)
+void ImgItemHelper::RotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip, BOOL gdiinuse)
 {
-    ImgItemHelper::kGDIOperationSemaphore.Wait();
+    if (!gdiinuse)
+    {
+        ImgItemHelper::kGDIOperationSemaphore.Wait();
+    }
+
     if (rotateflip != Gdiplus::RotateNoneFlipNone)
     {
         bitmap->RotateFlip(rotateflip);
     }
 
     HandleBuffer(imgitem, bitmap);
-    ImgItemHelper::kGDIOperationSemaphore.Notify();
+    
+    if (!gdiinuse)
+    {
+        ImgItemHelper::kGDIOperationSemaphore.Notify();
+    }
 }
 
 std::unique_ptr<Gdiplus::Bitmap> ImgItemHelper::Get24bppRGBBitmap(INT width, INT height, PBYTE buffer)

@@ -1,3 +1,7 @@
+## 1.4.0 (2017-08-28)
+
+- Support CMYK color in JPEG images
+
 ## 1.3.0 (2017-07-12)
 
 - Slideshow

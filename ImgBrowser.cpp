@@ -46,7 +46,7 @@ DWORD ImgBrowser::CollectFolder(std::wstring folderpath)
                     CollectFile(currentfile);
                 }
             }
-        } 
+        }
         while (FindNextFile(hFind, &findfiledata) && !cancellationflag_);
 
         FindClose(hFind);
@@ -73,8 +73,8 @@ void ImgBrowser::StartBrowsingAsync(std::wstring path, INT targetwidth, INT targ
 
     if (path.size() == 0)
     {
-        WCHAR currentdirectory[32768];
-        GetCurrentDirectory(sizeof(currentdirectory), currentdirectory);
+        TCHAR currentdirectory[4096];
+        GetCurrentDirectory(sizeof(currentdirectory) * sizeof(TCHAR), currentdirectory);
         path = currentdirectory;
     }
 
@@ -312,7 +312,7 @@ DWORD WINAPI ImgBrowser::StaticThreadCollect(void* browserinstance)
 
 void ImgBrowser::InitializeTempPath()
 {
-    TCHAR temppathbuffer[MAX_PATH];
+    TCHAR temppathbuffer[MAX_PATH + 1];
 
     auto pathlen = GetTempPath(MAX_PATH, temppathbuffer);
     if (pathlen > MAX_PATH || pathlen == 0)
@@ -356,7 +356,7 @@ void ImgBrowser::InitializeTempPath()
         {
             FindClose(find);
         }
-    } 
+    }
     while (folderexists);
 }
 

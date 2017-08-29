@@ -1,19 +1,15 @@
 #include "ImgJPEGItem.h"
 #include "ImgBitmap.h"
 #include "ImgItemHelper.h"
-#include "3rd-party\easyexif\exif.h"
 #include <memory>
 
 void ImgJPEGItem::Load()
 {
     status_ = Status::Loading;
-    tjhandle jpegdecompressor = NULL;
-    INT pixelformat = TJPF_BGR;
-    INT decompressflags{ TJFLAG_FASTDCT };
-    INT targetwidth, targetheight;
-    PBYTE buffer = NULL;
-    BOOL resize = FALSE;
-    Gdiplus::RotateFlipType rotateflip = Gdiplus::RotateNoneFlipNone;
+
+    tjhandle jpegdecompressor{ nullptr };
+    PBYTE buffer{ nullptr };
+    cmsHPROFILE iccprofile{ nullptr };
 
     try
     {
@@ -25,17 +21,46 @@ void ImgJPEGItem::Load()
             goto done;
         }
 
-        jpegdecompressor = tjInitDecompress();
+        jpegdecompressor = turbojpeg::InitDecompress();
         if (jpegdecompressor == NULL)
         {
             status_ = Status::Error;
             goto done;
         }
 
-        easyexif::EXIFInfo result;
-        if (result.parseFrom(jpegfilemap.view(), jpegfilemap.filesize().LowPart, TRUE) == 0)
+        turbojpeg::SaveMarkers(jpegdecompressor, EXIF_MARKER);
+        turbojpeg::SaveMarkers(jpegdecompressor, ICC_MARKER);
+
+        INT jpegSubsamp, jpegColorspace;
+        if (turbojpeg::DecompressHeader(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart,
+            &width_, &height_, &jpegSubsamp, &jpegColorspace, TJFLAG_NOCLEANUP))
         {
-            switch (result.Orientation)
+            errorstring_ = turbojpeg::GetErrorStr();
+            status_ = Status::Error;
+            goto done;
+        }
+
+        INT pixelformat = TJPF_BGR;
+        if (jpegColorspace == TJCS::TJCS_CMYK || jpegColorspace == TJCS::TJCS_YCCK)
+        {
+            pixelformat = TJPF_CMYK;
+            PBYTE iccprofiledata;
+            INT iccprofiledatabytecount;
+            if (turbojpeg::ReadICCProfile(jpegdecompressor, &iccprofiledata, &iccprofiledatabytecount))
+            {
+                iccprofile = cmsOpenProfileFromMem(iccprofiledata, iccprofiledatabytecount);
+                free(iccprofiledata);
+            }
+        }
+
+        Gdiplus::RotateFlipType rotateflip{ Gdiplus::RotateNoneFlipNone };
+        PBYTE exifdata;
+        INT exifdatabytecount = turbojpeg::LocateEXIFSegment(jpegdecompressor, &exifdata);
+        if (exifdatabytecount > 0)
+        {
+            easyexif::EXIFInfo exifinfo;
+            exifinfo.parseFromEXIFSegment(exifdata, exifdatabytecount);
+            switch (exifinfo.Orientation)
             {
             case 3:
                 rotateflip = Gdiplus::Rotate180FlipNone;
@@ -51,19 +76,9 @@ void ImgJPEGItem::Load()
             }
         }
 
-        INT jpegSubsamp, jpegColorspace;
-        if (tjDecompressHeader3(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart, &width_, &height_, &jpegSubsamp, &jpegColorspace))
-        {
-            errorstring_ = tjGetErrorStr();
-            status_ = Status::Error;
-            goto done;
-        }
+        turbojpeg::AbortDecompress(jpegdecompressor);
 
-        if (jpegColorspace == TJCS::TJCS_CMYK || jpegColorspace == TJCS::TJCS_YCCK)
-        {
-            pixelformat = TJPF_CMYK;
-        }
-
+        INT targetwidth, targetheight;
         if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone)
         {
             targetwidth = targetheight_;
@@ -75,6 +90,7 @@ void ImgJPEGItem::Load()
             targetheight = targetheight_;
         }
 
+        BOOL resize = FALSE;
         if (width_ > targetwidth || height_ > targetheight)
         {
             auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
@@ -110,32 +126,53 @@ void ImgJPEGItem::Load()
 
         stride_ = TJPAD(displaywidth_ * tjPixelSize[pixelformat]);
         buffersize_ = stride_ * displayheight_;
-
         buffer = (PBYTE)HeapAlloc(heap_, 0, buffersize_);
 
+        INT decompressflags{ TJFLAG_FASTDCT };
         if (!resize)
         {
             decompressflags |= TJFLAG_BOTTOMUP;
         }
 
-        if (tjDecompress2(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart, buffer, displaywidth_, stride_, displayheight_, pixelformat, decompressflags))
+        turbojpeg::SkipMarkers(jpegdecompressor, EXIF_MARKER);
+        turbojpeg::SkipMarkers(jpegdecompressor, ICC_MARKER);
+
+        if (turbojpeg::Decompress(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart, buffer,
+            displaywidth_, stride_, displayheight_, pixelformat, decompressflags))
         {
-            errorstring_ = tjGetErrorStr();
+            errorstring_ = turbojpeg::GetErrorStr();
             status_ = Status::Error;
             goto done;
         }
 
         if (pixelformat == TJPF_CMYK)
         {
-            // TODO: support CMYK JPEG images
-            status_ = Status::Error;
-            goto done;
+            if (iccprofile == nullptr)
+            {
+                // TODO: determine if CMYK images can be supported without an ICC profile
+                status_ = Status::Error;
+                goto done;
+            }
+
+            // TODO: determine if other types of transform (TYPE_CMYK_8_REV => TYPE_BGR_8) should be supported.
+            auto srgbprofile = cmsCreate_sRGBProfile();
+            auto transform = cmsCreateTransform(iccprofile, TYPE_CMYK_8_REV, srgbprofile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
+            auto newbuffer = (PBYTE)HeapAlloc(heap_, 0, buffersize_);
+            auto newstride = TJPAD(tjPixelSize[TJPF_BGR] * displaywidth_);
+            cmsDoTransformLineStride(transform, buffer, newbuffer, displaywidth_, displayheight_, stride_, newstride, 0, 0);
+
+            HeapFree(heap_, 0, buffer);
+            buffer = newbuffer;
+            buffersize_ = newstride * displayheight_;
+
+            cmsDeleteTransform(transform);
+            cmsCloseProfile(srgbprofile);
         }
 
         if (resize)
         {
-            ImgItemHelper::ResizeAndRotate24bppRGBImage(*this, displaywidth_, displayheight_, buffer, targetwidth, targetheight,
-                rotateflip);
+            ImgItemHelper::ResizeAndRotate24bppRGBImage(*this, displaywidth_, displayheight_, buffer,
+                targetwidth, targetheight, rotateflip);
         }
         else if (rotateflip != Gdiplus::RotateNoneFlipNone)
         {
@@ -161,14 +198,19 @@ void ImgJPEGItem::Load()
 
 done:
 
-    if (buffer != NULL)
+    if (jpegdecompressor != nullptr)
+    {
+        turbojpeg::Destroy(jpegdecompressor);
+    }
+
+    if (buffer != nullptr)
     {
         HeapFree(heap_, 0, buffer);
     }
 
-    if (jpegdecompressor != NULL)
+    if (iccprofile != nullptr)
     {
-        tjDestroy(jpegdecompressor);
+        cmsCloseProfile(iccprofile);
     }
 
     SetEvent(loadedevent_);

@@ -36,8 +36,9 @@ Pass a file or folder as an argument.
 ## 3rd-party libraries
 
 ImgVw uses the following libraries :
-- [libjpeg-turbo](http://libjpeg-turbo.virtualgl.org/)
 - [easyexif](https://github.com/mayanklahiri/easyexif)
+- [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
+- [Little-CMS](https://github.com/mm2/Little-CMS)
 
 ## License
 
