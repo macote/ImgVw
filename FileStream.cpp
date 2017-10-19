@@ -116,6 +116,7 @@ DWORD FileStream::Read(PBYTE buffer, DWORD count)
 			readindex_ = readlength_ = 0;
 			return bytesread;
 		}
+
 		bytesread = Read(buffer_, 0, buffersize_);
 		if (bytesread == 0)
 		{

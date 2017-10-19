@@ -2,8 +2,6 @@
 
 #include "ImgItem.h"
 #include "turbojpeg_ImgVw.h"
-#include "3rd-party\easyexif\exif.h"
-#include "3rd-party\Little-CMS\lcms2.h"
 #include <Windows.h>
 #include <Gdiplus.h>
 #include <string>

@@ -104,3 +104,44 @@ void ImgItemHelper::HandleBuffer(ImgItem& imgitem, Gdiplus::Bitmap* bitmap)
     imgitem.HandleBuffer(data.Width, data.Height, data.Stride, (PBYTE)data.Scan0);
     bitmap->UnlockBits(&data);
 }
+
+UINT ImgItemHelper::GetExifOrientationFromData(PBYTE exifdata, UINT exifdatabytecount)
+{
+    easyexif::EXIFInfo exifinfo;
+    exifinfo.parseFromEXIFSegment(exifdata, exifdatabytecount);
+    return exifinfo.Orientation;
+}
+
+Gdiplus::RotateFlipType ImgItemHelper::GetRotateFlipTypeFromExifOrientation(UINT exiforientation)
+{
+    switch (exiforientation)
+    {
+
+        //   1       2       3       4         5           6           7           8
+        //
+        // 888888  888888      88  88      8888888888  88                  88  8888888888
+        // 88          88      88  88      88  88      88  88          88  88      88  88
+        // 8888      8888    8888  8888    88          8888888888  8888888888          88
+        // 88          88      88  88
+        // 88          88  888888  888888
+
+    case 1:
+        return Gdiplus::RotateNoneFlipNone;
+    case 2:
+        return Gdiplus::RotateNoneFlipX;
+    case 3:
+        return Gdiplus::Rotate180FlipNone;
+    case 4:
+        return Gdiplus::Rotate180FlipX;
+    case 5:
+        return Gdiplus::Rotate90FlipX;
+    case 6:
+        return Gdiplus::Rotate90FlipNone;
+    case 7:
+        return Gdiplus::Rotate270FlipX;
+    case 8:
+        return Gdiplus::Rotate270FlipNone;
+    default:
+        return Gdiplus::RotateNoneFlipNone;
+    }
+}

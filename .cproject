@@ -44,6 +44,7 @@
 									<listOptionValue builtIn="false" value="Debug\resource.o"/>
 								</option>
 								<option id="gnu.cpp.link.option.libs.109316457" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
+									<listOptionValue builtIn="false" value="msimg32"/>
 									<listOptionValue builtIn="false" value="comctl32"/>
 									<listOptionValue builtIn="false" value="shlwapi"/>
 									<listOptionValue builtIn="false" value="ole32"/>
@@ -112,6 +113,7 @@
 								</option>
 								<option id="gnu.cpp.link.option.strip.1903154219" name="Omit all symbol information (-s)" superClass="gnu.cpp.link.option.strip" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 								<option id="gnu.cpp.link.option.libs.1401985270" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
+									<listOptionValue builtIn="false" value="msimg32"/>
 									<listOptionValue builtIn="false" value="comctl32"/>
 									<listOptionValue builtIn="false" value="shlwapi"/>
 									<listOptionValue builtIn="false" value="ole32"/>

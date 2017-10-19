@@ -9,7 +9,6 @@ void ImgJPEGItem::Load()
 
     tjhandle jpegdecompressor{ nullptr };
     PBYTE buffer{ nullptr };
-    cmsHPROFILE iccprofile{ nullptr };
 
     try
     {
@@ -48,7 +47,7 @@ void ImgJPEGItem::Load()
             INT iccprofiledatabytecount;
             if (turbojpeg::ReadICCProfile(jpegdecompressor, &iccprofiledata, &iccprofiledatabytecount))
             {
-                iccprofile = cmsOpenProfileFromMem(iccprofiledata, iccprofiledatabytecount);
+                OpenICCProfile(iccprofiledata, iccprofiledatabytecount);
                 free(iccprofiledata);
             }
         }
@@ -58,28 +57,15 @@ void ImgJPEGItem::Load()
         INT exifdatabytecount = turbojpeg::LocateEXIFSegment(jpegdecompressor, &exifdata);
         if (exifdatabytecount > 0)
         {
-            easyexif::EXIFInfo exifinfo;
-            exifinfo.parseFromEXIFSegment(exifdata, exifdatabytecount);
-            switch (exifinfo.Orientation)
-            {
-            case 3:
-                rotateflip = Gdiplus::Rotate180FlipNone;
-                break;
-            case 6:
-                rotateflip = Gdiplus::Rotate270FlipNone;
-                break;
-            case 8:
-                rotateflip = Gdiplus::Rotate90FlipNone;
-                break;
-            default:
-                break;
-            }
+            rotateflip = ImgItemHelper::GetRotateFlipTypeFromExifOrientation(
+                ImgItemHelper::GetExifOrientationFromData(exifdata, exifdatabytecount));
         }
 
         turbojpeg::AbortDecompress(jpegdecompressor);
 
         INT targetwidth, targetheight;
-        if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone)
+        if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone
+            || rotateflip == Gdiplus::Rotate90FlipX || rotateflip == Gdiplus::Rotate270FlipX)
         {
             targetwidth = targetheight_;
             targetheight = targetwidth_;
@@ -147,26 +133,14 @@ void ImgJPEGItem::Load()
 
         if (pixelformat == TJPF_CMYK)
         {
-            if (iccprofile == nullptr)
+            if (iccprofile_ == nullptr)
             {
                 // TODO: determine if CMYK images can be supported without an ICC profile
                 status_ = Status::Error;
                 goto done;
             }
 
-            // TODO: determine if other types of transform (TYPE_CMYK_8_REV => TYPE_BGR_8) should be supported.
-            auto srgbprofile = cmsCreate_sRGBProfile();
-            auto transform = cmsCreateTransform(iccprofile, TYPE_CMYK_8_REV, srgbprofile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
-            auto newbuffer = (PBYTE)HeapAlloc(heap_, 0, buffersize_);
-            auto newstride = TJPAD(tjPixelSize[TJPF_BGR] * displaywidth_);
-            cmsDoTransformLineStride(transform, buffer, newbuffer, displaywidth_, displayheight_, stride_, newstride, 0, 0);
-
-            HeapFree(heap_, 0, buffer);
-            buffer = newbuffer;
-            buffersize_ = newstride * displayheight_;
-
-            cmsDeleteTransform(transform);
-            cmsCloseProfile(srgbprofile);
+            TranformCMYK8ColorsToBGR8(&buffer, TJPAD(tjPixelSize[TJPF_BGR] * displaywidth_));
         }
 
         if (resize)
@@ -208,10 +182,7 @@ done:
         HeapFree(heap_, 0, buffer);
     }
 
-    if (iccprofile != nullptr)
-    {
-        cmsCloseProfile(iccprofile);
-    }
+    CloseICCProfile();
 
     SetEvent(loadedevent_);
 }

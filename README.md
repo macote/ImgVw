@@ -13,7 +13,7 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 
 This project is compatible with:
 - Visual Studio 2017
-- Eclipse Neon CDT with MinGW (GCC 6.3.0)
+- Eclipse CDT with MinGW (GCC 6.3.0)
 
 ## Usage
 
@@ -31,6 +31,7 @@ Pass a file or folder as an argument.
 | F7 | Decrease slideshow speed |
 | Delete | Move to recycle bin if possible or delete |
 | Shift + Delete | Delete |
+| Enter | Display current file path |
 | Escape | Exit |
 
 ## 3rd-party libraries

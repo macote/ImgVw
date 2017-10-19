@@ -33,9 +33,12 @@ LRESULT ImgVwWindow::OnCreate()
         captionfont_ = CreateFontIndirect(&nonclientmetrics.lfMessageFont);
     }
 
-    QueryPerformanceFrequency(&frequency_);
-    InitializeBrowser(path_);
+    QueryPerformanceFrequency(&qpcfrequency_);
+    arrowcursor_ = LoadCursor(NULL, IDC_ARROW);
+    SetCursor(arrowcursor_);
+    SetCapture(hwnd_);
     ShowCursor(FALSE);
+    InitializeBrowser(path_);
 
     return FALSE;
 }
@@ -123,6 +126,12 @@ void ImgVwWindow::InvalidateScreen()
     {
         RestartSlideShowTimer();
     }
+}
+
+void ImgVwWindow::PerformAction()
+{
+    auto filepath = browser_.GetCurrentFilePath();
+    MessageBox(hwnd_, filepath.c_str(), L"ImgVw", 0);
 }
 
 void ImgVwWindow::BrowseNext()
@@ -235,6 +244,50 @@ void ImgVwWindow::HandleSlideShow()
     }
 }
 
+BOOL ImgVwWindow::HandleMouseMove(WPARAM wParam, LPARAM lParam)
+{
+    auto points = MAKEPOINTS(lParam);
+    if (mousemovelastpoints_.x == 0 && mousemovelastpoints_.y == 0)
+    {
+        mousemovelastpoints_ = points;
+    }
+    else if (mousemovelastpoints_.x != points.x || mousemovelastpoints_.y != points.y)
+    {
+        mousemovelastpoints_ = points;
+
+        QueryPerformanceCounter(&mousemovelastcounter_);
+
+        if (!mousehidetimerstarted_)
+        {
+            ShowCursor(TRUE);
+            SetTimer(hwnd_, IDT_HIDEMOUSE, kMouseHideIntervalInMilliseconds, NULL);
+            mousehidetimerstarted_ = TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+void ImgVwWindow::HandleHideMouseCursor()
+{
+    KillTimer(hwnd_, IDT_HIDEMOUSE);
+
+    LARGE_INTEGER counter, elapsed;
+    QueryPerformanceCounter(&counter);
+    elapsed.QuadPart = (counter.QuadPart - mousemovelastcounter_.QuadPart) * 1000;
+    auto elapsedmilliseconds = static_cast<UINT>(elapsed.QuadPart / qpcfrequency_.QuadPart);
+
+    if (elapsedmilliseconds < kMouseHideIntervalInMilliseconds)
+    {
+        SetTimer(hwnd_, IDT_HIDEMOUSE, kMouseHideIntervalInMilliseconds - elapsedmilliseconds, NULL);
+    }
+    else
+    {
+        ShowCursor(FALSE);
+        mousehidetimerstarted_ = FALSE;
+    }
+}
+
 void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
 {
     if (browser_.GetCurrentItem() == nullptr)
@@ -333,6 +386,9 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             ShowCursor(TRUE);
             DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, (DLGPROC)AboutDialogProc);
             break;
+        case IDR_ENTER:
+            PerformAction();
+            break;
         case IDR_NEXT:
             BrowseNext();
             break;
@@ -368,6 +424,13 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         return FALSE;
+    case WM_MOUSEMOVE:
+        if (HandleMouseMove(wParam, lParam))
+        {
+            return 0;
+        }
+
+        break;
     case WM_MOUSEWHEEL:
         HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
         return FALSE;
@@ -384,7 +447,11 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDT_SLIDESHOW:
             HandleSlideShow();
             return 0;
+        case IDT_HIDEMOUSE:
+            HandleHideMouseCursor();
+            return 0;
         }
+
         break;
     case WM_NCDESTROY:
         OnNCDestroy();

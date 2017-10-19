@@ -2,6 +2,7 @@
 
 #include "ImgItem.h"
 #include "CountingSemaphore.h"
+#include "3rd-party\easyexif\exif.h"
 #include <Windows.h>
 #include <Shlwapi.h>
 #include <Gdiplus.h>
@@ -23,6 +24,8 @@ public:
         RotateImage(imgitem, bitmap, rotateflip, FALSE);
     };
     static std::unique_ptr<Gdiplus::Bitmap> Get24bppRGBBitmap(INT width, INT height, PBYTE buffer);
+    static UINT GetExifOrientationFromData(PBYTE exifdata, UINT exifdatabytecount);
+    static Gdiplus::RotateFlipType GetRotateFlipTypeFromExifOrientation(UINT exiforientation);
 private:
     static void RotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip, BOOL gdiinuse);
     static void HandleBuffer(ImgItem& imgitem, Gdiplus::Bitmap* bitmap);

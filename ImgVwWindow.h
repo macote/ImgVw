@@ -18,10 +18,11 @@
 class ImgVwWindow : public Window
 {
 public:
-    static const INT kInitialSlideShowIntervalInMilliseconds = 4000;
-    static const INT kMinimumSlideShowIntervalInMilliseconds = 500;
-    static const INT kMaximumSlideShowIntervalInMilliseconds = 10000;
-    static const INT kSlideShowIntervalIncrementStepInMilliseconds = 500;
+    static const UINT kInitialSlideShowIntervalInMilliseconds = 4000;
+    static const UINT kMinimumSlideShowIntervalInMilliseconds = 500;
+    static const UINT kMaximumSlideShowIntervalInMilliseconds = 10000;
+    static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 500;
+    static const UINT kMouseHideIntervalInMilliseconds = 1000;
 public:
     ImgVwWindow(HINSTANCE hinst, std::vector<std::wstring> args) : Window(hinst)
 #if _DEBUG && LOGIMGVWWINDOW
@@ -41,6 +42,7 @@ private:
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
     LRESULT OnCreate();
     void InitializeBrowser(std::wstring path);
+    void PerformAction();
     void BrowseNext();
     void BrowsePrevious();
     void BrowseFirst();
@@ -57,6 +59,8 @@ private:
     BOOL DisplayImage(HDC dc, ImgItem* item);
     void DisplayFileInformation(HDC dc, std::wstring filepath);
     void CloseWindow();
+    BOOL HandleMouseMove(WPARAM wParam, LPARAM lParam);
+    void HandleHideMouseCursor();
     void OnNCDestroy();
     static BOOL CALLBACK AboutDialogProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam);
 private:
@@ -64,10 +68,14 @@ private:
     std::wstring path_;
     WORD activeparam_{};
     HFONT captionfont_{ nullptr };
-    LARGE_INTEGER frequency_{};
+    HCURSOR arrowcursor_{ nullptr };
+    LARGE_INTEGER qpcfrequency_{};
     BOOL slideshowrunning_{};
     BOOL slideshowrandom_{};
     UINT slideshowinterval_{ kInitialSlideShowIntervalInMilliseconds };
+    POINTS mousemovelastpoints_{};
+    LARGE_INTEGER mousemovelastcounter_{};
+    BOOL mousehidetimerstarted_{ FALSE };
 #if _DEBUG && LOGIMGVWWINDOW
     TimestampLogger logger_;
 #endif
