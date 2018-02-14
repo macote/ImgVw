@@ -3,7 +3,7 @@
 #include "ImgItem.h"
 #include "CountingSemaphore.h"
 #include <Windows.h>
-#include <deque>
+#include <list>
 #include <functional>
 #include <memory>
 #include <string>
@@ -13,29 +13,42 @@ class LoaderItem
 {
 public:
     LoaderItem(ImgItem* imgitem, std::function<void()> handler)
-        : imgitem_(imgitem), loadcompleteevent_(handler)
+        : imgitem_(imgitem), loadcompleteevent_(handler) { }
+    ~LoaderItem()
     {
+        CloseLoaderItemThread();
     }
+    LoaderItem(const LoaderItem&) = delete;
+    LoaderItem& operator=(const LoaderItem&) = delete;
     ImgItem* imgitem() const { return imgitem_; }
     HANDLE loaderitemthread() const { return loaderitemthread_; }
     void set_loaderitemthread(HANDLE loaderitemthread) { loaderitemthread_ = loaderitemthread; }
-    void LoadComplete();
+    void CloseLoaderItemThread()
+    {
+        if (loaderitemthread_ != INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(loaderitemthread_);
+            loaderitemthread_ = INVALID_HANDLE_VALUE;
+        }
+    }
+    void LoadComplete()
+    {
+        if (loadcompleteevent_ != nullptr)
+        {
+            loadcompleteevent_();
+        }
+    }
 private:
     ImgItem* imgitem_{ nullptr };
     HANDLE loaderitemthread_{ INVALID_HANDLE_VALUE };
     std::function<void()> loadcompleteevent_{ nullptr };
 };
 
-inline void LoaderItem::LoadComplete()
-{
-    if (loadcompleteevent_ != nullptr)
-    {
-        loadcompleteevent_();
-    }
-}
-
 class ImgLoader
 {
+public:
+    static constexpr auto kMaximumLoaderCount = 2;	// TODO: adjust logic around this limit once GDI+ gets replaced completely
+    static constexpr auto kCleanupCycleCountTrigger = 29;
 public:
     ImgLoader()
     {
@@ -46,8 +59,8 @@ public:
 
         cancelevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
         workevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
-        loadersemaphore_.set_maximumcount(kMaximumLoaderCount);
-        StartLoop();
+        loadersemaphore_.SetupSemaphore(kMaximumLoaderCount);
+        StartLoading();
     }
     ~ImgLoader()
     {
@@ -60,25 +73,24 @@ public:
             CloseHandle(loopthread_);
         }
     }
+    ImgLoader(const ImgLoader&) = delete;
+    ImgLoader& operator=(const ImgLoader&) = delete;
     void LoadAsync(ImgItem* imgitem);
     void LoadNextAsync(ImgItem* imgitem);
     void StopLoading();
 private:
-    static const INT kMaximumLoaderCount = 2;	// TODO: adjust logic around this limit once GDI+ gets replaced completely
-private:
-    void StartLoop();
+    void StartLoading();
     DWORD Loop();
-    BOOL ItemPending();
     void QueueItem(ImgItem* imgitem, BOOL pushfront);
     ImgItem* GetNextItem();
     static DWORD WINAPI StaticThreadLoop(void* imgloaderinstance);
     static DWORD WINAPI StaticThreadLoad(void* imgiteminstance);
 private:
-    std::deque<ImgItem*> queue_;
-    std::deque<std::unique_ptr<LoaderItem>> loaderitems_;
+    std::list<ImgItem*> queue_;
+    std::list<std::unique_ptr<LoaderItem>> loaderitems_;
     HANDLE workevent_;
     HANDLE cancelevent_;
-    HANDLE loopthread_{ NULL };
+    HANDLE loopthread_{ INVALID_HANDLE_VALUE };
     BOOL cancellationflag_{};
     CountingSemaphore loadersemaphore_;
     CRITICAL_SECTION queuecriticalsection_;

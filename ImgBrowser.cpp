@@ -1,17 +1,15 @@
 #include "ImgBrowser.h"
-#include <shlobj.h>
 #include <Shlwapi.h>
-#include <string>
-#include <iomanip>
-#include <sstream>
 
-void ImgBrowser::CollectFile(std::wstring filepath)
+void ImgBrowser::CollectFile(const std::wstring& filepath)
 {
     EnterCriticalSection(&browsecriticalsection_);
+
     files_.insert(filepath);
-    randomlist_.push_back(filepath);
     cache_.Add(filepath, targetwidth_, targetheight_);
+    randomlist_.push_back(filepath);
     loader_.LoadAsync(cache_.Get(filepath).get());
+
     if (currentfileiterator_ == files_.end())
     {
         currentfileiterator_ = files_.begin();
@@ -20,7 +18,7 @@ void ImgBrowser::CollectFile(std::wstring filepath)
     LeaveCriticalSection(&browsecriticalsection_);
 }
 
-DWORD ImgBrowser::CollectFolder(std::wstring folderpath)
+DWORD ImgBrowser::CollectFolder(const std::wstring& folderpath)
 {
     WIN32_FIND_DATA findfiledata;
     HANDLE hFind;
@@ -60,7 +58,7 @@ BOOL ImgBrowser::IsFileFormatSupported(LPCTSTR filename)
     return ImgItemHelper::GetImgFormatFromExtension(filename) != ImgItem::Format::Unsupported;
 }
 
-void ImgBrowser::StartBrowsingAsync(std::wstring path, INT targetwidth, INT targetheight)
+void ImgBrowser::StartBrowsingAsync(const std::wstring& path, INT targetwidth, INT targetheight)
 {
     Reset();
 
@@ -70,47 +68,49 @@ void ImgBrowser::StartBrowsingAsync(std::wstring path, INT targetwidth, INT targ
     WIN32_FIND_DATA findfiledata;
     HANDLE findfilehandle;
     BOOL forcedfolder = FALSE;
+    std::wstring workpath = path;
 
-    if (path.size() == 0)
+    if (workpath.size() == 0)
     {
-        TCHAR currentdirectory[4096];
-        GetCurrentDirectory(sizeof(currentdirectory) * sizeof(TCHAR), currentdirectory);
-        path = currentdirectory;
+        const INT BUFFERSIZE = 4096;
+        TCHAR currentdirectory[BUFFERSIZE];
+        GetCurrentDirectory(BUFFERSIZE, currentdirectory);
+        workpath = currentdirectory;
     }
 
-    if (path.back() == L'\\')
+    if (workpath.back() == L'\\')
     {
-        path = path.substr(0, path.size() - 1);
+        workpath = workpath.substr(0, workpath.size() - 1);
         forcedfolder = TRUE;
     }
 
-    findfilehandle = FindFirstFile(path.c_str(), &findfiledata);
+    findfilehandle = FindFirstFile(workpath.c_str(), &findfiledata);
     if (findfilehandle != INVALID_HANDLE_VALUE)
     {
         FindClose(findfilehandle);
         if (!(findfiledata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !forcedfolder)
         {
-            auto backslashposition = path.rfind(L"\\");
+            auto backslashposition = workpath.rfind(L"\\");
             if (backslashposition != std::wstring::npos)
             {
-                folderpath_ = path.substr(0, backslashposition + 1);
+                folderpath_ = workpath.substr(0, backslashposition + 1);
             }
             else
             {
                 folderpath_ = L".\\";
-                path = folderpath_ + path;
+                workpath = folderpath_ + workpath;
             }
 
-            CollectFile(path);
+            CollectFile(workpath);
         }
         else
         {
-            folderpath_ = path + L"\\";
+            folderpath_ = workpath + L"\\";
         }
     }
     else
     {
-        WCHAR mypicturespath[MAX_PATH];
+        TCHAR mypicturespath[MAX_PATH];
         if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_MYPICTURES, NULL, SHGFP_TYPE_CURRENT, mypicturespath)))
         {
             folderpath_ = std::wstring(mypicturespath) + L"\\";
@@ -121,7 +121,7 @@ void ImgBrowser::StartBrowsingAsync(std::wstring path, INT targetwidth, INT targ
         }
     }
 
-    collectorthread_ = CreateThread(NULL, 0, StaticThreadCollect, (void*)this, 0, NULL);
+    collectorthread_ = CreateThread(NULL, 0, StaticThreadCollect, reinterpret_cast<void*>(this), 0, NULL);
 }
 
 void ImgBrowser::StopCollecting()
@@ -168,11 +168,11 @@ std::wstring ImgBrowser::GetCurrentFilePath()
     }
 }
 
-ImgItem* ImgBrowser::GetCurrentItem()
+const ImgItem* ImgBrowser::GetCurrentItem()
 {
     if (currentfileiterator_ != files_.end())
     {
-        auto imgitem = cache_.Get(*currentfileiterator_).get();
+        const auto imgitem = cache_.Get(*currentfileiterator_).get();
         if (imgitem != nullptr)
         {
             if (imgitem->status() == ImgItem::Status::Queued)
@@ -203,6 +203,7 @@ BOOL ImgBrowser::MoveToNext()
     }
 
     LeaveCriticalSection(&browsecriticalsection_);
+
     return moveSuccess;
 }
 
@@ -217,6 +218,7 @@ BOOL ImgBrowser::MoveToPrevious()
     }
 
     LeaveCriticalSection(&browsecriticalsection_);
+
     return moveSuccess;
 }
 
@@ -231,6 +233,7 @@ BOOL ImgBrowser::MoveToFirst()
     }
 
     LeaveCriticalSection(&browsecriticalsection_);
+
     return moveSuccess;
 }
 
@@ -245,6 +248,7 @@ BOOL ImgBrowser::MoveToLast()
     }
 
     LeaveCriticalSection(&browsecriticalsection_);
+
     return moveSuccess;
 }
 
@@ -255,6 +259,7 @@ BOOL ImgBrowser::MoveToItem(std::wstring filepath)
     currentfileiterator_ = files_.find(filepath);
     moveSuccess = currentfileiterator_ != files_.end();
     LeaveCriticalSection(&browsecriticalsection_);
+
     return moveSuccess;
 }
 
@@ -285,10 +290,9 @@ BOOL ImgBrowser::MoveToRandom()
 
     auto filepath = randomlist_[currentrandomindex_];
     ++currentrandomindex_;
-
     moveSuccess = MoveToItem(filepath);
-
     LeaveCriticalSection(&browsecriticalsection_);
+
     return moveSuccess;
 }
 
@@ -306,61 +310,7 @@ void ImgBrowser::RemoveCurrentItem()
 
 DWORD WINAPI ImgBrowser::StaticThreadCollect(void* browserinstance)
 {
-    ImgBrowser* browser = (ImgBrowser*)browserinstance;
+    ImgBrowser* browser = reinterpret_cast<ImgBrowser*>(browserinstance);
+
     return browser->CollectFolder(browser->folderpath_);
-}
-
-void ImgBrowser::InitializeTempPath()
-{
-    TCHAR temppathbuffer[MAX_PATH + 1];
-
-    auto pathlen = GetTempPath(MAX_PATH, temppathbuffer);
-    if (pathlen > MAX_PATH || pathlen == 0)
-    {
-        // TODO: handle error.
-    }
-
-    std::wstring temppath = temppathbuffer;
-
-    if (temppathbuffer[pathlen - 1] != L'\\')
-    {
-        temppath += L'\\';
-    }
-
-    std::wstring imgtemppath = temppath;
-    std::wstring testpath;
-    WIN32_FIND_DATA finddata;
-    HANDLE find;
-    BOOL folderexists = TRUE;
-
-    do
-    {
-        GUID guid;
-        if (CoCreateGuid(&guid) != S_OK)
-        {
-            // TODO: handle error.
-        }
-
-        std::wstringstream wss;
-        wss << std::setw(8) << std::setfill(L'0') << std::uppercase << std::hex << guid.Data1;
-        std::wstring testpath = temppath + wss.str();
-
-        find = FindFirstFile(testpath.c_str(), &finddata);
-        if (find == INVALID_HANDLE_VALUE)
-        {
-            CreateDirectory(testpath.c_str(), NULL);
-            folderexists = FALSE;
-            temppath_ = testpath;
-        }
-        else
-        {
-            FindClose(find);
-        }
-    }
-    while (folderexists);
-}
-
-void ImgBrowser::DeleteTempPath()
-{
-    RemoveDirectory(temppath_.c_str());
 }

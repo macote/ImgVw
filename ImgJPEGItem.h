@@ -6,18 +6,20 @@
 #include <Gdiplus.h>
 #include <string>
 
-class ImgJPEGItem : public ImgItem
+class ImgJPEGItem final : public ImgItem
 {
 public:
-    ImgJPEGItem(std::wstring filepath, std::wstring temppath, INT targetwidth, INT targetheight)
-        : ImgItem(filepath, temppath, targetwidth, targetheight)
+    ImgJPEGItem(std::wstring filepath, INT targetwidth, INT targetheight)
+        : ImgItem(filepath, targetwidth, targetheight)
     {
         scalingfactors_ = turbojpeg::GetScalingFactors(&scalingfactorcount_);
     }
+    ImgJPEGItem(const ImgJPEGItem&) = delete;
+    ImgJPEGItem& operator=(const ImgJPEGItem&) = delete;
     void Load();
 private:
     INT scalingfactorcount_{};
     tjscalingfactor* scalingfactors_{ nullptr };
     std::string errorstring_;
-    INT GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight);
+    INT GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight) const;
 };

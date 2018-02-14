@@ -3,26 +3,19 @@
 #include <Windows.h>
 #include <utility>
 
-class CountingSemaphore
+class CountingSemaphore final
 {
 public:
-    CountingSemaphore()
+    CountingSemaphore() { }
+    CountingSemaphore(LONG maximumcount)
     {
-    }
-    CountingSemaphore(LONG maximumcount) : maximumcount_(maximumcount)
-    {
-        if (maximumcount > 0)
-        {
-            SetupSemaphore();
-        }
+        SetupSemaphore(maximumcount);
     }
     ~CountingSemaphore()
     {
-        if (semaphore_ != INVALID_HANDLE_VALUE)
-        {
-            CloseHandle(semaphore_);
-        }
+        Close();
     }
+    CountingSemaphore(const CountingSemaphore&) = delete;
     CountingSemaphore(CountingSemaphore&& other)
     {
         *this = std::move(other);
@@ -31,38 +24,41 @@ public:
     {
         if (this != &other)
         {
+            Close();
+
             semaphore_ = other.semaphore_;
             other.semaphore_ = INVALID_HANDLE_VALUE;
         }
 
         return *this;
     }
-    void Notify();
-    void Wait();
-    LONG maximumcount() const { return maximumcount_; }
-    void set_maximumcount(LONG maximumcount);
+    void Notify() const;
+    void Wait() const;
+    void SetupSemaphore(LONG maximumcount);
 private:
-    void SetupSemaphore();
-    LONG maximumcount_{};
+    void Close()
+    {
+        if (semaphore_ != INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(semaphore_);
+            semaphore_ = INVALID_HANDLE_VALUE;
+        }
+    }
     HANDLE semaphore_{ INVALID_HANDLE_VALUE };
 };
 
-inline void CountingSemaphore::set_maximumcount(LONG maximumcount)
+inline void CountingSemaphore::SetupSemaphore(LONG maximumcount)
 {
-    maximumcount_ = maximumcount;
-    SetupSemaphore();
-}
+    Close();
 
-inline void CountingSemaphore::SetupSemaphore()
-{
-    semaphore_ = CreateSemaphore(NULL, maximumcount_, maximumcount_, NULL);
+    semaphore_ = CreateSemaphore(NULL, maximumcount, maximumcount, NULL);
     if (semaphore_ == NULL)
     {
         // TODO: handle error
     }
 }
 
-inline void CountingSemaphore::Notify()
+inline void CountingSemaphore::Notify() const
 {
     if (!ReleaseSemaphore(semaphore_, 1, NULL))
     {
@@ -70,14 +66,13 @@ inline void CountingSemaphore::Notify()
     }
 }
 
-inline void CountingSemaphore::Wait()
+inline void CountingSemaphore::Wait() const
 {
-    auto waitresult = WaitForSingleObject(semaphore_, INFINITE);
-    switch (waitresult)
+    switch (WaitForSingleObject(semaphore_, INFINITE))
     {
     case WAIT_OBJECT_0:
         break;
-    case WAIT_TIMEOUT:
+    case WAIT_FAILED:
         // TODO: handle unhandled case
         break;
     }

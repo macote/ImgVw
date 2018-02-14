@@ -1,15 +1,12 @@
 #pragma once
 
-#include "Window.h"
+#include <Windows.h>
 #include <algorithm>
 
 class ImgBitmap
 {
 public:
-    ImgBitmap()
-    {
-    }
-    ImgBitmap(PBITMAPINFO pbitmapinfo, PBYTE buffer, INT buffersize)
+    ImgBitmap(const PBITMAPINFO pbitmapinfo, const PBYTE buffer, INT buffersize)
     {
         Initialize(pbitmapinfo, buffer, buffersize);
     }
@@ -17,6 +14,7 @@ public:
     {
         DeleteBitmap();
     }
+    ImgBitmap(const ImgBitmap&) = delete;
     ImgBitmap(ImgBitmap&& other)
     {
         *this = std::move(other);
@@ -35,7 +33,7 @@ public:
     }
     HBITMAP bitmap() const { return bitmap_; }
 private:
-    void Initialize(PBITMAPINFO pbitmapinfo, PBYTE buffer, INT buffersize);
+    void Initialize(const PBITMAPINFO pbitmapinfo, const PBYTE buffer, INT buffersize);
     void DeleteBitmap();
 private:
     HBITMAP bitmap_{ nullptr };
@@ -46,15 +44,16 @@ inline void ImgBitmap::DeleteBitmap()
     if (bitmap_ != nullptr)
     {
         DeleteObject(bitmap_);
+        bitmap_ = nullptr;
     }
 }
 
-inline void ImgBitmap::Initialize(PBITMAPINFO pbitmapinfo, PBYTE buffer, INT buffersize)
+inline void ImgBitmap::Initialize(const PBITMAPINFO pbitmapinfo, const PBYTE buffer, INT buffersize)
 {
-    auto dc = GetDC(NULL);
-    auto usage = pbitmapinfo->bmiHeader.biClrUsed > 0 ? DIB_PAL_COLORS : DIB_RGB_COLORS;
+    const auto dc = GetDC(NULL);
+    const auto usage = pbitmapinfo->bmiHeader.biClrUsed > 0 ? DIB_PAL_COLORS : DIB_RGB_COLORS;
     PBYTE bits;
-    bitmap_ = CreateDIBSection(dc, pbitmapinfo, usage, (void**)&bits, NULL, 0);
+    bitmap_ = CreateDIBSection(dc, pbitmapinfo, usage, reinterpret_cast<void**>(&bits), NULL, 0);
     ReleaseDC(NULL, dc);
 
     CopyMemory(bits, buffer, buffersize);

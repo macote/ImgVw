@@ -13,7 +13,7 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 
 This project is compatible with:
 - Visual Studio 2017
-- Eclipse CDT with MinGW (GCC 6.3.0)
+- Eclipse CDT with MinGW
 
 ## Usage
 

@@ -5,16 +5,13 @@
 #include <Gdiplus.h>
 #include <string>
 
-class ImgGDIItem : public ImgItem
+class ImgGDIItem final : public ImgItem
 {
 public:
-    ImgGDIItem(std::wstring filepath, std::wstring temppath, INT targetwidth, INT targetheight)
-        : ImgItem(filepath, temppath, targetwidth, targetheight)
-    {
-    }
-    virtual ~ImgGDIItem()
-    {
-    }
+    ImgGDIItem(std::wstring filepath, INT targetwidth, INT targetheight)
+        : ImgItem(filepath, targetwidth, targetheight) { }
+    ImgGDIItem(const ImgGDIItem&) = delete;
+    ImgGDIItem& operator=(const ImgGDIItem&) = delete;
     void Load();
     void Unload();
     Gdiplus::Status lastgdiplusstatus() const { return lastgdiplusstatus_; }

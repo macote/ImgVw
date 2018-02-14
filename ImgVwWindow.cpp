@@ -1,9 +1,9 @@
 #include "ImgVwWindow.h"
 
-ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, std::vector<std::wstring> args)
+ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring> args)
 {
     auto self = new ImgVwWindow(hInst, args);
-    if (self != NULL)
+    if (self != nullptr)
     {
         self->backgroundbrush_ = CreateSolidBrush(RGB(0, 0, 0));
         self->manualcursor_ = TRUE;
@@ -17,7 +17,7 @@ ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, std::vector<std::wstring> args
         delete self;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 LRESULT ImgVwWindow::OnCreate()
@@ -45,7 +45,7 @@ LRESULT ImgVwWindow::OnCreate()
 
 void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
 {
-    auto imgitem = browser_.GetCurrentItem();
+    const auto imgitem = browser_.GetCurrentItem();
     if (imgitem != nullptr)
     {
         if (!DisplayImage(pps->hdc, imgitem))
@@ -60,7 +60,7 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
     }
 }
 
-void ImgVwWindow::InitializeBrowser(std::wstring path)
+void ImgVwWindow::InitializeBrowser(const std::wstring& path)
 {
     RECT windowrectangle;
     if (!GetClientRect(hwnd_, &windowrectangle))
@@ -71,7 +71,7 @@ void ImgVwWindow::InitializeBrowser(std::wstring path)
     browser_.StartBrowsingAsync(path_, windowrectangle.right, windowrectangle.bottom);
 }
 
-BOOL ImgVwWindow::DisplayImage(HDC dc, ImgItem* item)
+BOOL ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
 {
     if (item->status() != ImgItem::Status::Ready)
     {
@@ -84,9 +84,9 @@ BOOL ImgVwWindow::DisplayImage(HDC dc, ImgItem* item)
         return FALSE;
     }
 
-    auto memorydc = CreateCompatibleDC(dc);
-    auto imgbitmap = item->GetDisplayBitmap();
-    auto replacedobject = SelectObject(memorydc, imgbitmap.bitmap());
+    const auto memorydc = CreateCompatibleDC(dc);
+    const auto imgbitmap = item->GetDisplayBitmap();
+    const auto replacedobject = SelectObject(memorydc, imgbitmap.bitmap());
 
     if (ExcludeClipRect(dc, item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(), item->offsety() + item->displayheight()) == RGN_ERROR)
     {
@@ -111,7 +111,7 @@ BOOL ImgVwWindow::DisplayImage(HDC dc, ImgItem* item)
     return TRUE;
 }
 
-void ImgVwWindow::DisplayFileInformation(HDC dc, std::wstring filepath)
+void ImgVwWindow::DisplayFileInformation(HDC dc, const std::wstring& filepath)
 {
     RECT windowrectangle;
     GetWindowRect(hwnd_, &windowrectangle);
@@ -130,7 +130,7 @@ void ImgVwWindow::InvalidateScreen()
 
 void ImgVwWindow::PerformAction()
 {
-    auto filepath = browser_.GetCurrentFilePath();
+    const auto filepath = browser_.GetCurrentFilePath();
     MessageBox(hwnd_, filepath.c_str(), L"ImgVw", 0);
 }
 
@@ -246,16 +246,15 @@ void ImgVwWindow::HandleSlideShow()
 
 BOOL ImgVwWindow::HandleMouseMove(WPARAM wParam, LPARAM lParam)
 {
-    auto points = MAKEPOINTS(lParam);
+    const auto points = MAKEPOINTS(lParam);
     if (mousemovelastpoints_.x == 0 && mousemovelastpoints_.y == 0)
     {
         mousemovelastpoints_ = points;
     }
     else if (mousemovelastpoints_.x != points.x || mousemovelastpoints_.y != points.y)
     {
-        mousemovelastpoints_ = points;
-
         QueryPerformanceCounter(&mousemovelastcounter_);
+        mousemovelastpoints_ = points;
 
         if (!mousehidetimerstarted_)
         {
@@ -304,8 +303,7 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
     shfileopstruct.hwnd = hwnd_;
     shfileopstruct.wFunc = FO_DELETE;
     shfileopstruct.pFrom = deletepaths;
-    shfileopstruct.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI
-        | FOF_NOCONFIRMMKDIR | FOF_WANTNUKEWARNING;
+    shfileopstruct.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR | FOF_WANTNUKEWARNING;
     if (allowundo)
     {
         shfileopstruct.fFlags |= FOF_ALLOWUNDO;
@@ -338,6 +336,7 @@ BOOL CALLBACK ImgVwWindow::AboutDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wPara
         {
             EndDialog(hwndDlg, TRUE);
             ShowCursor(FALSE);
+
             return TRUE;
         }
 
@@ -385,7 +384,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDM_ABOUT:
             ShowCursor(TRUE);
-            DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, (DLGPROC)AboutDialogProc);
+            DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, reinterpret_cast<DLGPROC>(AboutDialogProc));
             break;
         case IDR_ENTER:
             PerformAction();
@@ -434,6 +433,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         break;
     case WM_MOUSEWHEEL:
         HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+
         return FALSE;
     case WM_SYSCOMMAND:
         if (LOWORD(wParam) == SC_CLOSE)
@@ -459,6 +459,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         break;
     case WM_DESTROY:
         PostQuitMessage(0);
+
         return 0;
     }
 

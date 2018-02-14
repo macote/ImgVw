@@ -30,7 +30,7 @@ SOFTWARE.
 void FileStream::OpenFile()
 {
 	DWORD desiredaccess = (mode_ == Mode::Open || mode_ == Mode::OpenWithoutBuffering) ? GENERIC_READ : GENERIC_WRITE;
-	DWORD createdisposition;
+    DWORD createdisposition = OPEN_EXISTING;
 	switch (mode_)
 	{
 	case FileStream::Mode::Create:
@@ -44,7 +44,6 @@ void FileStream::OpenFile()
 		desiredaccess = FILE_APPEND_DATA;
 		break;
 	default:
-		createdisposition = OPEN_EXISTING;
 		break;
 	}
 
@@ -66,7 +65,7 @@ void FileStream::OpenFile()
 	}
 }
 
-DWORD FileStream::Read(PBYTE buffer, DWORD offset, DWORD count)
+DWORD FileStream::Read(const PBYTE buffer, DWORD offset, DWORD count)
 {
 	DWORD bytesread = 0;
 	if (!ReadFile(filehandle_, buffer + offset, count, &bytesread, NULL))
@@ -81,10 +80,11 @@ DWORD FileStream::Read(PBYTE buffer, DWORD offset, DWORD count)
 	return bytesread;
 }
 
-DWORD FileStream::Write(PBYTE buffer, DWORD offset, DWORD count)
+DWORD FileStream::Write(const PBYTE buffer, DWORD offset, DWORD count)
 {
 	DWORD byteswritten = 0;
 	WriteFile(filehandle_, buffer + offset, count, &byteswritten, NULL);
+
 	return byteswritten;
 }
 
@@ -103,7 +103,7 @@ void FileStream::CloseFile()
 	}
 }
 
-DWORD FileStream::Read(PBYTE buffer, DWORD count)
+DWORD FileStream::Read(const PBYTE buffer, DWORD count)
 {
 	DWORD bufferbytes = readlength_ - readindex_;
 	BOOL eof = FALSE;
@@ -114,6 +114,7 @@ DWORD FileStream::Read(PBYTE buffer, DWORD count)
 		{
 			bytesread = Read(buffer, 0, count);
 			readindex_ = readlength_ = 0;
+
 			return bytesread;
 		}
 
@@ -145,7 +146,7 @@ DWORD FileStream::Read(PBYTE buffer, DWORD count)
 	return bufferbytes;
 }
 
-void FileStream::Write(PBYTE buffer, DWORD count)
+void FileStream::Write(const PBYTE buffer, DWORD count)
 {
 	DWORD bufferindex = 0;
 	if (writeindex_ > 0)

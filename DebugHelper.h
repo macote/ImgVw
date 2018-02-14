@@ -8,6 +8,8 @@ class DebugHelper
 public:
     static std::wstring FormatWindowMessage(MSG msg);
     static std::wstring FormatWindowMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
+private:
+    DebugHelper() { }
 };
 
 const std::map<UINT, std::wstring> kWindowsMessageCodeMap =
@@ -272,6 +274,7 @@ inline std::wstring DebugHelper::FormatWindowMessage(MSG msg)
     wss << L"lParam: " << std::setw(8) << std::setfill(L'0') << std::hex << msg.lParam << L"; ";
     wss << L"time: " << msg.time << L"; ";
     wss << L"pt: (" << msg.pt.x << L", " << msg.pt.y << ")";
+
     return wss.str();
 }
 
@@ -282,5 +285,6 @@ inline std::wstring DebugHelper::FormatWindowMessage(UINT uMsg, WPARAM wParam, L
     wss << L"message: " << std::setw(8) << std::setfill(L'0') << std::hex << uMsg << messagecode << L"; ";
     wss << L"wParam: " << std::setw(8) << std::setfill(L'0') << std::hex << wParam << L"; ";
     wss << L"lParam: " << std::setw(8) << std::setfill(L'0') << std::hex << lParam << L"; ";
+
     return wss.str();
 }

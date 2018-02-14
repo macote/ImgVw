@@ -10,22 +10,22 @@
 class ImgItemFactory
 {
 public:
-    static std::shared_ptr<ImgItem> Create(std::wstring filepath, std::wstring temppath, INT targetwidth, INT targetheight)
+    static std::shared_ptr<ImgItem> Create(const std::wstring& filepath, INT targetwidth, INT targetheight)
     {
-        auto imgformat = ImgItemHelper::GetImgFormatFromExtension(filepath);
+        const auto imgformat = ImgItemHelper::GetImgFormatFromExtension(filepath);
         switch (imgformat)
         {
         case ImgItem::Format::JPEG:
-            return std::make_shared<ImgJPEGItem>(filepath, temppath, targetwidth, targetheight);
+            return std::make_shared<ImgJPEGItem>(filepath, targetwidth, targetheight);
             break;
         case ImgItem::Format::PNG:
-            return std::make_shared<ImgGDIItem>(filepath, temppath, targetwidth, targetheight);
+            return std::make_shared<ImgGDIItem>(filepath, targetwidth, targetheight);
             break;
         case ImgItem::Format::Other:
-            return std::make_shared<ImgGDIItem>(filepath, temppath, targetwidth, targetheight);
+            return std::make_shared<ImgGDIItem>(filepath, targetwidth, targetheight);
             break;
         default:
-            throw std::runtime_error("FileHashFactory::Create(): the specified image format is not supported.");
+            throw std::runtime_error("ImgItemFactory::Create(): the specified image format is not supported.");
         }
     }
 };

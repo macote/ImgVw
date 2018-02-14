@@ -1,7 +1,5 @@
 #include "ImgJPEGItem.h"
-#include "ImgBitmap.h"
 #include "ImgItemHelper.h"
-#include <memory>
 
 void ImgJPEGItem::Load()
 {
@@ -31,7 +29,7 @@ void ImgJPEGItem::Load()
         turbojpeg::SaveMarkers(jpegdecompressor, ICC_MARKER);
 
         INT jpegSubsamp, jpegColorspace;
-        if (turbojpeg::DecompressHeader(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart,
+        if (turbojpeg::DecompressHeader(jpegdecompressor, jpegfilemap.data(), jpegfilemap.filesize().LowPart,
             &width_, &height_, &jpegSubsamp, &jpegColorspace, TJFLAG_NOCLEANUP))
         {
             errorstring_ = turbojpeg::GetErrorStr();
@@ -77,6 +75,7 @@ void ImgJPEGItem::Load()
         }
 
         BOOL resize = FALSE;
+        INT decompresswidth, decompressheight;
         if (width_ > targetwidth || height_ > targetheight)
         {
             auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
@@ -86,10 +85,10 @@ void ImgJPEGItem::Load()
             }
             else
             {
-                displaywidth_ = TJSCALED(width_, scalingfactors_[scalingfactorindex]);
-                displayheight_ = TJSCALED(height_, scalingfactors_[scalingfactorindex]);
-                auto widthdiff = targetwidth - displaywidth_;
-                auto heightdiff = targetheight - displayheight_;
+                decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex]);
+                decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex]);
+                auto widthdiff = targetwidth - decompresswidth;
+                auto heightdiff = targetheight - decompressheight;
 
                 if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight))
                     || (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth)))
@@ -100,19 +99,19 @@ void ImgJPEGItem::Load()
 
             if (resize)
             {
-                displaywidth_ = TJSCALED(width_, scalingfactors_[scalingfactorindex - 1]);
-                displayheight_ = TJSCALED(height_, scalingfactors_[scalingfactorindex - 1]);
+                decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex - 1]);
+                decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex - 1]);
             }
         }
         else
         {
-            displaywidth_ = width_;
-            displayheight_ = height_;
+            decompresswidth = width_;
+            decompressheight = height_;
         }
 
-        stride_ = TJPAD(displaywidth_ * tjPixelSize[pixelformat]);
-        buffersize_ = stride_ * displayheight_;
-        buffer = (PBYTE)HeapAlloc(heap_, 0, buffersize_);
+        INT stride = TJPAD(decompresswidth * tjPixelSize[pixelformat]);
+        auto buffersize = stride * decompressheight;
+        buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, buffersize));
 
         INT decompressflags{ TJFLAG_FASTDCT };
         if (!resize)
@@ -123,8 +122,8 @@ void ImgJPEGItem::Load()
         turbojpeg::SkipMarkers(jpegdecompressor, EXIF_MARKER);
         turbojpeg::SkipMarkers(jpegdecompressor, ICC_MARKER);
 
-        if (turbojpeg::Decompress(jpegdecompressor, jpegfilemap.view(), jpegfilemap.filesize().LowPart, buffer,
-            displaywidth_, stride_, displayheight_, pixelformat, decompressflags))
+        if (turbojpeg::Decompress(jpegdecompressor, jpegfilemap.data(), jpegfilemap.filesize().LowPart, buffer,
+            decompresswidth, stride, decompressheight, pixelformat, decompressflags))
         {
             errorstring_ = turbojpeg::GetErrorStr();
             status_ = Status::Error;
@@ -133,28 +132,31 @@ void ImgJPEGItem::Load()
 
         if (pixelformat == TJPF_CMYK)
         {
-            if (iccprofile_ == nullptr)
+            if (IsICCProfileLoaded())
             {
                 // TODO: determine if CMYK images can be supported without an ICC profile
                 status_ = Status::Error;
                 goto done;
             }
 
-            TranformCMYK8ColorsToBGR8(&buffer, TJPAD(tjPixelSize[TJPF_BGR] * displaywidth_));
+            // TODO: determine if it could be possible to resize and rotate before transforming colors.
+            auto newstride = TJPAD(decompresswidth * tjPixelSize[TJPF_BGR]);
+            TranformCMYK8ColorsToBGR8(decompresswidth, decompressheight, stride, newstride, &buffer);
+            stride = newstride;
         }
 
         if (resize)
         {
-            ImgItemHelper::ResizeAndRotate24bppRGBImage(*this, displaywidth_, displayheight_, buffer,
+            displaybuffer_ = ImgItemHelper::ResizeAndRotate24bppRGBImage(decompresswidth, decompressheight, buffer,
                 targetwidth, targetheight, rotateflip);
         }
         else if (rotateflip != Gdiplus::RotateNoneFlipNone)
         {
-            ImgItemHelper::Rotate24bppRGBImage(*this, displaywidth_, displayheight_, buffer, rotateflip);
+            displaybuffer_ = ImgItemHelper::Rotate24bppRGBImage(decompresswidth, decompressheight, buffer, rotateflip);
         }
         else
         {
-            WriteTempFile(buffer, buffersize_);
+            displaybuffer_.WriteData(decompresswidth, decompressheight, stride, buffer);
         }
     }
     catch (...)
@@ -163,10 +165,7 @@ void ImgJPEGItem::Load()
         goto done;
     }
 
-    SetupRGBColorsBITMAPINFO(24, displaywidth_, displayheight_);
-
-    offsetx_ = (targetwidth_ - displaywidth_) / 2;
-    offsety_ = (targetheight_ - displayheight_) / 2;
+    SetupDisplayParameters();
 
     status_ = Status::Ready;
 
@@ -187,7 +186,7 @@ done:
     SetEvent(loadedevent_);
 }
 
-INT ImgJPEGItem::GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight)
+INT ImgJPEGItem::GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight) const
 {
     INT i{}, scaledwidth, scaledheight;
 

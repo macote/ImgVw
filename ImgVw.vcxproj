@@ -94,6 +94,7 @@
     <ClInclude Include="DebugHelper.h" />
     <ClInclude Include="FileStream.h" />
     <ClInclude Include="ImgBitmap.h" />
+    <ClInclude Include="ImgBuffer.h" />
     <ClInclude Include="ImgItem.h" />
     <ClInclude Include="ImgBrowser.h" />
     <ClInclude Include="CountingSemaphore.h" />
@@ -103,6 +104,7 @@
     <ClInclude Include="ImgItemHelper.h" />
     <ClInclude Include="ImgJPEGItem.h" />
     <ClInclude Include="ImgLoader.h" />
+    <ClInclude Include="ImgSettings.h" />
     <ClInclude Include="ImgVw.h" />
     <ClInclude Include="ImgVwWindow.h" />
     <ClInclude Include="FileMapView.h" />
@@ -116,6 +118,7 @@
     <ClCompile Include="3rd-party\easyexif\exif.cpp" />
     <ClCompile Include="FileStream.cpp" />
     <ClCompile Include="ImgBrowser.cpp" />
+    <ClCompile Include="ImgBuffer.cpp" />
     <ClCompile Include="ImgGDIItem.cpp" />
     <ClCompile Include="ImgItem.cpp" />
     <ClCompile Include="ImgItemHelper.cpp" />

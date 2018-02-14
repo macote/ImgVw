@@ -15,16 +15,17 @@
 #include "DebugHelper.h"
 #endif
 
-class ImgVwWindow : public Window
+class ImgVwWindow final : public Window
 {
 public:
+    static constexpr auto kClassName = L"ImgVwWindow";
     static const UINT kInitialSlideShowIntervalInMilliseconds = 4000;
-    static const UINT kMinimumSlideShowIntervalInMilliseconds = 500;
+    static const UINT kMinimumSlideShowIntervalInMilliseconds = 250;
     static const UINT kMaximumSlideShowIntervalInMilliseconds = 10000;
-    static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 500;
+    static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 250;
     static const UINT kMouseHideIntervalInMilliseconds = 1000;
 public:
-    ImgVwWindow(HINSTANCE hinst, std::vector<std::wstring> args) : Window(hinst)
+    ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args) : Window(hinst)
 #if _DEBUG && LOGIMGVWWINDOW
         , logger_(TimestampLogger(LOGIMGVWWINDOWPATH + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE))
 #endif
@@ -34,14 +35,16 @@ public:
             path_ = args[1];
         }
     }
-    LPCWSTR ClassName() { return L"ImgVwWindow"; }
-    static ImgVwWindow* Create(HINSTANCE hInst, std::vector<std::wstring> args);
+    ImgVwWindow(const ImgVwWindow&) = delete;
+    ImgVwWindow& operator=(const ImgVwWindow&) = delete;
+    LPCWSTR ClassName() const { return kClassName; }
+    static ImgVwWindow* Create(HINSTANCE hInst, const std::vector<std::wstring> args);
 private:
     void PaintContent(PAINTSTRUCT* pps);
     void DeleteCurrentItem(BOOL allowundo);
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
     LRESULT OnCreate();
-    void InitializeBrowser(std::wstring path);
+    void InitializeBrowser(const std::wstring& path);
     void PerformAction();
     void BrowseNext();
     void BrowsePrevious();
@@ -56,8 +59,8 @@ private:
     void DecreaseSlideShowSpeed();
     void HandleSlideShow();
     void InvalidateScreen();
-    BOOL DisplayImage(HDC dc, ImgItem* item);
-    void DisplayFileInformation(HDC dc, std::wstring filepath);
+    BOOL DisplayImage(HDC dc, const ImgItem* item);
+    void DisplayFileInformation(HDC dc, const std::wstring& filepath);
     void CloseWindow();
     BOOL HandleMouseMove(WPARAM wParam, LPARAM lParam);
     void HandleHideMouseCursor();

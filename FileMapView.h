@@ -6,7 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 
-class FileMapView
+class FileMapView final
 {
 public:
     enum class Mode
@@ -15,58 +15,105 @@ public:
         WriteNew
     };
 public:
-    FileMapView(std::wstring filepath, Mode mode) : filepath_(filepath), mode_(mode)
+    FileMapView(const std::wstring& filepath, Mode mode) : filepath_(filepath), mode_(mode)
     {
-        try
-        {
-            OpenFile();
-            InitializeMapping();
-        }
-        catch (const std::exception&)
-        {
-            CloseFileMapView();
-            throw;
-        }
-    }
-    FileMapView(HANDLE file, Mode mode) : mode_(mode), file_(file)
-    {
-        try
-        {
-            InitializeMapping();
-        }
-        catch (const std::exception&)
-        {
-            CloseFileMapView();
-            throw;
-        }
+        OpenFile();
+        InitializeMapping();
     }
     ~FileMapView()
     {
-        CloseFileMapView();
+        Close();
+    }
+    FileMapView(const FileMapView&) = delete;
+    FileMapView(FileMapView&& other)
+    {
+        *this = std::move(other);
+    }
+    FileMapView& operator=(FileMapView&& other)
+    {
+        if (this != &other)
+        {
+            Close();
+
+            filepath_ = std::move(other.filepath_);
+            mode_ = other.mode_;
+            file_ = other.file_;
+            other.file_ = INVALID_HANDLE_VALUE;
+            filesize_.QuadPart = other.filesize_.QuadPart;
+            other.filesize_.QuadPart = 0;
+            mapfile_ = other.mapfile_;
+            other.mapfile_ = INVALID_HANDLE_VALUE;
+            data_ = other.data_;
+            other.data_ = nullptr;
+        }
+
+        return *this;
     }
     LARGE_INTEGER filesize() const { return filesize_; }
-    PBYTE view() const { return view_; }
+    PBYTE data() const { return data_; }
+    void Open(const std::wstring& filepath, Mode mode);
+    void Close();
 private:
     void InitializeMapping();
     void OpenFile();
     void GetFileSize();
     void OpenMapping();
     void MapView();
-    void CloseFileMapView();
-    BOOL ownsfilehandle_{ FALSE };
     std::wstring filepath_;
     Mode mode_;
     HANDLE file_{ INVALID_HANDLE_VALUE };
     LARGE_INTEGER filesize_{ 0 };
     HANDLE mapfile_{ INVALID_HANDLE_VALUE };
-    PBYTE view_{ nullptr };
+    PBYTE data_{ nullptr };
 };
+
+inline void FileMapView::Open(const std::wstring& filepath, Mode mode)
+{
+    if (file_ != INVALID_HANDLE_VALUE)
+    {
+        Close();
+    }
+
+    filepath_ = filepath;
+    mode_ = mode;
+    OpenFile();
+    InitializeMapping();
+}
+
+inline void FileMapView::Close()
+{
+    if (data_ != nullptr)
+    {
+        UnmapViewOfFile(data_);
+        data_ = nullptr;
+    }
+
+    if (mapfile_ != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(mapfile_);
+        mapfile_ = INVALID_HANDLE_VALUE;
+    }
+
+    if (file_ != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(file_);
+        file_ = INVALID_HANDLE_VALUE;
+    }
+}
 
 inline void FileMapView::InitializeMapping()
 {
-    GetFileSize();
-    OpenMapping();
-    MapView();
+    try
+    {
+        GetFileSize();
+        OpenMapping();
+        MapView();
+    }
+    catch (const std::exception&)
+    {
+        Close();
+        throw;
+    }
 }
 
 inline void FileMapView::OpenFile()
@@ -88,8 +135,6 @@ inline void FileMapView::OpenFile()
         ss << GetLastError();
         throw std::runtime_error(ss.str());
     }
-
-    ownsfilehandle_ = TRUE;
 }
 
 inline void FileMapView::GetFileSize()
@@ -114,23 +159,5 @@ inline void FileMapView::OpenMapping()
 inline void FileMapView::MapView()
 {
     auto desiredAccess = mode_ == Mode::Read ? FILE_MAP_READ : FILE_MAP_WRITE;
-    view_ = (PBYTE)MapViewOfFile(mapfile_, desiredAccess, 0, 0, 0);
-}
-
-inline void  FileMapView::CloseFileMapView()
-{
-    if (view_ != nullptr)
-    {
-        UnmapViewOfFile(view_);
-    }
-
-    if (mapfile_ != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle(mapfile_);
-    }
-
-    if (file_ != INVALID_HANDLE_VALUE && ownsfilehandle_)
-    {
-        CloseHandle(file_);
-    }
+    data_ = reinterpret_cast<PBYTE>(MapViewOfFile(mapfile_, desiredAccess, 0, 0, 0));
 }

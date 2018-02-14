@@ -7,11 +7,9 @@
 class TimestampLogger
 {
 public:
-    TimestampLogger(std::wstring filepath)
-        : TimestampLogger(filepath, FALSE)
-    {
-    }
-    TimestampLogger(std::wstring filepath, BOOL autoflush)
+    TimestampLogger(const std::wstring& filepath)
+        : TimestampLogger(filepath, FALSE) { }
+    TimestampLogger(const std::wstring& filepath, BOOL autoflush)
         : streamlinewriter_(StreamLineWriter(filepath, TRUE))
     {
         pwritecriticalsection_ = new CRITICAL_SECTION();
@@ -21,22 +19,6 @@ public:
         }
 
         set_autoflush(autoflush);
-    }
-    TimestampLogger(TimestampLogger&& other)
-        : streamlinewriter_(std::move(other.streamlinewriter_)), pwritecriticalsection_(other.pwritecriticalsection_)
-    {
-        *this = std::move(other);
-    }
-    TimestampLogger& operator=(TimestampLogger&& other)
-    {
-        if (this != &other)
-        {
-            streamlinewriter_ = std::move(other.streamlinewriter_);
-            pwritecriticalsection_ = other.pwritecriticalsection_;
-            other.pwritecriticalsection_ = nullptr;
-        }
-
-        return *this;
     }
     ~TimestampLogger()
     {
@@ -48,13 +30,15 @@ public:
 
         Close();
     }
-    void WriteLine(std::wstring line);
+    TimestampLogger(const TimestampLogger&) = delete;
+    TimestampLogger& operator=(const TimestampLogger&) = delete;
+    void WriteLine(const std::wstring& line);
     void Close()
     {
         streamlinewriter_.Close();
     }
     BOOL autoflush() const { return streamlinewriter_.autoflush(); };
-    void set_autoflush(const BOOL autoflush) { streamlinewriter_.set_autoflush(autoflush); };
+    void set_autoflush(BOOL autoflush) { streamlinewriter_.set_autoflush(autoflush); };
     static std::wstring GetTimestampString();
     static std::wstring GetTimestampString(BOOL asvalidfilename);
 private:
@@ -62,7 +46,7 @@ private:
     PCRITICAL_SECTION pwritecriticalsection_{ nullptr };
 };
 
-inline void TimestampLogger::WriteLine(std::wstring line)
+inline void TimestampLogger::WriteLine(const std::wstring& line)
 {
     EnterCriticalSection(pwritecriticalsection_);
 
@@ -85,7 +69,7 @@ inline std::wstring TimestampLogger::GetTimestampString(BOOL asvalidfilename)
     SYSTEMTIME filetime;
     GetLocalTime(&filetime);
     std::wstringstream wss;
-    auto timeseparator = asvalidfilename ? L"." : L":";
+    const auto timeseparator = asvalidfilename ? L"." : L":";
     wss << filetime.wYear << L"-";
     wss << std::setw(2) << std::setfill(L'0') << filetime.wMonth << L"-";
     wss << std::setw(2) << std::setfill(L'0') << filetime.wDay << L"T";
@@ -93,5 +77,6 @@ inline std::wstring TimestampLogger::GetTimestampString(BOOL asvalidfilename)
     wss << std::setw(2) << std::setfill(L'0') << filetime.wMinute << timeseparator;
     wss << std::setw(2) << std::setfill(L'0') << filetime.wSecond << L".";
     wss << std::setw(3) << std::setfill(L'0') << filetime.wMilliseconds;
+
     return wss.str();
 }

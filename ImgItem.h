@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ImgBitmap.h"
+#include "ImgBuffer.h"
 #include "FileMapView.h"
 #include "3rd-party\Little-CMS\lcms2.h"
 #include <Windows.h>
@@ -29,12 +30,11 @@ public:
         Error
     };
 public:
-    ImgItem(std::wstring filepath, std::wstring temppath, INT targetwidth, INT targetheight)
-        : filepath_(filepath), targetwidth_(targetwidth), targetheight_(targetheight), temppath_(temppath)
+    ImgItem(std::wstring filepath, INT targetwidth, INT targetheight)
+        : filepath_(filepath), targetwidth_(targetwidth), targetheight_(targetheight)
     {
         loadedevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
         heap_ = GetProcessHeap();
-        CreateTempFile();
     }
     virtual ~ImgItem()
     {
@@ -43,51 +43,45 @@ public:
             HeapFree(heap_, 0, pbitmapinfo_);
         }
 
+        CloseICCProfile();
         CloseHandle(loadedevent_);
-        DeleteTempFile();
     }
+    ImgItem(const ImgItem&) = delete;
+    ImgItem& operator=(const ImgItem&) = delete;
     virtual void Load() = 0;
     virtual void Unload();
     Status status() const { return status_; }
     std::wstring errormessage() const { return errormessage_; }
-    INT displaywidth() const { return displaywidth_; }
-    INT displayheight() const { return displayheight_; }
+    INT displaywidth() const { return displaybuffer_.width(); }
+    INT displayheight() const { return displaybuffer_.height(); }
     INT offsetx() const { return offsetx_; }
     INT offsety() const { return offsety_; }
     HANDLE loadedevent() const { return loadedevent_; }
-    void HandleBuffer(INT width, INT height, INT stride, PBYTE buffer);
-    ImgBitmap GetDisplayBitmap();
+    ImgBitmap GetDisplayBitmap() const;
 protected:
-    void SetupRGBColorsBITMAPINFO(WORD bitCount, INT width, INT height);
-    void CreateTempFile();
-    void WriteTempFile(PBYTE buffer, INT buffersize);
-    INT buffersize() const { return buffersize_; }
-    INT stride() const { return stride_; }
+    void SetupDisplayParameters()
+    {
+        SetupDisplayParameters(FALSE);
+    }
+    void SetupDisplayParameters(BOOL topdownbitmap);
     void OpenICCProfile(PBYTE iccprofiledata, UINT iccprofiledatabytecount);
-    void TranformCMYK8ColorsToBGR8(PBYTE* buffer, UINT newstride);
+    BOOL IsICCProfileLoaded() const { return iccprofile_ != nullptr; }
+    void TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer) const;
     void CloseICCProfile();
 protected:
     std::wstring filepath_;
     INT targetwidth_;
     INT targetheight_;
-    INT displaywidth_{};
-    INT displayheight_{};
     INT width_{};
     INT height_{};
     INT offsetx_{};
     INT offsety_{};
-    INT buffersize_{};
-    INT stride_{};
+    ImgBuffer displaybuffer_;
     Status status_{ Status::Queued };
     std::wstring errormessage_;
     HANDLE loadedevent_{ NULL };
     HANDLE heap_{ INVALID_HANDLE_VALUE };
+private:
     PBITMAPINFO pbitmapinfo_{ nullptr };
     cmsHPROFILE iccprofile_{ nullptr };
-private:
-    void DeleteTempFile();
-private:
-    std::wstring tempfilename_;
-    std::wstring temppath_;
-    HANDLE tempfile_{ INVALID_HANDLE_VALUE };
 };

@@ -1,10 +1,10 @@
 #include "ImgItemHelper.h"
 
-CountingSemaphore ImgItemHelper::kGDIOperationSemaphore = CountingSemaphore(kGDIOperationSemaphoreCount);
+const CountingSemaphore ImgItemHelper::kGDIOperationSemaphore = CountingSemaphore(kGDIOperationSemaphoreCount);
 
-ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(std::wstring filepath)
+ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(const std::wstring& filepath)
 {
-    auto extension = PathFindExtension(filepath.c_str());
+    const auto extension = PathFindExtension(filepath.c_str());
     if (StrCmpI(extension, L".jpg") == 0 || StrCmpI(extension, L".jpeg") == 0)
     {
         return ImgItem::Format::JPEG;
@@ -25,46 +25,50 @@ ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(std::wstring filepath)
     return ImgItem::Format::Unsupported;
 }
 
-void ImgItemHelper::Resize24bppRGBImage(ImgItem& imgitem, INT width, INT height, PBYTE buffer, INT targetwidth, INT targetheight)
+ImgBuffer ImgItemHelper::Resize24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth, INT targetheight)
 {
-    ResizeAndRotate24bppRGBImage(imgitem, width, height, buffer, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone);
+    return ResizeAndRotate24bppRGBImage(width, height, buffer, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone);
 }
 
-void ImgItemHelper::ResizeAndRotate24bppRGBImage(ImgItem& imgitem, INT width, INT height, PBYTE buffer, INT targetwidth, INT targetheight,
+ImgBuffer ImgItemHelper::ResizeAndRotate24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth, INT targetheight,
     Gdiplus::RotateFlipType rotateflip)
 {
     auto bitmaptoresize = Get24bppRGBBitmap(width, height, buffer);
-    ResizeAndRotateImage(imgitem, bitmaptoresize.get(), targetwidth, targetheight, rotateflip);
+
+    return ResizeAndRotateImage(bitmaptoresize.get(), targetwidth, targetheight, rotateflip);
 }
 
-void ImgItemHelper::Rotate24bppRGBImage(ImgItem& imgitem, INT width, INT height, PBYTE buffer, Gdiplus::RotateFlipType rotateflip)
+ImgBuffer ImgItemHelper::Rotate24bppRGBImage(INT width, INT height, const PBYTE buffer, Gdiplus::RotateFlipType rotateflip)
 {
     auto bitmaptorotate = Get24bppRGBBitmap(width, height, buffer);
-    RotateImage(imgitem, bitmaptorotate.get(), rotateflip);
+
+    return RotateImage(bitmaptorotate.get(), rotateflip);
 }
 
-void ImgItemHelper::ResizeImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight)
+ImgBuffer ImgItemHelper::ResizeImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight)
 {
-    ResizeAndRotateImage(imgitem, bitmap, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone);
+    return ResizeAndRotateImage(bitmap, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone);
 }
 
-void ImgItemHelper::ResizeAndRotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
+ImgBuffer ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
     Gdiplus::RotateFlipType rotateflip)
 {
-    auto percentWidth = (float)targetwidth / bitmap->GetWidth();
-    auto percentHeight = (float)targetheight / bitmap->GetHeight();
+    auto percentWidth = static_cast<FLOAT>(targetwidth) / bitmap->GetWidth();
+    auto percentHeight = static_cast<FLOAT>(targetheight) / bitmap->GetHeight();
     auto percent = percentHeight < percentWidth ? percentHeight : percentWidth;
-    auto newwidth = (int)(bitmap->GetWidth() * percent);
-    auto newheight = (int)(bitmap->GetHeight() * percent);
+    auto newwidth = static_cast<INT>(bitmap->GetWidth() * percent);
+    auto newheight = static_cast<INT>(bitmap->GetHeight() * percent);
     ImgItemHelper::kGDIOperationSemaphore.Wait();
     std::unique_ptr<Gdiplus::Bitmap> resizedbitmap = std::make_unique<Gdiplus::Bitmap>(newwidth, newheight, PixelFormat24bppRGB);
     Gdiplus::Graphics graphics(resizedbitmap.get());
     graphics.DrawImage(bitmap, 0, 0, newwidth, newheight);
-    RotateImage(imgitem, resizedbitmap.get(), rotateflip, TRUE);
+    auto buffer = RotateImage(resizedbitmap.get(), rotateflip, TRUE);
     ImgItemHelper::kGDIOperationSemaphore.Notify();
+    
+    return buffer;
 }
 
-void ImgItemHelper::RotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip, BOOL gdiinuse)
+ImgBuffer ImgItemHelper::RotateImage(Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip, BOOL gdiinuse)
 {
     if (!gdiinuse)
     {
@@ -76,15 +80,17 @@ void ImgItemHelper::RotateImage(ImgItem& imgitem, Gdiplus::Bitmap* bitmap, Gdipl
         bitmap->RotateFlip(rotateflip);
     }
 
-    HandleBuffer(imgitem, bitmap);
-    
+    auto buffer = GetBuffer(bitmap);
+
     if (!gdiinuse)
     {
         ImgItemHelper::kGDIOperationSemaphore.Notify();
     }
+
+    return buffer;
 }
 
-std::unique_ptr<Gdiplus::Bitmap> ImgItemHelper::Get24bppRGBBitmap(INT width, INT height, PBYTE buffer)
+std::unique_ptr<Gdiplus::Bitmap> ImgItemHelper::Get24bppRGBBitmap(INT width, INT height, const PBYTE buffer)
 {
     BITMAPINFO bitmapinfo{};
     bitmapinfo.bmiHeader.biCompression = BI_RGB;
@@ -93,22 +99,27 @@ std::unique_ptr<Gdiplus::Bitmap> ImgItemHelper::Get24bppRGBBitmap(INT width, INT
     bitmapinfo.bmiHeader.biHeight = height;
     bitmapinfo.bmiHeader.biPlanes = 1;
     bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+
     return std::make_unique<Gdiplus::Bitmap>(&bitmapinfo, buffer);
 }
 
-void ImgItemHelper::HandleBuffer(ImgItem& imgitem, Gdiplus::Bitmap* bitmap)
+ImgBuffer ImgItemHelper::GetBuffer(Gdiplus::Bitmap* bitmap)
 {
     Gdiplus::BitmapData data{};
     Gdiplus::Rect rect(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
     bitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat24bppRGB, &data);
-    imgitem.HandleBuffer(data.Width, data.Height, data.Stride, (PBYTE)data.Scan0);
+    ImgBuffer buffer;
+    buffer.WriteData(data.Width, data.Height, data.Stride, reinterpret_cast<PBYTE>(data.Scan0));
     bitmap->UnlockBits(&data);
+
+    return buffer;
 }
 
-UINT ImgItemHelper::GetExifOrientationFromData(PBYTE exifdata, UINT exifdatabytecount)
+UINT ImgItemHelper::GetExifOrientationFromData(const PBYTE exifdata, UINT exifdatabytecount)
 {
     easyexif::EXIFInfo exifinfo;
     exifinfo.parseFromEXIFSegment(exifdata, exifdatabytecount);
+
     return exifinfo.Orientation;
 }
 
@@ -117,13 +128,13 @@ Gdiplus::RotateFlipType ImgItemHelper::GetRotateFlipTypeFromExifOrientation(UINT
     switch (exiforientation)
     {
 
-        //   1       2       3       4         5           6           7           8
-        //
-        // 888888  888888      88  88      8888888888  88                  88  8888888888
-        // 88          88      88  88      88  88      88  88          88  88      88  88
-        // 8888      8888    8888  8888    88          8888888888  8888888888          88
-        // 88          88      88  88
-        // 88          88  888888  888888
+    //   1       2       3       4         5           6           7           8
+    //
+    // 888888  888888      88  88      8888888888  88                  88  8888888888
+    // 88          88      88  88      88  88      88  88          88  88      88  88
+    // 8888      8888    8888  8888    88          8888888888  8888888888          88
+    // 88          88      88  88
+    // 88          88  888888  888888
 
     case 1:
         return Gdiplus::RotateNoneFlipNone;
@@ -134,13 +145,13 @@ Gdiplus::RotateFlipType ImgItemHelper::GetRotateFlipTypeFromExifOrientation(UINT
     case 4:
         return Gdiplus::Rotate180FlipX;
     case 5:
-        return Gdiplus::Rotate90FlipX;
-    case 6:
-        return Gdiplus::Rotate90FlipNone;
-    case 7:
         return Gdiplus::Rotate270FlipX;
-    case 8:
+    case 6:
         return Gdiplus::Rotate270FlipNone;
+    case 7:
+        return Gdiplus::Rotate90FlipX;
+    case 8:
+        return Gdiplus::Rotate90FlipNone;
     default:
         return Gdiplus::RotateNoneFlipNone;
     }

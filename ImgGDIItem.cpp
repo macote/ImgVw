@@ -1,5 +1,4 @@
 #include "ImgGDIItem.h"
-#include "ImgBitmap.h"
 #include "ImgItemHelper.h"
 
 void ImgGDIItem::Load()
@@ -25,21 +24,14 @@ void ImgGDIItem::Load()
     height_ = bitmap->GetHeight();
     if (width_ > targetwidth_ || height_ > targetheight_)
     {
-        ImgItemHelper::ResizeImage(*this, bitmap.get(), targetwidth_, targetheight_);
+        displaybuffer_ = ImgItemHelper::ResizeImage(bitmap.get(), targetwidth_, targetheight_);
     }
     else
     {
-        Gdiplus::BitmapData data{};
-        Gdiplus::Rect rect(0, 0, width_, height_);
-        bitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat24bppRGB, &data);
-        HandleBuffer(data.Width, data.Height, data.Stride, (PBYTE)data.Scan0);
-        bitmap->UnlockBits(&data);
+        displaybuffer_ = ImgItemHelper::GetBuffer(bitmap.get());
     }
 
-    SetupRGBColorsBITMAPINFO(24, displaywidth_, -displayheight_); // stored image is top-down, hence the negative height
-
-    offsetx_ = (targetwidth_ - displaywidth_) / 2;
-    offsety_ = (targetheight_ - displayheight_) / 2;
+    SetupDisplayParameters(true);
 
     status_ = Status::Ready;
 

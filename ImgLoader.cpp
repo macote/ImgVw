@@ -23,12 +23,12 @@ void ImgLoader::StopLoading()
     if (loaderitems_.size() > 0)
     {
         std::vector<HANDLE> threads;
-        for (auto it = loaderitems_.begin(); it != loaderitems_.end(); ++it)
+        for (const auto & loaderitem : loaderitems_)
         {
-            auto status = (*it)->imgitem()->status();
+            auto status = loaderitem->imgitem()->status();
             if (!(status == ImgItem::Status::Error || status == ImgItem::Status::Ready))
             {
-                threads.push_back((*it)->loaderitemthread());
+                threads.push_back(loaderitem->loaderitemthread());
             }
         }
 
@@ -46,18 +46,20 @@ void ImgLoader::StopLoading()
     cancellationflag_ = FALSE;
 }
 
-void ImgLoader::StartLoop()
+void ImgLoader::StartLoading()
 {
-    loopthread_ = CreateThread(NULL, 0, StaticThreadLoop, (void*)this, 0, NULL);
+    loopthread_ = CreateThread(NULL, 0, StaticThreadLoop, reinterpret_cast<void*>(this), 0, NULL);
 }
 
 DWORD ImgLoader::Loop()
 {
-    HANDLE events[2] = { workevent_, cancelevent_ };
+    const HANDLE waitevents[2] = { workevent_, cancelevent_ };
+    INT cyclecount{};
 
     while (!cancellationflag_)
     {
-        if (WaitForMultipleObjects(2, events, FALSE, INFINITE) == WAIT_FAILED)
+        ++cyclecount;
+        if (WaitForMultipleObjects(2, waitevents, FALSE, INFINITE) == WAIT_FAILED)
         {
             // TODO: handle error
             break;
@@ -68,14 +70,14 @@ DWORD ImgLoader::Loop()
             break;
         }
 
-        if (ItemPending())
+        auto imgitem = GetNextItem();
+        if (imgitem != nullptr)
         {
             loadersemaphore_.Wait();
-            auto imgitem = GetNextItem();
-            if (imgitem != NULL && imgitem->status() == ImgItem::Status::Queued)
+            if (imgitem->status() == ImgItem::Status::Queued)
             {
                 auto loaderitem = std::make_unique<LoaderItem>(imgitem, [&]() { loadersemaphore_.Notify(); });
-                loaderitem->set_loaderitemthread(CreateThread(NULL, 0, StaticThreadLoad, (void*)loaderitem.get(), 0, NULL));
+                loaderitem->set_loaderitemthread(CreateThread(NULL, 0, StaticThreadLoad, reinterpret_cast<void*>(loaderitem.get()), 0, NULL));
                 loaderitems_.push_back(std::move(loaderitem));
             }
             else
@@ -83,14 +85,33 @@ DWORD ImgLoader::Loop()
                 loadersemaphore_.Notify();
             }
         }
+
+        if (cyclecount % kCleanupCycleCountTrigger == 0)
+        {
+            INT closedthreads{};
+            auto it = loaderitems_.begin();
+            while (it != loaderitems_.end())
+            {
+                if (WaitForSingleObject((*it).get()->loaderitemthread(), 0) == WAIT_OBJECT_0)
+                {
+                    (*it).get()->CloseLoaderItemThread();
+                    ++closedthreads;
+                    loaderitems_.erase(it++);
+                }
+                else
+                {
+                    it++;
+                }
+
+                if (closedthreads == kCleanupCycleCountTrigger)
+                {
+                    break;
+                }
+            }
+        }
     }
 
     return 0;
-}
-
-BOOL ImgLoader::ItemPending()
-{
-    return queue_.size() > 0;
 }
 
 void ImgLoader::QueueItem(ImgItem* imgitem, BOOL pushfront)
@@ -106,39 +127,42 @@ void ImgLoader::QueueItem(ImgItem* imgitem, BOOL pushfront)
     }
 
     LeaveCriticalSection(&queuecriticalsection_);
+
     SetEvent(workevent_);
 }
 
 ImgItem* ImgLoader::GetNextItem()
 {
-    ImgItem* imgitem = NULL;
+    ImgItem* imgitem = nullptr;
     EnterCriticalSection(&queuecriticalsection_);
     if (queue_.size() > 0)
     {
         imgitem = queue_.front();
         queue_.pop_front();
     }
-
-    if (queue_.size() == 0)
+    else
     {
         ResetEvent(workevent_);
     }
 
     LeaveCriticalSection(&queuecriticalsection_);
+
     return imgitem;
 }
 
 DWORD WINAPI ImgLoader::StaticThreadLoop(void* imgloaderinstance)
 {
-    auto imgloader = (ImgLoader*)imgloaderinstance;
+    auto imgloader = reinterpret_cast<ImgLoader*>(imgloaderinstance);
     imgloader->Loop();
+
     return 0;
 }
 
 DWORD WINAPI ImgLoader::StaticThreadLoad(void* loaderiteminstance)
 {
-    auto loaderitem = (LoaderItem*)loaderiteminstance;
+    auto loaderitem = reinterpret_cast<LoaderItem*>(loaderiteminstance);
     loaderitem->imgitem()->Load();
     loaderitem->LoadComplete();
+
     return 0;
 }

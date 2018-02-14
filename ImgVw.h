@@ -15,12 +15,14 @@ class ImgVw
 {
 public:
     static INT Run(HINSTANCE hInstance, INT nShowCmd);
+private:
+    ImgVw() { }
 };
 
 inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 {
     int argscount;
-    auto args = CommandLineToArgvW(GetCommandLine(), &argscount);
+    const auto args = CommandLineToArgvW(GetCommandLine(), &argscount);
     std::vector<std::wstring> argsvector;
     for (int i = 0; i < argscount; ++i)
     {

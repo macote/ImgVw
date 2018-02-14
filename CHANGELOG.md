@@ -1,3 +1,13 @@
+## 1.6.0 (2018-02-10)
+
+- Fix EXIF rotate bug
+- Fix delete bug
+- Release loaded image thread handles
+
+## 1.5.0 (2017-12-05)
+
+- Update mouse handling code
+
 ## 1.4.0 (2017-08-28)
 
 - Support CMYK color in JPEG images

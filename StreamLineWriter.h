@@ -7,26 +7,27 @@
 class StreamLineWriter
 {
 public:
+    static constexpr auto kEndOfLine = "\r\n";
+public:
     enum class Encoding
     {
         UTF8
     };
-    StreamLineWriter(std::wstring filepath, bool append) : StreamLineWriter(filepath, Encoding::UTF8, append)
-    {
-    }
-    StreamLineWriter(std::wstring filepath, Encoding encoding, bool append)
-        : filestream_(FileStream(filepath, append ? FileStream::Mode::Append : FileStream::Mode::Truncate)), encoding_(encoding)
-    {
-    }
-    StreamLineWriter(const StreamLineWriter& that) = delete;
+    StreamLineWriter(const std::wstring& filepath, bool append)
+        : StreamLineWriter(filepath, Encoding::UTF8, append) { }
+    StreamLineWriter(const std::wstring& filepath, Encoding encoding, bool append)
+        : filestream_(FileStream(filepath, append
+            ? FileStream::Mode::Append
+            : FileStream::Mode::Truncate)), encoding_(encoding) { }
+    StreamLineWriter(const StreamLineWriter&) = delete;
     StreamLineWriter(StreamLineWriter&& other)
-        : filestream_(std::move(other.filestream_)), encoding_(other.encoding_)
-    {
-    }
+        : filestream_(std::move(other.filestream_)), encoding_(other.encoding_) { }
     StreamLineWriter& operator=(StreamLineWriter&& other)
     {
         if (this != &other)
         {
+            Close();
+
             filestream_ = std::move(other.filestream_);
             encoding_ = other.encoding_;
         }
@@ -38,9 +39,9 @@ public:
         Close();
     }
     BOOL autoflush() const { return autoflush_; };
-    void set_autoflush(const BOOL autoflush) { autoflush_ = autoflush; };
-    void Write(std::wstring line);
-    void WriteLine(std::wstring line);
+    void set_autoflush(BOOL autoflush) { autoflush_ = autoflush; };
+    void Write(const std::wstring& line);
+    void WriteLine(const std::wstring& line);
     void Close()
     {
         filestream_.Close();
@@ -48,23 +49,23 @@ public:
 private:
     void WriteEOL()
     {
-        filestream_.Write((PBYTE)"\r\n", 2);
+        filestream_.Write(reinterpret_cast<PBYTE>(const_cast<char*>(kEndOfLine)), 2);
     }
     FileStream filestream_;
     Encoding encoding_;
     BOOL autoflush_{};
 };
 
-inline void StreamLineWriter::Write(std::wstring line)
+inline void StreamLineWriter::Write(const std::wstring& line)
 {
     if (line.size() > 0)
     {
         if (encoding_ == Encoding::UTF8)
         {
-            DWORD cbMultiByte = WideCharToMultiByte(CP_UTF8, 0, line.c_str(), -1, NULL, 0, NULL, NULL);
-            LPSTR bytes = (LPSTR)HeapAlloc(GetProcessHeap(), 0, cbMultiByte);
+            auto cbMultiByte = WideCharToMultiByte(CP_UTF8, 0, line.c_str(), -1, NULL, 0, NULL, NULL);
+            auto bytes = reinterpret_cast<LPSTR>(HeapAlloc(GetProcessHeap(), 0, cbMultiByte));
             cbMultiByte = WideCharToMultiByte(CP_UTF8, 0, line.c_str(), -1, bytes, cbMultiByte, NULL, NULL);
-            filestream_.Write((PBYTE)bytes, cbMultiByte - 1);
+            filestream_.Write(reinterpret_cast<PBYTE>(bytes), cbMultiByte - 1);
             HeapFree(GetProcessHeap(), 0, bytes);
         }
         else
@@ -74,7 +75,7 @@ inline void StreamLineWriter::Write(std::wstring line)
     }
 }
 
-inline void StreamLineWriter::WriteLine(std::wstring line)
+inline void StreamLineWriter::WriteLine(const std::wstring& line)
 {
     Write(line);
     WriteEOL();
