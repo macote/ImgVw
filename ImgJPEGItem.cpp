@@ -52,7 +52,7 @@ void ImgJPEGItem::Load()
 
         Gdiplus::RotateFlipType rotateflip{ Gdiplus::RotateNoneFlipNone };
         PBYTE exifdata;
-        INT exifdatabytecount = turbojpeg::LocateEXIFSegment(jpegdecompressor, &exifdata);
+        const auto exifdatabytecount = turbojpeg::LocateEXIFSegment(jpegdecompressor, &exifdata);
         if (exifdatabytecount > 0)
         {
             rotateflip = ImgItemHelper::GetRotateFlipTypeFromExifOrientation(
@@ -61,7 +61,7 @@ void ImgJPEGItem::Load()
 
         turbojpeg::AbortDecompress(jpegdecompressor);
 
-        INT targetwidth, targetheight;
+        INT targetwidth{}, targetheight{};
         if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone
             || rotateflip == Gdiplus::Rotate90FlipX || rotateflip == Gdiplus::Rotate270FlipX)
         {
@@ -75,10 +75,10 @@ void ImgJPEGItem::Load()
         }
 
         BOOL resize = FALSE;
-        INT decompresswidth, decompressheight;
+        INT decompresswidth{}, decompressheight{};
         if (width_ > targetwidth || height_ > targetheight)
         {
-            auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
+            const auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
             if (scalingfactorindex >= scalingfactorcount_)
             {
                 resize = TRUE;
@@ -87,8 +87,8 @@ void ImgJPEGItem::Load()
             {
                 decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex]);
                 decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex]);
-                auto widthdiff = targetwidth - decompresswidth;
-                auto heightdiff = targetheight - decompressheight;
+                const auto widthdiff = targetwidth - decompresswidth;
+                const auto heightdiff = targetheight - decompressheight;
 
                 if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight))
                     || (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth)))
@@ -109,8 +109,8 @@ void ImgJPEGItem::Load()
             decompressheight = height_;
         }
 
-        INT stride = TJPAD(decompresswidth * tjPixelSize[pixelformat]);
-        auto buffersize = stride * decompressheight;
+        auto stride = TJPAD(decompresswidth * tjPixelSize[pixelformat]);
+        const auto buffersize = stride * decompressheight;
         buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, buffersize));
 
         INT decompressflags{ TJFLAG_FASTDCT };
@@ -132,15 +132,7 @@ void ImgJPEGItem::Load()
 
         if (pixelformat == TJPF_CMYK)
         {
-            if (IsICCProfileLoaded())
-            {
-                // TODO: determine if CMYK images can be supported without an ICC profile
-                status_ = Status::Error;
-                goto done;
-            }
-
-            // TODO: determine if it could be possible to resize and rotate before transforming colors.
-            auto newstride = TJPAD(decompresswidth * tjPixelSize[TJPF_BGR]);
+            const auto newstride = TJPAD(decompresswidth * tjPixelSize[TJPF_BGR]);
             TranformCMYK8ColorsToBGR8(decompresswidth, decompressheight, stride, newstride, &buffer);
             stride = newstride;
         }
@@ -188,7 +180,7 @@ done:
 
 INT ImgJPEGItem::GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight) const
 {
-    INT i{}, scaledwidth, scaledheight;
+    INT i{}, scaledwidth{}, scaledheight{};
 
     while (i < scalingfactorcount_)
     {

@@ -274,7 +274,7 @@ void ImgVwWindow::HandleHideMouseCursor()
     LARGE_INTEGER counter, elapsed;
     QueryPerformanceCounter(&counter);
     elapsed.QuadPart = (counter.QuadPart - mousemovelastcounter_.QuadPart) * 1000;
-    auto elapsedmilliseconds = static_cast<UINT>(elapsed.QuadPart / qpcfrequency_.QuadPart);
+    const auto elapsedmilliseconds = static_cast<UINT>(elapsed.QuadPart / qpcfrequency_.QuadPart);
 
     if (elapsedmilliseconds < kMouseHideIntervalInMilliseconds)
     {
@@ -295,8 +295,8 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
     }
 
     SHFILEOPSTRUCT shfileopstruct{};
-    TCHAR deletepaths[4096];
-    size_t pathlen = browser_.GetCurrentFilePath().size();
+    TCHAR deletepaths[4096] = {};
+    const size_t pathlen = browser_.GetCurrentFilePath().size();
     wcsncpy(deletepaths, browser_.GetCurrentFilePath().c_str(), pathlen);
     deletepaths[pathlen + 1] = 0;
     deletepaths[pathlen] = 0;

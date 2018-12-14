@@ -25,7 +25,7 @@ void ImgLoader::StopLoading()
         std::vector<HANDLE> threads;
         for (const auto & loaderitem : loaderitems_)
         {
-            auto status = loaderitem->imgitem()->status();
+            const auto status = loaderitem->imgitem()->status();
             if (!(status == ImgItem::Status::Error || status == ImgItem::Status::Ready))
             {
                 threads.push_back(loaderitem->loaderitemthread());
@@ -86,7 +86,7 @@ DWORD ImgLoader::Loop()
             }
         }
 
-        if (cyclecount % kCleanupCycleCountTrigger == 0)
+        if (loaderitems_.size() > 0 && cyclecount % kCleanupCycleCountTrigger == 0)
         {
             INT closedthreads{};
             auto it = loaderitems_.begin();

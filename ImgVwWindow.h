@@ -19,10 +19,10 @@ class ImgVwWindow final : public Window
 {
 public:
     static constexpr auto kClassName = L"ImgVwWindow";
-    static const UINT kInitialSlideShowIntervalInMilliseconds = 4000;
-    static const UINT kMinimumSlideShowIntervalInMilliseconds = 250;
+    static const UINT kInitialSlideShowIntervalInMilliseconds = 1750;
+    static const UINT kMinimumSlideShowIntervalInMilliseconds = 125;
     static const UINT kMaximumSlideShowIntervalInMilliseconds = 10000;
-    static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 250;
+    static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 125;
     static const UINT kMouseHideIntervalInMilliseconds = 1000;
 public:
     ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args) : Window(hinst)

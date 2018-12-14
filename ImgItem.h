@@ -64,9 +64,10 @@ protected:
         SetupDisplayParameters(FALSE);
     }
     void SetupDisplayParameters(BOOL topdownbitmap);
-    void OpenICCProfile(PBYTE iccprofiledata, UINT iccprofiledatabytecount);
+    void OpenICCProfile(const PBYTE iccprofiledata, UINT iccprofiledatabytecount);
+	void LoadDefaultICCProfile();
     BOOL IsICCProfileLoaded() const { return iccprofile_ != nullptr; }
-    void TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer) const;
+    void TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer);
     void CloseICCProfile();
 protected:
     std::wstring filepath_;
@@ -83,5 +84,6 @@ protected:
     HANDLE heap_{ INVALID_HANDLE_VALUE };
 private:
     PBITMAPINFO pbitmapinfo_{ nullptr };
+    cmsHPROFILE iccdefaultprofile_{ nullptr };
     cmsHPROFILE iccprofile_{ nullptr };
 };

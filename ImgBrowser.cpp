@@ -65,9 +65,9 @@ void ImgBrowser::StartBrowsingAsync(const std::wstring& path, INT targetwidth, I
     targetwidth_ = targetwidth;
     targetheight_ = targetheight;
 
-    WIN32_FIND_DATA findfiledata;
-    HANDLE findfilehandle;
-    BOOL forcedfolder = FALSE;
+    WIN32_FIND_DATA findfiledata{};
+    HANDLE findfilehandle{};
+    BOOL forcedfolder{};
     std::wstring workpath = path;
 
     if (workpath.size() == 0)
@@ -90,7 +90,7 @@ void ImgBrowser::StartBrowsingAsync(const std::wstring& path, INT targetwidth, I
         FindClose(findfilehandle);
         if (!(findfiledata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !forcedfolder)
         {
-            auto backslashposition = workpath.rfind(L"\\");
+            const auto backslashposition = workpath.rfind(L"\\");
             if (backslashposition != std::wstring::npos)
             {
                 folderpath_ = workpath.substr(0, backslashposition + 1);

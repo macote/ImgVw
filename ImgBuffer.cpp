@@ -36,7 +36,7 @@ void ImgBuffer::WriteData(INT width, INT height, INT stride, const PBYTE buffer)
     stride_ = stride;
     buffersize_ = stride * height;
 
-    DWORD byteswritten;
+    DWORD byteswritten{};
     SetFilePointerEx(tempfile_, LARGE_INTEGER{ 0 }, NULL, FILE_BEGIN);
     if (!WriteFile(tempfile_, buffer, buffersize_, &byteswritten, NULL))
     {

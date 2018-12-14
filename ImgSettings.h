@@ -36,7 +36,7 @@ inline void ImgSettings::InitializeTempPath()
 {
     TCHAR temppathbuffer[MAX_PATH + 1];
 
-    auto pathlen = GetTempPath(MAX_PATH, temppathbuffer);
+    const auto pathlen = GetTempPath(MAX_PATH, temppathbuffer);
     if (pathlen > MAX_PATH || pathlen == 0)
     {
         // TODO: handle error.
@@ -44,15 +44,15 @@ inline void ImgSettings::InitializeTempPath()
 
     std::wstring temppath = temppathbuffer;
 
-    if (temppathbuffer[pathlen - 1] != L'\\')
+    if (pathlen > 0 && temppathbuffer[pathlen - 1] != L'\\')
     {
         temppath += L'\\';
     }
 
     std::wstring imgtemppath = temppath;
     std::wstring testpath;
-    WIN32_FIND_DATA finddata;
-    HANDLE find;
+    WIN32_FIND_DATA finddata{};
+    HANDLE find{};
     BOOL folderexists = TRUE;
 
     do
@@ -65,7 +65,7 @@ inline void ImgSettings::InitializeTempPath()
 
         std::wstringstream wss;
         wss << std::setw(8) << std::setfill(L'0') << std::uppercase << std::hex << guid.Data1;
-        std::wstring testpath = temppath + wss.str();
+        testpath = temppath + wss.str();
 
         find = FindFirstFile(testpath.c_str(), &finddata);
         if (find == INVALID_HANDLE_VALUE)

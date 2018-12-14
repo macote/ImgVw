@@ -20,7 +20,7 @@ void Window::Register()
 
 LRESULT CALLBACK Window::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    Window *self;
+    Window* self{ nullptr };
     if (uMsg == WM_NCCREATE)
     {
         const auto lpcs = reinterpret_cast<LPCREATESTRUCT>(lParam);
@@ -45,7 +45,7 @@ LRESULT CALLBACK Window::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 LRESULT Window::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    LRESULT lres;
+    LRESULT lres{};
     switch (uMsg)
     {
     case WM_NCDESTROY:

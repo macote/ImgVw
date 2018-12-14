@@ -60,7 +60,7 @@ private:
     void OpenMapping();
     void MapView();
     std::wstring filepath_;
-    Mode mode_;
+    Mode mode_{ Mode::Read };
     HANDLE file_{ INVALID_HANDLE_VALUE };
     LARGE_INTEGER filesize_{ 0 };
     HANDLE mapfile_{ INVALID_HANDLE_VALUE };
@@ -144,7 +144,7 @@ inline void FileMapView::GetFileSize()
 
 inline void FileMapView::OpenMapping()
 {
-    auto flProtect = mode_ == Mode::Read ? PAGE_READONLY : PAGE_READWRITE;
+    const auto flProtect = mode_ == Mode::Read ? PAGE_READONLY : PAGE_READWRITE;
     mapfile_ = CreateFileMapping(file_, NULL, flProtect, 0, 0, NULL);
     if (mapfile_ == NULL)
     {
@@ -158,6 +158,6 @@ inline void FileMapView::OpenMapping()
 
 inline void FileMapView::MapView()
 {
-    auto desiredAccess = mode_ == Mode::Read ? FILE_MAP_READ : FILE_MAP_WRITE;
+    const auto desiredAccess = mode_ == Mode::Read ? FILE_MAP_READ : FILE_MAP_WRITE;
     data_ = reinterpret_cast<PBYTE>(MapViewOfFile(mapfile_, desiredAccess, 0, 0, 0));
 }

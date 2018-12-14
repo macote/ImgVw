@@ -24,6 +24,7 @@
 #define IDR_TOGGLESSR                   120
 #define IDR_ENTER                       121
 #define IDT_HIDEMOUSE                   122
+#define IDR_ICCDEFAULT					123
 #define IDC_STATIC                      -1
 
 #define WM_PROGRESS_EVENT_DATA			WM_USER + 1

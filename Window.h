@@ -7,6 +7,7 @@ class Window
 {
 public:
     Window(HINSTANCE hinst) : hinst_(hinst) { }
+    virtual ~Window() { }
     HWND hwnd() const { return hwnd_; }
 protected:
     virtual LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -16,7 +17,6 @@ protected:
     {
         return RegisterClassEx(pwc);
     }
-    virtual ~Window() { }
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
     HWND WinCreateWindow(DWORD dwExStyle, LPCWSTR pszName, DWORD dwStyle,
