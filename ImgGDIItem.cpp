@@ -4,15 +4,8 @@
 void ImgGDIItem::Load()
 {
     status_ = Status::Loading;
-    std::unique_ptr<Gdiplus::Bitmap> bitmap;
 
-    if (filepath_.size() == 0)
-    {
-        status_ = Status::Error;
-        goto done;
-    }
-
-    bitmap = std::make_unique<Gdiplus::Bitmap>(filepath_.c_str(), FALSE);
+    const auto bitmap = std::make_unique<Gdiplus::Bitmap>(filepath_.c_str(), FALSE);
     lastgdiplusstatus_ = bitmap->GetLastStatus();
     if (lastgdiplusstatus_ != Gdiplus::Status::Ok || bitmap->GetWidth() == 0)
     {

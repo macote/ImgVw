@@ -21,10 +21,10 @@ private:
 
 inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 {
-    int argscount;
+    INT argscount;
     const auto args = CommandLineToArgvW(GetCommandLine(), &argscount);
     std::vector<std::wstring> argsvector;
-    for (int i = 0; i < argscount; ++i)
+    for (INT i = 0; i < argscount; ++i)
     {
         argsvector.push_back(args[i]);
     }
@@ -39,16 +39,16 @@ inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
     {
         InitCommonControls();
 
-        Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+        const Gdiplus::GdiplusStartupInput gdiplusStartupInput;
         ULONG_PTR gdiplusToken;
         Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
-        auto imgvwwindow = ImgVwWindow::Create(hInstance, argsvector);
-        if (imgvwwindow)
+        const auto imgvwwindow = ImgVwWindow::Create(hInstance, argsvector);
+        if (imgvwwindow != nullptr)
         {
             ShowWindow(imgvwwindow->hwnd(), nShowCmd);
 
-            auto hacc = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_IMGVW));
+            const auto hacc = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_IMGVW));
             MSG msg;
 
             while (GetMessage(&msg, NULL, 0, 0))

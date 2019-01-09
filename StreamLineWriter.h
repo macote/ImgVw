@@ -47,13 +47,14 @@ public:
         filestream_.Close();
     }
 private:
+    FileStream filestream_;
+    Encoding encoding_;
+    BOOL autoflush_{};
+private:
     void WriteEOL()
     {
         filestream_.Write(reinterpret_cast<PBYTE>(const_cast<char*>(kEndOfLine)), 2);
     }
-    FileStream filestream_;
-    Encoding encoding_;
-    BOOL autoflush_{};
 };
 
 inline void StreamLineWriter::Write(const std::wstring& line)

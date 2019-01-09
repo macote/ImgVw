@@ -62,23 +62,36 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
 
 void ImgVwWindow::InitializeBrowser(const std::wstring& path)
 {
-    RECT windowrectangle;
+    RECT windowrectangle{};
     if (!GetClientRect(hwnd_, &windowrectangle))
     {
         return;
     }
 
-    browser_.StartBrowsingAsync(path_, windowrectangle.right, windowrectangle.bottom);
+    browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom);
 }
 
 BOOL ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
 {
     if (item->status() != ImgItem::Status::Ready)
     {
-        return FALSE;
+        if (item->iccprofileloadfailed())
+        {
+            SelectDefaultICCProfile();
+            browser_.ReloadCurrentItem();
+
+            if (item->status() != ImgItem::Status::Ready)
+            {
+                return FALSE;
+            }
+        }
+        else
+        {
+            return FALSE;
+        }
     }
 
-    RECT windowrectangle;
+    RECT windowrectangle{};
     if (!GetClientRect(hwnd_, &windowrectangle))
     {
         return FALSE;
@@ -131,7 +144,9 @@ void ImgVwWindow::InvalidateScreen()
 void ImgVwWindow::PerformAction()
 {
     const auto filepath = browser_.GetCurrentFilePath();
+    ShowCursor(TRUE);
     MessageBox(hwnd_, filepath.c_str(), L"ImgVw", 0);
+    ShowCursor(FALSE);
 }
 
 void ImgVwWindow::BrowseNext()
@@ -162,6 +177,17 @@ void ImgVwWindow::BrowseLast()
 {
     if (browser_.MoveToLast())
     {
+        InvalidateScreen();
+    }
+}
+
+void ImgVwWindow::BrowseSubFolders()
+{
+    auto invalidate = browser_.GetCurrentItem() == nullptr;
+    browser_.BrowseSubFoldersAsync();
+    if (invalidate)
+    {
+        browser_.GetReady();
         InvalidateScreen();
     }
 }
@@ -274,7 +300,7 @@ void ImgVwWindow::HandleHideMouseCursor()
     LARGE_INTEGER counter, elapsed;
     QueryPerformanceCounter(&counter);
     elapsed.QuadPart = (counter.QuadPart - mousemovelastcounter_.QuadPart) * 1000;
-    auto elapsedmilliseconds = static_cast<UINT>(elapsed.QuadPart / qpcfrequency_.QuadPart);
+    const auto elapsedmilliseconds = static_cast<UINT>(elapsed.QuadPart / qpcfrequency_.QuadPart);
 
     if (elapsedmilliseconds < kMouseHideIntervalInMilliseconds)
     {
@@ -295,8 +321,8 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
     }
 
     SHFILEOPSTRUCT shfileopstruct{};
-    TCHAR deletepaths[4096];
-    size_t pathlen = browser_.GetCurrentFilePath().size();
+    TCHAR deletepaths[4096] = {};
+    const size_t pathlen = browser_.GetCurrentFilePath().size();
     wcsncpy(deletepaths, browser_.GetCurrentFilePath().c_str(), pathlen);
     deletepaths[pathlen + 1] = 0;
     deletepaths[pathlen] = 0;
@@ -321,6 +347,70 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
         }
 
         InvalidateScreen();
+    }
+}
+
+void ImgVwWindow::SelectDefaultICCProfile()
+{
+    OPENFILENAME ofn;
+    TCHAR szFile[260];
+
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd_;
+    ofn.lpstrFile = szFile;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = L"ICC Profile\0*.icc\0All\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrTitle = L"Select default ICC profile...";
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrInitialDir = NULL;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+    ShowCursor(TRUE);
+    if (GetOpenFileName(&ofn))
+    {
+        TCHAR appdatapath[260];
+        if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, appdatapath)))
+        {
+            TCHAR imgvwappdatapath[260];
+            PathCombine(imgvwappdatapath, appdatapath, ImgSettings::kAppDataPath);
+
+            auto result = SHCreateDirectoryEx(hwnd_, imgvwappdatapath, NULL);
+            if (result == ERROR_SUCCESS || result == ERROR_ALREADY_EXISTS)
+            {
+                TCHAR iccpath[260];
+                PathCombine(iccpath, imgvwappdatapath, ImgItem::kDefaultICCProfileFilename);
+                CopyFile(ofn.lpstrFile, iccpath, FALSE);
+            }
+        }
+    }
+
+    ShowCursor(FALSE);
+}
+
+void ImgVwWindow::HandleContextMenu(LPARAM lParam)
+{
+    RECT rc;
+    POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+
+    GetClientRect(hwnd_, &rc);
+    ScreenToClient(hwnd_, &pt);
+
+    if (PtInRect(&rc, pt))
+    {
+        ClientToScreen(hwnd_, &pt);
+
+        const auto root = LoadMenu(hinst_, L"IMGPOPUP");
+        const auto popup = GetSubMenu(root, 0);
+
+        ShowCursor(TRUE);
+        TrackPopupMenu(popup, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd_, NULL);
+        ShowCursor(FALSE);
+
+        DestroyMenu(root);
     }
 }
 
@@ -417,6 +507,15 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDR_DECSSS:
             DecreaseSlideShowSpeed();
             break;
+        case IDR_RECURSE:
+            BrowseSubFolders();
+            break;
+        case IDM_LOADICC:
+            SelectDefaultICCProfile();
+            ImgItem::UnloadDefaultICCProfile();
+            browser_.ReloadCurrentItem();
+            InvalidateScreen();
+            break;
         case IDM_EXIT:
         case IDR_ESCAPE:
             CloseWindow();
@@ -424,6 +523,9 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         return FALSE;
+    case WM_CONTEXTMENU:
+        HandleContextMenu(lParam);
+        return TRUE;
     case WM_MOUSEMOVE:
         if (HandleMouseMove(wParam, lParam))
         {

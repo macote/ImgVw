@@ -1,3 +1,10 @@
+## 1.7.0 (2019-01-08)
+
+- Add the ability to browse subfolders
+- Add the ability to use a default ICC profile
+- Add support for high DPI
+- Add context menu
+
 ## 1.6.0 (2018-02-10)
 
 - Fix EXIF rotate bug

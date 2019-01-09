@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="ImgVw" version="1.6.0.0"
+  <assemblyIdentity type="win32" name="ImgVw" version="1.7.0.0"
                     processorArchitecture="*"/>
   <description>HashCheck</description>
   <dependency>
@@ -9,4 +9,9 @@
                         processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*"/>
     </dependentAssembly>
   </dependency>
+  <asmv3:application xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
+    <asmv3:windowsSettings xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">
+      <dpiAware>True</dpiAware>
+    </asmv3:windowsSettings>
+  </asmv3:application>
 </assembly>

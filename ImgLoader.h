@@ -60,7 +60,7 @@ public:
         cancelevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
         workevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
         loadersemaphore_.SetupSemaphore(kMaximumLoaderCount);
-        StartLoading();
+        LoadAsync();
     }
     ~ImgLoader()
     {
@@ -75,16 +75,8 @@ public:
     }
     ImgLoader(const ImgLoader&) = delete;
     ImgLoader& operator=(const ImgLoader&) = delete;
-    void LoadAsync(ImgItem* imgitem);
-    void LoadNextAsync(ImgItem* imgitem);
+    void QueueItem(ImgItem* imgitem, BOOL loadnext = FALSE);
     void StopLoading();
-private:
-    void StartLoading();
-    DWORD Loop();
-    void QueueItem(ImgItem* imgitem, BOOL pushfront);
-    ImgItem* GetNextItem();
-    static DWORD WINAPI StaticThreadLoop(void* imgloaderinstance);
-    static DWORD WINAPI StaticThreadLoad(void* imgiteminstance);
 private:
     std::list<ImgItem*> queue_;
     std::list<std::unique_ptr<LoaderItem>> loaderitems_;
@@ -94,4 +86,11 @@ private:
     BOOL cancellationflag_{};
     CountingSemaphore loadersemaphore_;
     CRITICAL_SECTION queuecriticalsection_;
+private:
+    void LoadAsync();
+    DWORD Loop();
+    ImgItem* GetNextItem();
+    void CleanupItemThreadObjects();
+    static DWORD WINAPI StaticThreadLoop(void* imgloaderinstance);
+    static DWORD WINAPI StaticThreadLoad(void* imgiteminstance);
 };

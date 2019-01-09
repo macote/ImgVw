@@ -5,19 +5,20 @@ const CountingSemaphore ImgItemHelper::kGDIOperationSemaphore = CountingSemaphor
 ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(const std::wstring& filepath)
 {
     const auto extension = PathFindExtension(filepath.c_str());
-    if (StrCmpI(extension, L".jpg") == 0 || StrCmpI(extension, L".jpeg") == 0)
+    if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".jpg", -1) == CSTR_EQUAL
+        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".jpeg", -1) == CSTR_EQUAL)
     {
         return ImgItem::Format::JPEG;
     }
-    else if (StrCmpI(extension, L".png") == 0)
+    else if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".png", -1) == CSTR_EQUAL)
     {
         return ImgItem::Format::PNG;
     }
-    else if (StrCmpI(extension, L".bmp") == 0
-        || StrCmpI(extension, L".gif") == 0
-        || StrCmpI(extension, L".ico") == 0
-        || StrCmpI(extension, L".tif") == 0
-        || StrCmpI(extension, L".tiff") == 0)
+    else if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".bmp", -1) == CSTR_EQUAL
+        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".gif", -1) == CSTR_EQUAL
+        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".ico", -1) == CSTR_EQUAL
+        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".tif", -1) == CSTR_EQUAL
+        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".tiff", -1) == CSTR_EQUAL)
     {
         return ImgItem::Format::Other;
     }
@@ -53,13 +54,13 @@ ImgBuffer ImgItemHelper::ResizeImage(Gdiplus::Bitmap* bitmap, INT targetwidth, I
 ImgBuffer ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
     Gdiplus::RotateFlipType rotateflip)
 {
-    auto percentWidth = static_cast<FLOAT>(targetwidth) / bitmap->GetWidth();
-    auto percentHeight = static_cast<FLOAT>(targetheight) / bitmap->GetHeight();
-    auto percent = percentHeight < percentWidth ? percentHeight : percentWidth;
-    auto newwidth = static_cast<INT>(bitmap->GetWidth() * percent);
-    auto newheight = static_cast<INT>(bitmap->GetHeight() * percent);
+    const auto percentWidth = static_cast<FLOAT>(targetwidth) / bitmap->GetWidth();
+    const auto percentHeight = static_cast<FLOAT>(targetheight) / bitmap->GetHeight();
+    const auto percent = percentHeight < percentWidth ? percentHeight : percentWidth;
+    const auto newwidth = static_cast<INT>(bitmap->GetWidth() * percent);
+    const auto newheight = static_cast<INT>(bitmap->GetHeight() * percent);
     ImgItemHelper::kGDIOperationSemaphore.Wait();
-    std::unique_ptr<Gdiplus::Bitmap> resizedbitmap = std::make_unique<Gdiplus::Bitmap>(newwidth, newheight, PixelFormat24bppRGB);
+    auto resizedbitmap = std::make_unique<Gdiplus::Bitmap>(newwidth, newheight, PixelFormat24bppRGB);
     Gdiplus::Graphics graphics(resizedbitmap.get());
     graphics.DrawImage(bitmap, 0, 0, newwidth, newheight);
     auto buffer = RotateImage(resizedbitmap.get(), rotateflip, TRUE);
@@ -106,7 +107,7 @@ std::unique_ptr<Gdiplus::Bitmap> ImgItemHelper::Get24bppRGBBitmap(INT width, INT
 ImgBuffer ImgItemHelper::GetBuffer(Gdiplus::Bitmap* bitmap)
 {
     Gdiplus::BitmapData data{};
-    Gdiplus::Rect rect(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
+    const Gdiplus::Rect rect(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
     bitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat24bppRGB, &data);
     ImgBuffer buffer;
     buffer.WriteData(data.Width, data.Height, data.Stride, reinterpret_cast<PBYTE>(data.Scan0));

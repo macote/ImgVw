@@ -1,15 +1,5 @@
 #include "ImgLoader.h"
 
-void ImgLoader::LoadAsync(ImgItem* imgitem)
-{
-    QueueItem(imgitem, FALSE);
-}
-
-void ImgLoader::LoadNextAsync(ImgItem* imgitem)
-{
-    QueueItem(imgitem, TRUE);
-}
-
 void ImgLoader::StopLoading()
 {
     cancellationflag_ = TRUE;
@@ -25,7 +15,7 @@ void ImgLoader::StopLoading()
         std::vector<HANDLE> threads;
         for (const auto & loaderitem : loaderitems_)
         {
-            auto status = loaderitem->imgitem()->status();
+            const auto status = loaderitem->imgitem()->status();
             if (!(status == ImgItem::Status::Error || status == ImgItem::Status::Ready))
             {
                 threads.push_back(loaderitem->loaderitemthread());
@@ -46,7 +36,7 @@ void ImgLoader::StopLoading()
     cancellationflag_ = FALSE;
 }
 
-void ImgLoader::StartLoading()
+void ImgLoader::LoadAsync()
 {
     loopthread_ = CreateThread(NULL, 0, StaticThreadLoop, reinterpret_cast<void*>(this), 0, NULL);
 }
@@ -86,38 +76,43 @@ DWORD ImgLoader::Loop()
             }
         }
 
-        if (cyclecount % kCleanupCycleCountTrigger == 0)
+        if (loaderitems_.size() > 0 && cyclecount % kCleanupCycleCountTrigger == 0)
         {
-            INT closedthreads{};
-            auto it = loaderitems_.begin();
-            while (it != loaderitems_.end())
-            {
-                if (WaitForSingleObject((*it).get()->loaderitemthread(), 0) == WAIT_OBJECT_0)
-                {
-                    (*it).get()->CloseLoaderItemThread();
-                    ++closedthreads;
-                    loaderitems_.erase(it++);
-                }
-                else
-                {
-                    it++;
-                }
-
-                if (closedthreads == kCleanupCycleCountTrigger)
-                {
-                    break;
-                }
-            }
+            CleanupItemThreadObjects();
         }
     }
 
     return 0;
 }
 
-void ImgLoader::QueueItem(ImgItem* imgitem, BOOL pushfront)
+void ImgLoader::CleanupItemThreadObjects()
+{
+    INT closedthreads{};
+    auto it = loaderitems_.begin();
+    while (it != loaderitems_.end())
+    {
+        if (WaitForSingleObject((*it).get()->loaderitemthread(), 0) == WAIT_OBJECT_0)
+        {
+            (*it).get()->CloseLoaderItemThread();
+            ++closedthreads;
+            loaderitems_.erase(it++);
+        }
+        else
+        {
+            it++;
+        }
+
+        if (closedthreads == kCleanupCycleCountTrigger)
+        {
+            break;
+        }
+    }
+}
+
+void ImgLoader::QueueItem(ImgItem* imgitem, BOOL loadnext)
 {
     EnterCriticalSection(&queuecriticalsection_);
-    if (pushfront)
+    if (loadnext)
     {
         queue_.push_front(imgitem);
     }

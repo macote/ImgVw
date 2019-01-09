@@ -74,6 +74,16 @@ public:
 	}
 	DWORD lasterror() const { return lasterror_; }
 private:
+	PBYTE buffer_{ nullptr };
+	std::wstring filepath_;
+	Mode mode_;
+	DWORD buffersize_;
+	HANDLE filehandle_{ INVALID_HANDLE_VALUE };
+	DWORD lasterror_{};
+	DWORD readindex_{};
+	DWORD readlength_{};
+	DWORD writeindex_{};
+private:
 	void AllocateBuffer();
 	void OpenFile();
 	DWORD Read(const PBYTE buffer, DWORD offset, DWORD count);
@@ -81,15 +91,6 @@ private:
 	void FlushWrite();
 	void CloseFile();
 	void FreeBuffer();
-	DWORD readindex_{};
-	DWORD readlength_{};
-	DWORD writeindex_{};
-	PBYTE buffer_{ nullptr };
-	std::wstring filepath_;
-	Mode mode_;
-	DWORD buffersize_;
-	HANDLE filehandle_{ INVALID_HANDLE_VALUE };
-	DWORD lasterror_{};
 };
 
 inline void FileStream::AllocateBuffer()

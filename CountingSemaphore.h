@@ -36,6 +36,8 @@ public:
     void Wait() const;
     void SetupSemaphore(LONG maximumcount);
 private:
+    HANDLE semaphore_{ INVALID_HANDLE_VALUE };
+private:
     void Close()
     {
         if (semaphore_ != INVALID_HANDLE_VALUE)
@@ -44,7 +46,6 @@ private:
             semaphore_ = INVALID_HANDLE_VALUE;
         }
     }
-    HANDLE semaphore_{ INVALID_HANDLE_VALUE };
 };
 
 inline void CountingSemaphore::SetupSemaphore(LONG maximumcount)

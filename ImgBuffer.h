@@ -48,10 +48,6 @@ public:
     INT stride() const { return stride_; }
     DWORD buffersize() const { return buffersize_; }
 private:
-    void CreateTempFile();
-    void CloseTempFile();
-    void DeleteTempFile();
-private:
     INT width_{};
     INT height_{};
     INT stride_{};
@@ -60,4 +56,8 @@ private:
     std::wstring tempfilename_;
     HANDLE heap_{ INVALID_HANDLE_VALUE };
     HANDLE tempfile_{ INVALID_HANDLE_VALUE };
+private:
+    void CreateTempFile();
+    void CloseTempFile();
+    void DeleteTempFile();
 };

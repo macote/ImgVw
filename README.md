@@ -29,6 +29,8 @@ Pass a file or folder as an argument.
 | Shift + F5 | Toggle slideshow (random mode) |
 | F6 | Increase slideshow speed |
 | F7 | Decrease slideshow speed |
+| F8 | Add images found in subfolders |
+| Ctrl + I | Select default ICC profile |
 | Delete | Move to recycle bin if possible or delete |
 | Shift + Delete | Delete |
 | Enter | Display current file path |

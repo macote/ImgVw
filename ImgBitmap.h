@@ -33,10 +33,10 @@ public:
     }
     HBITMAP bitmap() const { return bitmap_; }
 private:
+    HBITMAP bitmap_{ nullptr };
+private:
     void Initialize(const PBITMAPINFO pbitmapinfo, const PBYTE buffer, INT buffersize);
     void DeleteBitmap();
-private:
-    HBITMAP bitmap_{ nullptr };
 };
 
 inline void ImgBitmap::DeleteBitmap()

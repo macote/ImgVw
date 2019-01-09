@@ -2,9 +2,11 @@
 
 #include "ImgBitmap.h"
 #include "ImgBuffer.h"
+#include "ImgSettings.h"
 #include "FileMapView.h"
 #include "3rd-party\Little-CMS\lcms2.h"
 #include <Windows.h>
+#include <Shlwapi.h>
 #include <string>
 #include <iomanip>
 #include <sstream>
@@ -13,7 +15,8 @@
 class ImgItem
 {
 public:
-    static constexpr double kResizePercentThreshold = 0.025;
+    static constexpr auto kResizePercentThreshold = 0.025l;
+    static constexpr auto kDefaultICCProfileFilename = L"default.icc";
 public:
     enum class Format
     {
@@ -51,6 +54,7 @@ public:
     virtual void Load() = 0;
     virtual void Unload();
     Status status() const { return status_; }
+    BOOL iccprofileloadfailed() const { return iccprofileloadfailed_; }
     std::wstring errormessage() const { return errormessage_; }
     INT displaywidth() const { return displaybuffer_.width(); }
     INT displayheight() const { return displaybuffer_.height(); }
@@ -58,16 +62,8 @@ public:
     INT offsety() const { return offsety_; }
     HANDLE loadedevent() const { return loadedevent_; }
     ImgBitmap GetDisplayBitmap() const;
-protected:
-    void SetupDisplayParameters()
-    {
-        SetupDisplayParameters(FALSE);
-    }
-    void SetupDisplayParameters(BOOL topdownbitmap);
-    void OpenICCProfile(PBYTE iccprofiledata, UINT iccprofiledatabytecount);
-    BOOL IsICCProfileLoaded() const { return iccprofile_ != nullptr; }
-    void TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer) const;
-    void CloseICCProfile();
+    static void LoadDefaultICCProfile();
+    static void UnloadDefaultICCProfile();
 protected:
     std::wstring filepath_;
     INT targetwidth_;
@@ -81,7 +77,28 @@ protected:
     std::wstring errormessage_;
     HANDLE loadedevent_{ NULL };
     HANDLE heap_{ INVALID_HANDLE_VALUE };
+protected:
+    void SetupDisplayParameters() { SetupDisplayParameters(FALSE); }
+    void SetupDisplayParameters(BOOL topdownbitmap);
+    void OpenICCProfile(const PBYTE iccprofiledata, UINT iccprofiledatabytecount);
+    BOOL IsICCProfileLoaded() const { return iccprofile_ != nullptr; }
+    BOOL TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer);
+    void CloseICCProfile();
+private:
+    static cmsHPROFILE DefaultICCProfile;
+    static CRITICAL_SECTION DefaultICCProfileCriticalSection;
+    static struct DefaultICCProfileCriticalSectionInitializer
+    {
+        DefaultICCProfileCriticalSectionInitializer()
+        {
+            if (!InitializeCriticalSectionAndSpinCount(&DefaultICCProfileCriticalSection, 0x00000400))
+            {
+                // TODO: handle error
+            }
+        }
+    } defaultICCProfileCriticalSectionInitializer;
 private:
     PBITMAPINFO pbitmapinfo_{ nullptr };
     cmsHPROFILE iccprofile_{ nullptr };
+    BOOL iccprofileloadfailed_{};
 };
