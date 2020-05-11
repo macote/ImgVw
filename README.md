@@ -9,12 +9,6 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 - Auto-rotate JPEG images based on EXIF information
 - Works on Windows XP and later
 
-## How to build
-
-This project is compatible with:
-- Visual Studio 2017
-- Eclipse CDT with MinGW
-
 ## Usage
 
 Pass a file or folder as an argument.
