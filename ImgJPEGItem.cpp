@@ -76,37 +76,29 @@ void ImgJPEGItem::Load()
 
         BOOL resize = FALSE;
         INT decompresswidth{}, decompressheight{};
-        if (width_ > targetwidth || height_ > targetheight)
+        const auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
+        if (scalingfactorindex >= scalingfactorcount_)
         {
-            const auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
-            if (scalingfactorindex >= scalingfactorcount_)
-            {
-                resize = TRUE;
-            }
-            else
-            {
-                decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex]);
-                decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex]);
-                const auto widthdiff = targetwidth - decompresswidth;
-                const auto heightdiff = targetheight - decompressheight;
-
-                if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight))
-                    || (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth)))
-                {
-                    resize = TRUE;
-                }
-            }
-
-            if (resize)
-            {
-                decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex - 1]);
-                decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex - 1]);
-            }
+            resize = TRUE;
         }
         else
         {
-            decompresswidth = width_;
-            decompressheight = height_;
+            decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex]);
+            decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex]);
+            const auto widthdiff = targetwidth - decompresswidth;
+            const auto heightdiff = targetheight - decompressheight;
+
+            if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight))
+                || (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth)))
+            {
+                resize = TRUE;
+            }
+        }
+
+        if (resize)
+        {
+            decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex - 1]);
+            decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex - 1]);
         }
 
         auto stride = TJPAD(decompresswidth * tjPixelSize[pixelformat]);
