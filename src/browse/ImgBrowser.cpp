@@ -158,6 +158,11 @@ void ImgBrowser::BrowseSubFoldersAsync()
 
 void ImgBrowser::StopCollecting()
 {
+    if (collectorthread_ == NULL || collectorthread_ == INVALID_HANDLE_VALUE)
+    {
+        return;
+    }
+
     cancellationflag_ = TRUE;
 
     if (WaitForSingleObject(collectorthread_, INFINITE) != WAIT_OBJECT_0)
@@ -348,9 +353,10 @@ BOOL ImgBrowser::MoveToRandom()
             currentrandomindex_ = 0;
         }
 
-        auto filepath = randomlist_[currentrandomindex_];
+        const auto filepath = randomlist_[currentrandomindex_];
         ++currentrandomindex_;
-        moveSuccess = MoveToItem(filepath);
+        currentfileiterator_ = files_.find(filepath);
+        moveSuccess = currentfileiterator_ != files_.end();
     }
 
     LeaveCriticalSection(&browsecriticalsection_);

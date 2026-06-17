@@ -9,15 +9,27 @@ EXE = ImgVw.exe
 
 WINDRES = windres
 
-OBJECTS = obj/FileStream.o obj/ImgBrowser.o obj/ImgBuffer.o obj/ImgGDIItem.o obj/ImgItem.o obj/ImgItemHelper.o obj/ImgJPEGItem.o obj/ImgLoader.o obj/ImgVwWindow.o obj/Program.o obj/turbojpeg_ImgVw.o obj/Window.o obj/ImgVw.o obj/exif.o
+arch ?= x86
+BINDIR = bin/${arch}
+OBJDIR = obj/${arch}
+SOURCE_DIRS = src/app src/browse src/diagnostics src/image src/platform/win32 src/ui/win32
 
-CFLAGS = -std=c++17 -I3rd-party/libjpeg-turbo -I3rd-party/easyexif -I3rd-party/Little-CMS -DWINVER=0x0501 -D_WIN32_WINNT=0x0501 -DUNICODE -D_UNICODE -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -O2 ${WARNS} -fmessage-length=0 -fasynchronous-unwind-tables
+vpath %.cpp ${SOURCE_DIRS}
+vpath %.rc resources
 
-ifeq (${DUMPMACHINE},x86_64-w64-mingw32) 
-	CFLAGS = -m64 + ${CFLAGS}
+OBJECTS = ${OBJDIR}/FileStream.o ${OBJDIR}/ImgBrowser.o ${OBJDIR}/ImgBuffer.o ${OBJDIR}/ImgGDIItem.o ${OBJDIR}/ImgItem.o ${OBJDIR}/ImgItemHelper.o ${OBJDIR}/ImgJPEGItem.o ${OBJDIR}/ImgLoader.o ${OBJDIR}/ImgVwWindow.o ${OBJDIR}/Program.o ${OBJDIR}/turbojpeg_ImgVw.o ${OBJDIR}/Window.o ${OBJDIR}/ImgVw.o ${OBJDIR}/exif.o
+
+CFLAGS = -std=c++17 -I. -Isrc/app -Isrc/browse -Isrc/diagnostics -Isrc/image -Isrc/platform/win32 -Isrc/ui/win32 -Iresources -isystem 3rd-party/libjpeg-turbo -isystem 3rd-party/easyexif -isystem 3rd-party/Little-CMS -DWINVER=0x0501 -D_WIN32_WINNT=0x0501 -DUNICODE -D_UNICODE -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -O2 ${WARNS} -fmessage-length=0 -fasynchronous-unwind-tables
+
+ifeq (${DUMPMACHINE},x86_64-w64-mingw32)
+	CFLAGS := -m64 ${CFLAGS}
 endif
 
-LDPATHS = -L3rd-party/libjpeg-turbo -L3rd-party/Little-CMS
+ifeq (${arch},x64)
+	LDPATHS = -L3rd-party/libjpeg-turbo/ucrt64 -L3rd-party/Little-CMS/ucrt64
+else
+	LDPATHS = -L3rd-party/libjpeg-turbo -L3rd-party/Little-CMS
+endif
 
 LDLIBS = -lmsimg32 -lcomctl32 -lshlwapi -lole32 -lgdiplus -luxtheme -ljpeg -llcms2
 
@@ -31,34 +43,33 @@ endif
     
 .PHONY: all clean
 
-all: bin/${EXE}
+all: ${BINDIR}/${EXE}
 
 clean:
-ifeq (${SYS}, MINGW64)
-	@if [ -d "bin" ]; then rm -r bin; fi
-	@if [ -d "obj" ]; then rm -r obj; fi
+ifneq (${SYS},)
+	@if [ -d "${BINDIR}" ]; then rm -r "${BINDIR}"; fi
+	@if [ -d "${OBJDIR}" ]; then rm -r "${OBJDIR}"; fi
 else
-	@if exist bin\* del /f /s /q bin 1>nul & rd /s /q bin
-	@if exist obj\* del /f /s /q obj 1>nul & rd /s /q obj
+	@if exist ${BINDIR}\* del /f /s /q ${BINDIR} 1>nul & rd /s /q ${BINDIR}
+	@if exist ${OBJDIR}\* del /f /s /q ${OBJDIR} 1>nul & rd /s /q ${OBJDIR}
 endif
 
-bin obj:
-ifeq (${SYS}, MINGW64)
-	@if [ ! -d "bin" ]; then mkdir bin; fi
-	@if [ ! -d "obj" ]; then mkdir obj; fi
+${BINDIR} ${OBJDIR}:
+ifneq (${SYS},)
+	@if [ ! -d "$@" ]; then mkdir -p "$@"; fi
 else
 	@if not exist "$@" mkdir "$@"
 endif
 
-obj/exif.o: 3rd-party/easyexif/exif.cpp | obj
-	${CC} ${CFLAGS} -c 3rd-party/easyexif/exif.cpp -o obj/exif.o
+${OBJDIR}/exif.o: 3rd-party/easyexif/exif.cpp | ${OBJDIR}
+	${CC} ${CFLAGS} -c 3rd-party/easyexif/exif.cpp -o ${OBJDIR}/exif.o
 
-obj/ImgVw.o: ImgVw.rc
-	${WINDRES} --language 0x0409 ImgVw.rc -o obj/ImgVw.o
+${OBJDIR}/ImgVw.o: ImgVw.rc | ${OBJDIR}
+	${WINDRES} --include-dir resources --language 0x0409 "$<" -o ${OBJDIR}/ImgVw.o
 
-obj/%.o: %.cpp | obj
+${OBJDIR}/%.o: %.cpp | ${OBJDIR}
 	${CC} ${CFLAGS} -c "$<" -o "$@"
 
-bin/${EXE}: ${OBJECTS} | bin
+${BINDIR}/${EXE}: ${OBJECTS} | ${BINDIR}
 	${CC} ${LDFLAGS} ${LDPATHS} -o "$@" ${OBJECTS} ${LDLIBS}
 

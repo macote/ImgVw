@@ -37,6 +37,12 @@ ImgVw uses the following libraries :
 - [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
 - [Little-CMS](https://github.com/mm2/Little-CMS)
 
+## Builds
+
+Visual Studio and MSYS builds support Win32 and x64 configurations. Win32 remains available for legacy Windows
+compatibility. x64 is recommended for large images or large folders, but requires architecture-matched static libraries
+for libjpeg-turbo and Little CMS.
+
 ## License
 
 ImgVw is BSD-licensed.

@@ -1,0 +1,19 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Win32" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/Other/">
+    <File Path=".editorconfig" />
+    <File Path=".clang-format" />
+    <File Path=".clang-tidy" />
+    <File Path=".gitignore" />
+    <File Path="CHANGELOG.md" />
+    <File Path="docs/CODING_STYLE.md" />
+    <File Path="LICENSE.md" />
+    <File Path="README.md" />
+    <File Path="TODO.md" />
+    <File Path="resources/application.manifest" />
+  </Folder>
+  <Project Path="ImgVw.vcxproj" />
+</Solution>

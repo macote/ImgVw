@@ -161,4 +161,12 @@ inline void FileMapView::MapView()
 {
     const auto desiredAccess = mode_ == Mode::Read ? FILE_MAP_READ : FILE_MAP_WRITE;
     data_ = reinterpret_cast<PBYTE>(MapViewOfFile(mapfile_, desiredAccess, 0, 0, 0));
+    if (data_ == nullptr)
+    {
+        std::stringstream ss;
+        ss << "FileMapView.MapView(MapViewOfFile()) failed with error ";
+        ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase;
+        ss << GetLastError();
+        throw std::runtime_error(ss.str());
+    }
 }

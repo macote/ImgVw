@@ -4,7 +4,7 @@
 #include "ImgBuffer.h"
 #include "ImgSettings.h"
 #include "FileMapView.h"
-#include "3rd-party\Little-CMS\lcms2.h"
+#include <lcms2.h>
 #include <Windows.h>
 #include <Shlwapi.h>
 #include <string>

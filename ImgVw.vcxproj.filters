@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Source Files">
@@ -13,150 +13,168 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Header Files\3rd-party">
-      <UniqueIdentifier>{2fdc4020-9962-4747-9393-06c9014b2b5e}</UniqueIdentifier>
+    <Filter Include="3rd-party">
+      <UniqueIdentifier>{2FDC4020-9962-4747-9393-06C9014B2B5E}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\3rd-party">
-      <UniqueIdentifier>{81c417ca-ce3c-48a0-9fe2-be143bb70a77}</UniqueIdentifier>
+    <Filter Include="App">
+      <UniqueIdentifier>{8B2F3E23-F26B-4D4D-8B0F-4316D6FD2831}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Browse">
+      <UniqueIdentifier>{2A7E8D05-4743-48EE-8B35-9B536434F4F7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Diagnostics">
+      <UniqueIdentifier>{4E71339B-0B3F-4075-95D4-17DC858482E6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Image">
+      <UniqueIdentifier>{8FE35DB1-E510-4577-A6FC-F784C8211D87}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform">
+      <UniqueIdentifier>{FC862693-21AB-4FC5-B7D6-EB6727561EDE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UI">
+      <UniqueIdentifier>{C2D9EB85-D0C8-4DD8-B91A-C1CB3277D77C}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgVwWindow.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgCache.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgBrowser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgItemFactory.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgGDIItem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgItem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgJPEGItem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgVw.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgItemHelper.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImgBitmap.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FileMapView.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CountingSemaphore.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="3rd-party\easyexif\exif.h">
-      <Filter>Header Files\3rd-party</Filter>
-    </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FileStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="StreamLineWriter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="TimestampLogger.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="DebugHelper.h">
-      <Filter>Header Files</Filter>
+      <Filter>3rd-party</Filter>
     </ClInclude>
     <ClInclude Include="3rd-party\libjpeg-turbo\jconfig.h">
-      <Filter>Header Files\3rd-party</Filter>
+      <Filter>3rd-party</Filter>
     </ClInclude>
     <ClInclude Include="3rd-party\libjpeg-turbo\jerror.h">
-      <Filter>Header Files\3rd-party</Filter>
+      <Filter>3rd-party</Filter>
     </ClInclude>
     <ClInclude Include="3rd-party\libjpeg-turbo\jmorecfg.h">
-      <Filter>Header Files\3rd-party</Filter>
+      <Filter>3rd-party</Filter>
     </ClInclude>
     <ClInclude Include="3rd-party\libjpeg-turbo\jpeglib.h">
-      <Filter>Header Files\3rd-party</Filter>
-    </ClInclude>
-    <ClInclude Include="3rd-party\Little-CMS\lcms2.h">
-      <Filter>Header Files\3rd-party</Filter>
+      <Filter>3rd-party</Filter>
     </ClInclude>
     <ClInclude Include="3rd-party\libjpeg-turbo\turbojpeg.h">
-      <Filter>Header Files\3rd-party</Filter>
+      <Filter>3rd-party</Filter>
     </ClInclude>
-    <ClInclude Include="turbojpeg_ImgVw.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="3rd-party\Little-CMS\lcms2.h">
+      <Filter>3rd-party</Filter>
     </ClInclude>
-    <ClInclude Include="ImgBuffer.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="resources\resource.h">
+      <Filter>Resource Files</Filter>
     </ClInclude>
-    <ClInclude Include="ImgSettings.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\app\ImgVw.h">
+      <Filter>App</Filter>
+    </ClInclude>
+    <ClInclude Include="src\browse\ImgBrowser.h">
+      <Filter>Browse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\diagnostics\DebugHelper.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\diagnostics\StreamLineWriter.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\diagnostics\TimestampLogger.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgBitmap.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgBuffer.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgCache.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgGDIItem.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgItem.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgItemFactory.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgItemHelper.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgJPEGItem.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgLoader.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\turbojpeg_ImgVw.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\CountingSemaphore.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\FileMapView.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\FileStream.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\ImgSettings.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\ImgVwWindow.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\Window.h">
+      <Filter>UI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Program.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Window.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImgVwWindow.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImgBrowser.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImgLoader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImgGDIItem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImgJPEGItem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImgItemHelper.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="3rd-party\easyexif\exif.cpp">
-      <Filter>Source Files\3rd-party</Filter>
+      <Filter>3rd-party</Filter>
     </ClCompile>
-    <ClCompile Include="FileStream.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\app\Program.cpp">
+      <Filter>App</Filter>
     </ClCompile>
-    <ClCompile Include="turbojpeg_ImgVw.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\browse\ImgBrowser.cpp">
+      <Filter>Browse</Filter>
     </ClCompile>
-    <ClCompile Include="ImgItem.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\image\ImgBuffer.cpp">
+      <Filter>Image</Filter>
     </ClCompile>
-    <ClCompile Include="ImgBuffer.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\image\ImgGDIItem.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ImgItem.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ImgItemHelper.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ImgJPEGItem.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ImgLoader.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\turbojpeg_ImgVw.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\win32\FileStream.cpp">
+      <Filter>Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\win32\ImgVwWindow.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\win32\Window.cpp">
+      <Filter>UI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="ImgVw.rc">
+    <ResourceCompile Include="resources\ImgVw.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="ImgVw.ico">
+    <Image Include="resources\ImgVw.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="resources\small.ico">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

@@ -1,0 +1,28 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(src|tests|resources).*'
+AnalyzeTemporaryDtors: false
+CheckOptions:
+  - key: cppcoreguidelines-owning-memory.LegacyResourceProducers
+    value: 'CreateFile;CreateFileMapping;CreateEvent;CreateSemaphore;CreateThread;CreateCompatibleDC;CreateSolidBrush;CreateFontIndirect;LoadMenu'
+  - key: cppcoreguidelines-owning-memory.LegacyResourceConsumers
+    value: 'CloseHandle;UnmapViewOfFile;DeleteDC;DeleteObject;DestroyMenu'
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: CamelCase
+  - key: readability-identifier-naming.MemberCase
+    value: lower_case
+  - key: readability-identifier-naming.MemberSuffix
+    value: _

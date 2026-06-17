@@ -2,6 +2,11 @@
 
 void ImgLoader::StopLoading()
 {
+    if (loopthread_ == NULL || loopthread_ == INVALID_HANDLE_VALUE)
+    {
+        return;
+    }
+
     cancellationflag_ = TRUE;
     SetEvent(cancelevent_);
 

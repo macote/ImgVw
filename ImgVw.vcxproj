@@ -5,28 +5,49 @@
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F0D77C92-6951-4588-8889-73F090229F4D}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>ImgVw</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -39,12 +60,29 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\diagnostics;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\easyexif;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <GenerateManifest>false</GenerateManifest>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <GenerateManifest>false</GenerateManifest>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
@@ -55,6 +93,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ImgVwIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -74,6 +113,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ImgVwIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -81,6 +121,43 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\jpeg-static.lib;3rd-party\Little-CMS\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ImgVwIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\x64\jpeg-static.lib;3rd-party\Little-CMS\x64\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ShowProgress>NotSet</ShowProgress>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ImgVwIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\x64\jpeg-static.lib;3rd-party\Little-CMS\x64\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -91,49 +168,50 @@
     <ClInclude Include="3rd-party\libjpeg-turbo\jpeglib.h" />
     <ClInclude Include="3rd-party\libjpeg-turbo\turbojpeg.h" />
     <ClInclude Include="3rd-party\Little-CMS\lcms2.h" />
-    <ClInclude Include="DebugHelper.h" />
-    <ClInclude Include="FileStream.h" />
-    <ClInclude Include="ImgBitmap.h" />
-    <ClInclude Include="ImgBuffer.h" />
-    <ClInclude Include="ImgItem.h" />
-    <ClInclude Include="ImgBrowser.h" />
-    <ClInclude Include="CountingSemaphore.h" />
-    <ClInclude Include="ImgCache.h" />
-    <ClInclude Include="ImgGDIItem.h" />
-    <ClInclude Include="ImgItemFactory.h" />
-    <ClInclude Include="ImgItemHelper.h" />
-    <ClInclude Include="ImgJPEGItem.h" />
-    <ClInclude Include="ImgLoader.h" />
-    <ClInclude Include="ImgSettings.h" />
-    <ClInclude Include="ImgVw.h" />
-    <ClInclude Include="ImgVwWindow.h" />
-    <ClInclude Include="FileMapView.h" />
-    <ClInclude Include="resource.h" />
-    <ClInclude Include="StreamLineWriter.h" />
-    <ClInclude Include="TimestampLogger.h" />
-    <ClInclude Include="turbojpeg_ImgVw.h" />
-    <ClInclude Include="Window.h" />
+    <ClInclude Include="resources\resource.h" />
+    <ClInclude Include="src\app\ImgVw.h" />
+    <ClInclude Include="src\browse\ImgBrowser.h" />
+    <ClInclude Include="src\diagnostics\DebugHelper.h" />
+    <ClInclude Include="src\diagnostics\StreamLineWriter.h" />
+    <ClInclude Include="src\diagnostics\TimestampLogger.h" />
+    <ClInclude Include="src\image\ImgBitmap.h" />
+    <ClInclude Include="src\image\ImgBuffer.h" />
+    <ClInclude Include="src\image\ImgCache.h" />
+    <ClInclude Include="src\image\ImgGDIItem.h" />
+    <ClInclude Include="src\image\ImgItem.h" />
+    <ClInclude Include="src\image\ImgItemFactory.h" />
+    <ClInclude Include="src\image\ImgItemHelper.h" />
+    <ClInclude Include="src\image\ImgJPEGItem.h" />
+    <ClInclude Include="src\image\ImgLoader.h" />
+    <ClInclude Include="src\image\turbojpeg_ImgVw.h" />
+    <ClInclude Include="src\platform\win32\CountingSemaphore.h" />
+    <ClInclude Include="src\platform\win32\FileMapView.h" />
+    <ClInclude Include="src\platform\win32\FileStream.h" />
+    <ClInclude Include="src\platform\win32\ImgSettings.h" />
+    <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
+    <ClInclude Include="src\ui\win32\Window.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="3rd-party\easyexif\exif.cpp" />
-    <ClCompile Include="FileStream.cpp" />
-    <ClCompile Include="ImgBrowser.cpp" />
-    <ClCompile Include="ImgBuffer.cpp" />
-    <ClCompile Include="ImgGDIItem.cpp" />
-    <ClCompile Include="ImgItem.cpp" />
-    <ClCompile Include="ImgItemHelper.cpp" />
-    <ClCompile Include="ImgJPEGItem.cpp" />
-    <ClCompile Include="ImgLoader.cpp" />
-    <ClCompile Include="ImgVwWindow.cpp" />
-    <ClCompile Include="Program.cpp" />
-    <ClCompile Include="turbojpeg_ImgVw.cpp" />
-    <ClCompile Include="Window.cpp" />
+    <ClCompile Include="src\app\Program.cpp" />
+    <ClCompile Include="src\browse\ImgBrowser.cpp" />
+    <ClCompile Include="src\image\ImgBuffer.cpp" />
+    <ClCompile Include="src\image\ImgGDIItem.cpp" />
+    <ClCompile Include="src\image\ImgItem.cpp" />
+    <ClCompile Include="src\image\ImgItemHelper.cpp" />
+    <ClCompile Include="src\image\ImgJPEGItem.cpp" />
+    <ClCompile Include="src\image\ImgLoader.cpp" />
+    <ClCompile Include="src\image\turbojpeg_ImgVw.cpp" />
+    <ClCompile Include="src\platform\win32\FileStream.cpp" />
+    <ClCompile Include="src\ui\win32\ImgVwWindow.cpp" />
+    <ClCompile Include="src\ui\win32\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="ImgVw.rc" />
+    <ResourceCompile Include="resources\ImgVw.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="ImgVw.ico" />
+    <Image Include="resources\ImgVw.ico" />
+    <Image Include="resources\small.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

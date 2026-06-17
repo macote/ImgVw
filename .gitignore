@@ -1,6 +1,8 @@
 /Release/
 /Debug/
 /Test/
+/bin/
+/obj/
 /ipch/
 /.vs/
 *.user
@@ -11,3 +13,4 @@
 *.VC.opendb
 *.aps
 scratch.txt
+artifacts

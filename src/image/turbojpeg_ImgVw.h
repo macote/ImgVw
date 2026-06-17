@@ -5,9 +5,9 @@
 
 #include <stdio.h>
 #include <setjmp.h>
-#include "3rd-party\libjpeg-turbo\jpeglib.h"
-#include "3rd-party\libjpeg-turbo\jerror.h"
-#include "3rd-party\libjpeg-turbo\turbojpeg.h"
+#include <jerror.h>
+#include <jpeglib.h>
+#include <turbojpeg.h>
 #include <Windows.h>
 
 #define EXIF_MARKER (JPEG_APP0 + 1)

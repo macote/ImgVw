@@ -66,9 +66,15 @@ public:
     {
         StopLoading();
         DeleteCriticalSection(&queuecriticalsection_);
-        CloseHandle(cancelevent_);
-        CloseHandle(workevent_);
-        if (loopthread_ != NULL)
+        if (cancelevent_ != NULL)
+        {
+            CloseHandle(cancelevent_);
+        }
+        if (workevent_ != NULL)
+        {
+            CloseHandle(workevent_);
+        }
+        if (loopthread_ != NULL && loopthread_ != INVALID_HANDLE_VALUE)
         {
             CloseHandle(loopthread_);
         }

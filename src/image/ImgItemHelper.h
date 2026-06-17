@@ -3,7 +3,7 @@
 #include "ImgBuffer.h"
 #include "ImgItem.h"
 #include "CountingSemaphore.h"
-#include "3rd-party\easyexif\exif.h"
+#include <exif.h>
 #include <Windows.h>
 #include <Shlwapi.h>
 #include <Gdiplus.h>

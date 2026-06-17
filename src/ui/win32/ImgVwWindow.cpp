@@ -321,14 +321,19 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
     }
 
     SHFILEOPSTRUCT shfileopstruct{};
-    TCHAR deletepaths[4096] = {};
-    const size_t pathlen = browser_.GetCurrentFilePath().size();
-    wcsncpy(deletepaths, browser_.GetCurrentFilePath().c_str(), pathlen);
-    deletepaths[pathlen + 1] = 0;
-    deletepaths[pathlen] = 0;
+    const auto filepath = browser_.GetCurrentFilePath();
+    if (filepath.empty())
+    {
+        return;
+    }
+
+    std::vector<TCHAR> deletepaths(filepath.begin(), filepath.end());
+    deletepaths.push_back(L'\0');
+    deletepaths.push_back(L'\0');
+
     shfileopstruct.hwnd = hwnd_;
     shfileopstruct.wFunc = FO_DELETE;
-    shfileopstruct.pFrom = deletepaths;
+    shfileopstruct.pFrom = deletepaths.data();
     shfileopstruct.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR | FOF_WANTNUKEWARNING;
     if (allowundo)
     {
@@ -353,14 +358,14 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
 void ImgVwWindow::SelectDefaultICCProfile()
 {
     OPENFILENAME ofn;
-    TCHAR szFile[260];
+    TCHAR szFile[MAX_PATH]{};
 
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hwnd_;
     ofn.lpstrFile = szFile;
     ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = sizeof(szFile);
+    ofn.nMaxFile = _countof(szFile);
     ofn.lpstrFilter = L"ICC Profile\0*.icc\0All\0*.*\0";
     ofn.nFilterIndex = 1;
     ofn.lpstrTitle = L"Select default ICC profile...";

@@ -16,6 +16,12 @@ void ImgItem::Unload()
 
 void ImgItem::SetupDisplayParameters(BOOL topdownbitmap)
 {
+    if (pbitmapinfo_ != nullptr)
+    {
+        HeapFree(heap_, 0, pbitmapinfo_);
+        pbitmapinfo_ = nullptr;
+    }
+
     pbitmapinfo_ = reinterpret_cast<PBITMAPINFO>(HeapAlloc(heap_, 0, sizeof(BITMAPINFOHEADER)));
     if (pbitmapinfo_ == NULL)
     {
@@ -73,11 +79,14 @@ void ImgItem::LoadDefaultICCProfile()
 
 void ImgItem::UnloadDefaultICCProfile()
 {
+    EnterCriticalSection(&DefaultICCProfileCriticalSection);
     if (DefaultICCProfile != nullptr)
     {
         cmsCloseProfile(DefaultICCProfile);
         DefaultICCProfile = nullptr;
     }
+
+    LeaveCriticalSection(&DefaultICCProfileCriticalSection);
 }
 
 BOOL ImgItem::TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer)
