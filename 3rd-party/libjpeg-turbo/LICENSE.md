@@ -1,29 +1,33 @@
 libjpeg-turbo Licenses
 ======================
 
-libjpeg-turbo is covered by three compatible BSD-style open source licenses:
+libjpeg-turbo is covered by two compatible BSD-style open source licenses:
 
 - The IJG (Independent JPEG Group) License, which is listed in
   [README.ijg](README.ijg)
 
-  This license applies to the libjpeg API library and associated programs
-  (any code inherited from libjpeg, and any modifications to that code.)
+  This license applies to the libjpeg API library and associated programs,
+  including any code inherited from libjpeg and any modifications to that
+  code.  Note that the libjpeg-turbo SIMD source code bears the
+  [zlib License](https://opensource.org/licenses/Zlib), but in the context of
+  the overall libjpeg API library, the terms of the zlib License are subsumed
+  by the terms of the IJG License.
 
 - The Modified (3-clause) BSD License, which is listed below
 
-  This license covers the TurboJPEG API library and associated programs.
-
-- The zlib License, which is listed below
-
-  This license is a subset of the other two, and it covers the libjpeg-turbo
-  SIMD extensions.
+  This license applies to the TurboJPEG API library and associated programs, as
+  well as the build system.  Note that the TurboJPEG API library wraps the
+  libjpeg API library, so in the context of the overall TurboJPEG API library,
+  both the terms of the IJG License and the terms of the Modified (3-clause)
+  BSD License apply.
 
 
 Complying with the libjpeg-turbo Licenses
 =========================================
 
 This section provides a roll-up of the libjpeg-turbo licensing terms, to the
-best of our understanding.
+best of our understanding.  This is not a license in and of itself.  It is
+intended solely for clarification.
 
 1.  If you are distributing a modified version of the libjpeg-turbo source,
     then:
@@ -37,7 +41,7 @@ best of our understanding.
         - Clauses 1 and 3 of the zlib License
 
     2.  You must add your own copyright notice to the header of each source
-        file you modified, so others can tell that you modified that file (if
+        file you modified, so others can tell that you modified that file.  (If
         there is not an existing copyright header in that file, then you can
         simply add a notice stating that you modified the file.)
 
@@ -65,7 +69,7 @@ best of our understanding.
 
     2.  If your binary distribution includes or uses the TurboJPEG API, then
         your product documentation must include the text of the Modified BSD
-        License.
+        License (see below.)
 
         **Origin**
         - Clause 2 of the Modified BSD License
@@ -90,7 +94,8 @@ best of our understanding.
 The Modified (3-clause) BSD License
 ===================================
 
-Copyright (C)\<YEAR\> \<AUTHOR\>.  All Rights Reserved.
+Copyright (C) 2009-2026 D. R. Commander.  All Rights Reserved.<br>
+Copyright (C) 2015 Viktor Szathmáry.  All Rights Reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -117,23 +122,14 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
 
-The zlib License
-================
+Why Two Licenses?
+=================
 
-Copyright (C) \<YEAR\>, \<AUTHOR\>.
-
-This software is provided 'as-is', without any express or implied
-warranty.  In no event will the authors be held liable for any damages
-arising from the use of this software.
-
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute it
-freely, subject to the following restrictions:
-
-1. The origin of this software must not be misrepresented; you must not
-   claim that you wrote the original software. If you use this software
-   in a product, an acknowledgment in the product documentation would be
-   appreciated but is not required.
-2. Altered source versions must be plainly marked as such, and must not be
-   misrepresented as being the original software.
-3. This notice may not be removed or altered from any source distribution.
+The zlib License could have been used instead of the Modified (3-clause) BSD
+License, and since the IJG License effectively subsumes the distribution
+conditions of the zlib License, this would have effectively placed
+libjpeg-turbo binary distributions under the IJG License.  However, the IJG
+License specifically refers to the Independent JPEG Group and does not extend
+attribution and endorsement protections to other entities.  Thus, it was
+desirable to choose a license that granted us the same protections for new code
+that were granted to the IJG for code derived from their software.

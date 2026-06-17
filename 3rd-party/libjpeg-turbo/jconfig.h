@@ -1,41 +1,48 @@
-/* jconfig.vc --- jconfig.h for Microsoft Visual C++ on Windows 95 or NT. */
-/* see jconfig.txt for explanations */
-
-#define JPEG_LIB_VERSION 62
-#define LIBJPEG_TURBO_VERSION 1.5.2
-#define LIBJPEG_TURBO_VERSION_NUMBER 1005002
-#define C_ARITH_CODING_SUPPORTED
-#define D_ARITH_CODING_SUPPORTED
-#define MEM_SRCDST_SUPPORTED
-
-/*
- * Define BITS_IN_JSAMPLE as either
- *   8   for 8-bit sample values (the usual setting)
- *   12  for 12-bit sample values
- * Only 8 and 12 are legal data precisions for lossy JPEG according to the
- * JPEG standard, and the IJG code does not support anything else!
- * We do not support run-time selection of data precision, sorry.
+/* Version ID for the JPEG library.
+ * Might be useful for tests like "#if JPEG_LIB_VERSION >= 60".
  */
+#define JPEG_LIB_VERSION  62
 
-#define BITS_IN_JSAMPLE  8      /* use 8 or 12 */
+/* libjpeg-turbo version */
+#define LIBJPEG_TURBO_VERSION  3.1.4.1
 
-#define HAVE_UNSIGNED_CHAR
-#define HAVE_UNSIGNED_SHORT
-/* #define void char */
-/* #define const */
-#undef __CHAR_UNSIGNED__
-#define HAVE_STDDEF_H
-#define HAVE_STDLIB_H
-#undef NEED_BSD_STRINGS
-#undef NEED_SYS_TYPES_H
-#undef NEED_FAR_POINTERS	/* we presume a 32-bit flat memory model */
-#undef INCOMPLETE_TYPES_BROKEN
+/* libjpeg-turbo version in integer form */
+#define LIBJPEG_TURBO_VERSION_NUMBER  3001004
+
+/* Support arithmetic encoding when using 8-bit samples */
+#define C_ARITH_CODING_SUPPORTED 1
+
+/* Support arithmetic decoding when using 8-bit samples */
+#define D_ARITH_CODING_SUPPORTED 1
+
+/* Support in-memory source/destination managers */
+#define MEM_SRCDST_SUPPORTED  1
+
+/* Use accelerated SIMD routines when using 8-bit samples */
+/* #undef WITH_SIMD */
+
+/* This version of libjpeg-turbo supports run-time selection of data precision,
+ * so BITS_IN_JSAMPLE is no longer used to specify the data precision at build
+ * time.  However, some downstream software expects the macro to be defined.
+ * Since 12-bit data precision is an opt-in feature that requires explicitly
+ * calling 12-bit-specific libjpeg API functions and using 12-bit-specific data
+ * types, the unmodified portion of the libjpeg API still behaves as if it were
+ * built for 8-bit precision, and JSAMPLE is still literally an 8-bit data
+ * type.  Thus, it is correct to define BITS_IN_JSAMPLE to 8 here.
+ */
+#ifndef BITS_IN_JSAMPLE
+#define BITS_IN_JSAMPLE  8
+#endif
+
+#ifdef _WIN32
+
+#undef RIGHT_SHIFT_IS_UNSIGNED
 
 /* Define "boolean" as unsigned char, not int, per Windows custom */
-#ifndef __RPCNDR_H__		/* don't conflict if rpcndr.h already read */
+#ifndef __RPCNDR_H__            /* don't conflict if rpcndr.h already read */
 typedef unsigned char boolean;
 #endif
-#define HAVE_BOOLEAN		/* prevent jmorecfg.h from redefining it */
+#define HAVE_BOOLEAN            /* prevent jmorecfg.h from redefining it */
 
 /* Define "INT32" as int, not long, per Windows custom */
 #if !(defined(_BASETSD_H_) || defined(_BASETSD_H))   /* don't conflict if basetsd.h already read */
@@ -44,8 +51,10 @@ typedef signed int INT32;
 #endif
 #define XMD_H                   /* prevent jmorecfg.h from redefining it */
 
-#ifdef JPEG_INTERNALS
+#else
 
-#undef RIGHT_SHIFT_IS_UNSIGNED
+/* Define if your (broken) compiler shifts signed values as if they were
+   unsigned. */
+/* #undef RIGHT_SHIFT_IS_UNSIGNED */
 
-#endif /* JPEG_INTERNALS */
+#endif
