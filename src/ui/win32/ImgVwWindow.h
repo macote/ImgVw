@@ -27,6 +27,7 @@ class ImgVwWindow final : public Window
     static const UINT kMaximumSlideShowIntervalInMilliseconds = 10000;
     static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 125;
     static const UINT kMouseHideIntervalInMilliseconds = 1000;
+    static const UINT kBrowserChangedMessage = WM_APP + 1;
 
   public:
     ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args)

@@ -48,14 +48,9 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
     const auto imgitem = browser_.GetCurrentItem();
     if (imgitem != nullptr)
     {
-        if (!DisplayImage(pps->hdc, imgitem))
+        if (!DisplayImage(pps->hdc, imgitem.get()))
         {
             DisplayFileInformation(pps->hdc, browser_.GetCurrentFilePath());
-        }
-
-        if (WaitForSingleObject(imgitem->loadedevent(), INFINITE) != WAIT_OBJECT_0)
-        {
-            // TODO: handle error
         }
     }
 }
@@ -68,6 +63,7 @@ void ImgVwWindow::InitializeBrowser(const std::wstring& path)
         return;
     }
 
+    browser_.SetNotificationWindow(hwnd_, kBrowserChangedMessage);
     browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom);
 }
 
@@ -185,13 +181,8 @@ void ImgVwWindow::BrowseLast()
 
 void ImgVwWindow::BrowseSubFolders()
 {
-    auto invalidate = browser_.GetCurrentItem() == nullptr;
     browser_.BrowseSubFoldersAsync();
-    if (invalidate)
-    {
-        browser_.GetReady();
-        InvalidateScreen();
-    }
+    InvalidateScreen();
 }
 
 void ImgVwWindow::HandleMouseWheel(WORD distance)
@@ -466,6 +457,9 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     switch (uMsg)
     {
+    case kBrowserChangedMessage:
+        InvalidateScreen();
+        return 0;
     case WM_ACTIVATE:
         activeparam_ = LOWORD(wParam);
         return FALSE;

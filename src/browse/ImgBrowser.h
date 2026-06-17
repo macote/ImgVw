@@ -8,6 +8,7 @@
 #include <vector>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <random>
 
 class ImgBrowser final
@@ -39,8 +40,9 @@ class ImgBrowser final
     void BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight);
     void BrowseSubFoldersAsync();
     void StopBrowsing();
+    void SetNotificationWindow(HWND hwnd, UINT message);
     std::wstring GetCurrentFilePath();
-    const ImgItem* GetCurrentItem();
+    std::shared_ptr<ImgItem> GetCurrentItem();
     BOOL MoveToNext();
     BOOL MoveToPrevious();
     BOOL MoveToFirst();
@@ -49,7 +51,6 @@ class ImgBrowser final
     BOOL MoveToRandom();
     void RemoveCurrentItem();
     void ReloadCurrentItem();
-    void GetReady();
 
   private:
     ImgCache cache_;
@@ -69,12 +70,15 @@ class ImgBrowser final
     CRITICAL_SECTION browsecriticalsection_;
     INT targetwidth_{};
     INT targetheight_{};
+    HWND notificationhwnd_{nullptr};
+    UINT notificationmessage_{};
 
   private:
     void CollectFile(const std::wstring& filepath);
     void CollectFolder(const std::wstring& folderpath);
     void CollectSubFolders();
     void StopCollecting();
+    void NotifyChanged();
     static DWORD WINAPI StaticThreadCollect(void* browserinstance);
     static DWORD WINAPI StaticThreadCollectSubFolders(void* browserinstance);
     void Reset();

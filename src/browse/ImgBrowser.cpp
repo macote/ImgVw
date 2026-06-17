@@ -8,7 +8,7 @@ void ImgBrowser::CollectFile(const std::wstring& filepath)
     files_.insert(filepath);
     cache_.Add(filepath, targetwidth_, targetheight_);
     randomlist_.push_back(filepath);
-    loader_.QueueItem(cache_.Get(filepath).get());
+    loader_.QueueItem(cache_.Get(filepath));
 
     if (currentfileiterator_ == files_.end())
     {
@@ -16,6 +16,7 @@ void ImgBrowser::CollectFile(const std::wstring& filepath)
     }
 
     SetEvent(readyevent_);
+    NotifyChanged();
 
     LeaveCriticalSection(&browsecriticalsection_);
 }
@@ -141,9 +142,16 @@ void ImgBrowser::BrowseSubFoldersAsync()
 
     recursive_ = TRUE;
 
-    if (WaitForSingleObject(collectorthread_, INFINITE) != WAIT_OBJECT_0)
+    const auto collectorstatus = WaitForSingleObject(collectorthread_, 0);
+    if (collectorstatus == WAIT_TIMEOUT)
+    {
+        return;
+    }
+
+    if (collectorstatus != WAIT_OBJECT_0)
     {
         // TODO: handle error
+        return;
     }
 
     if (!cancellationflag_ && !folders_.empty())
@@ -185,6 +193,13 @@ void ImgBrowser::StopBrowsing()
     loader_.StopLoading();
 }
 
+void ImgBrowser::SetNotificationWindow(HWND hwnd, UINT message)
+{
+    notificationhwnd_ = hwnd;
+    notificationmessage_ = message;
+    loader_.SetNotificationWindow(hwnd, message);
+}
+
 void ImgBrowser::Reset()
 {
     randomlist_.clear();
@@ -205,11 +220,11 @@ std::wstring ImgBrowser::GetCurrentFilePath()
     }
 }
 
-const ImgItem* ImgBrowser::GetCurrentItem()
+std::shared_ptr<ImgItem> ImgBrowser::GetCurrentItem()
 {
     if (currentfileiterator_ != files_.end())
     {
-        const auto imgitem = cache_.Get(*currentfileiterator_).get();
+        auto imgitem = cache_.Get(*currentfileiterator_);
         if (imgitem != nullptr)
         {
             if (imgitem->status() == ImgItem::Status::Queued)
@@ -217,23 +232,18 @@ const ImgItem* ImgBrowser::GetCurrentItem()
                 loader_.QueueItem(imgitem, TRUE);
             }
 
-            if (WaitForSingleObject(imgitem->loadedevent(), INFINITE) != WAIT_OBJECT_0)
-            {
-                // TODO: handle error
-            }
-
             return imgitem;
         }
     }
 
-    return nullptr;
+    return {};
 }
 
 void ImgBrowser::ReloadCurrentItem()
 {
     if (currentfileiterator_ != files_.end())
     {
-        auto imgitem = cache_.Get(*currentfileiterator_).get();
+        auto imgitem = cache_.Get(*currentfileiterator_);
         if (imgitem != nullptr)
         {
             if (imgitem->status() != ImgItem::Status::Queued)
@@ -242,11 +252,6 @@ void ImgBrowser::ReloadCurrentItem()
             }
 
             loader_.QueueItem(imgitem, TRUE);
-
-            if (WaitForSingleObject(imgitem->loadedevent(), INFINITE) != WAIT_OBJECT_0)
-            {
-                // TODO: handle error
-            }
         }
     }
 }
@@ -385,11 +390,11 @@ void ImgBrowser::CollectSubFolders()
     folders_.clear();
 }
 
-void ImgBrowser::GetReady()
+void ImgBrowser::NotifyChanged()
 {
-    if (WaitForSingleObject(readyevent_, INFINITE) != WAIT_OBJECT_0)
+    if (notificationhwnd_ != nullptr && notificationmessage_ != 0)
     {
-        // TODO: handle error
+        PostMessage(notificationhwnd_, notificationmessage_, 0, 0);
     }
 }
 
@@ -404,6 +409,7 @@ DWORD WINAPI ImgBrowser::StaticThreadCollect(void* browserinstance)
     }
 
     SetEvent(browser->readyevent_);
+    browser->NotifyChanged();
 
     return 0;
 }
@@ -415,6 +421,7 @@ DWORD WINAPI ImgBrowser::StaticThreadCollectSubFolders(void* browserinstance)
     browser->CollectSubFolders();
 
     SetEvent(browser->readyevent_);
+    browser->NotifyChanged();
 
     return 0;
 }

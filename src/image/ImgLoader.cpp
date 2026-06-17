@@ -38,6 +38,9 @@ void ImgLoader::StopLoading()
         loaderitems_.clear();
     }
 
+    queue_.clear();
+    pendingitems_.clear();
+
     cancellationflag_ = FALSE;
 }
 
@@ -68,17 +71,18 @@ DWORD ImgLoader::Loop()
         auto imgitem = GetNextItem();
         if (imgitem != nullptr)
         {
-            loadersemaphore_.Wait();
             if (imgitem->status() == ImgItem::Status::Queued)
             {
-                auto loaderitem = std::make_unique<LoaderItem>(imgitem, [&]() { loadersemaphore_.Notify(); });
+                loadersemaphore_.Wait();
+                auto loaderitem =
+                    std::make_unique<LoaderItem>(imgitem, [this, imgitem]() { CompleteItem(imgitem, TRUE); });
                 loaderitem->set_loaderitemthread(
                     CreateThread(nullptr, 0, StaticThreadLoad, reinterpret_cast<void*>(loaderitem.get()), 0, nullptr));
                 loaderitems_.push_back(std::move(loaderitem));
             }
             else
             {
-                loadersemaphore_.Notify();
+                CompleteItem(imgitem, FALSE);
             }
         }
 
@@ -115,9 +119,26 @@ void ImgLoader::CleanupItemThreadObjects()
     }
 }
 
-void ImgLoader::QueueItem(ImgItem* imgitem, BOOL loadnext)
+void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext)
 {
+    if (imgitem == nullptr)
+    {
+        return;
+    }
+
+    if (imgitem->status() != ImgItem::Status::Queued)
+    {
+        return;
+    }
+
     EnterCriticalSection(&queuecriticalsection_);
+    if (pendingitems_.find(imgitem.get()) != pendingitems_.end())
+    {
+        LeaveCriticalSection(&queuecriticalsection_);
+        return;
+    }
+
+    pendingitems_.insert(imgitem.get());
     if (loadnext)
     {
         queue_.push_front(imgitem);
@@ -132,9 +153,15 @@ void ImgLoader::QueueItem(ImgItem* imgitem, BOOL loadnext)
     SetEvent(workevent_);
 }
 
-ImgItem* ImgLoader::GetNextItem()
+void ImgLoader::SetNotificationWindow(HWND hwnd, UINT message)
 {
-    ImgItem* imgitem = nullptr;
+    notificationhwnd_ = hwnd;
+    notificationmessage_ = message;
+}
+
+std::shared_ptr<ImgItem> ImgLoader::GetNextItem()
+{
+    std::shared_ptr<ImgItem> imgitem;
     EnterCriticalSection(&queuecriticalsection_);
     if (!queue_.empty())
     {
@@ -149,6 +176,28 @@ ImgItem* ImgLoader::GetNextItem()
     LeaveCriticalSection(&queuecriticalsection_);
 
     return imgitem;
+}
+
+void ImgLoader::CompleteItem(const std::shared_ptr<ImgItem>& imgitem, BOOL notifysemaphore)
+{
+    EnterCriticalSection(&queuecriticalsection_);
+    pendingitems_.erase(imgitem.get());
+    LeaveCriticalSection(&queuecriticalsection_);
+
+    if (notifysemaphore)
+    {
+        loadersemaphore_.Notify();
+    }
+
+    NotifyLoadComplete();
+}
+
+void ImgLoader::NotifyLoadComplete()
+{
+    if (notificationhwnd_ != nullptr && notificationmessage_ != 0)
+    {
+        PostMessage(notificationhwnd_, notificationmessage_, 0, 0);
+    }
 }
 
 DWORD WINAPI ImgLoader::StaticThreadLoop(void* imgloaderinstance)
