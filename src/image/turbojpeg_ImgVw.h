@@ -38,7 +38,7 @@ typedef struct _tjinstance
 
 char* GetErrorStr();
 tjhandle InitDecompress();
-tjhandle InitDecompressInternal(tjinstance* pinstance);
+tjhandle InitDecompressInternal(tjinstance* inst);
 int Destroy(tjhandle handle);
 int AbortDecompress(tjhandle handle);
 int SaveMarkers(tjhandle handle, int markercode);

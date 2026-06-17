@@ -111,5 +111,5 @@ class ImgLoader
     ImgItem* GetNextItem();
     void CleanupItemThreadObjects();
     static DWORD WINAPI StaticThreadLoop(void* imgloaderinstance);
-    static DWORD WINAPI StaticThreadLoad(void* imgiteminstance);
+    static DWORD WINAPI StaticThreadLoad(void* loaderiteminstance);
 };

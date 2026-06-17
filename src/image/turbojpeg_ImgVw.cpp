@@ -308,8 +308,8 @@ tjhandle InitDecompressInternal(tjinstance* inst)
 
 tjhandle InitDecompress()
 {
-    tjinstance* inst;
-    if ((inst = (tjinstance*)malloc(sizeof(tjinstance))) == nullptr)
+    tjinstance* inst = (tjinstance*)malloc(sizeof(tjinstance));
+    if (inst == nullptr)
     {
         snprintf(errStr, JMSG_LENGTH_MAX, "tjInitDecompress(): Memory allocation failure");
         return nullptr;
@@ -489,8 +489,12 @@ int Decompress(tjhandle handle, const unsigned char* jpegBuf, unsigned long jpeg
     if (pitch == 0)
         pitch = dinfo->output_width * tjPixelSize[pixelFormat];
 
-    if ((row_pointer = (JSAMPROW*)malloc(sizeof(JSAMPROW) * dinfo->output_height)) == nullptr)
+    row_pointer = (JSAMPROW*)malloc(sizeof(JSAMPROW) * dinfo->output_height);
+    if (row_pointer == nullptr)
+    {
         _throw("tjDecompress2(): Memory allocation failure");
+    }
+
     if (setjmp(inst->jerr.setjmp_buffer))
     {
         /* If we get here, the JPEG code has signaled an error. */

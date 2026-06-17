@@ -94,5 +94,5 @@ class ImgVwWindow final : public Window
     BOOL HandleMouseMove(WPARAM wParam, LPARAM lParam);
     void HandleHideMouseCursor();
     void OnNCDestroy();
-    static BOOL CALLBACK AboutDialogProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam);
+    static BOOL CALLBACK AboutDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
