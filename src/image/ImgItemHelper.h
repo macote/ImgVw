@@ -11,15 +11,15 @@
 
 class ImgItemHelper
 {
-public:
+  public:
     static ImgItem::Format GetImgFormatFromExtension(const std::wstring& filepath);
     static ImgBuffer Resize24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth, INT targetheight);
-    static ImgBuffer ResizeAndRotate24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth, INT targetheight,
-        Gdiplus::RotateFlipType rotateflip);
+    static ImgBuffer ResizeAndRotate24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth,
+                                                  INT targetheight, Gdiplus::RotateFlipType rotateflip);
     static ImgBuffer Rotate24bppRGBImage(INT width, INT height, const PBYTE buffer, Gdiplus::RotateFlipType rotateflip);
     static ImgBuffer ResizeImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight);
     static ImgBuffer ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
-        Gdiplus::RotateFlipType rotateflip);
+                                          Gdiplus::RotateFlipType rotateflip);
     static ImgBuffer RotateImage(Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip)
     {
         return RotateImage(bitmap, rotateflip, FALSE);
@@ -29,7 +29,8 @@ public:
     static Gdiplus::RotateFlipType GetRotateFlipTypeFromExifOrientation(UINT exiforientation);
     static ImgBuffer RotateImage(Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip, BOOL gdiinuse);
     static ImgBuffer GetBuffer(Gdiplus::Bitmap* bitmap);
-private:
+
+  private:
     static const INT kGDIOperationSemaphoreCount = 1;
     static const CountingSemaphore kGDIOperationSemaphore;
 };

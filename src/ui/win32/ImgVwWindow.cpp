@@ -1,6 +1,6 @@
 #include "ImgVwWindow.h"
 
-ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring> args)
+ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring>& args)
 {
     auto self = new ImgVwWindow(hInst, args);
     if (self != nullptr)
@@ -8,8 +8,8 @@ ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring
         self->backgroundbrush_ = CreateSolidBrush(RGB(0, 0, 0));
         self->manualcursor_ = TRUE;
         self->dontfillbackground_ = TRUE;
-        if (self->WinCreateWindow(WS_EX_APPWINDOW, L"ImgVw", WS_POPUP, 0, 0,
-            GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), NULL, NULL))
+        if (self->WinCreateWindow(WS_EX_APPWINDOW, L"ImgVw", WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN),
+                                  GetSystemMetrics(SM_CYSCREEN), nullptr, nullptr))
         {
             return self;
         }
@@ -34,7 +34,7 @@ LRESULT ImgVwWindow::OnCreate()
     }
 
     QueryPerformanceFrequency(&qpcfrequency_);
-    arrowcursor_ = LoadCursor(NULL, IDC_ARROW);
+    arrowcursor_ = LoadCursor(nullptr, IDC_ARROW);
     SetCursor(arrowcursor_);
     SetCapture(hwnd_);
     ShowCursor(FALSE);
@@ -101,7 +101,8 @@ BOOL ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
     const auto imgbitmap = item->GetDisplayBitmap();
     const auto replacedobject = SelectObject(memorydc, imgbitmap.bitmap());
 
-    if (ExcludeClipRect(dc, item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(), item->offsety() + item->displayheight()) == RGN_ERROR)
+    if (ExcludeClipRect(dc, item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(),
+                        item->offsety() + item->displayheight()) == RGN_ERROR)
     {
         // TODO: handle error
     }
@@ -109,11 +110,12 @@ BOOL ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
     {
         // TODO: handle error
     }
-    else if (SelectClipRgn(dc, NULL) == RGN_ERROR)
+    else if (SelectClipRgn(dc, nullptr) == RGN_ERROR)
     {
         // TODO: handle error
     }
-    else if (!BitBlt(dc, item->offsetx(), item->offsety(), item->displaywidth(), item->displayheight(), memorydc, 0, 0, SRCCOPY))
+    else if (!BitBlt(dc, item->offsetx(), item->offsety(), item->displaywidth(), item->displayheight(), memorydc, 0, 0,
+                     SRCCOPY))
     {
         // TODO: handle error
     }
@@ -134,7 +136,7 @@ void ImgVwWindow::DisplayFileInformation(HDC dc, const std::wstring& filepath)
 
 void ImgVwWindow::InvalidateScreen()
 {
-    InvalidateRect(hwnd_, NULL, FALSE);
+    InvalidateRect(hwnd_, nullptr, FALSE);
     if (slideshowrunning_)
     {
         RestartSlideShowTimer();
@@ -221,7 +223,7 @@ void ImgVwWindow::StartSlideShow()
 {
     if (!slideshowrunning_)
     {
-        SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, NULL);
+        SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, nullptr);
         slideshowrunning_ = TRUE;
     }
 }
@@ -240,7 +242,7 @@ void ImgVwWindow::RestartSlideShowTimer()
     if (slideshowrunning_)
     {
         KillTimer(hwnd_, IDT_SLIDESHOW);
-        SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, NULL);
+        SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, nullptr);
     }
 }
 
@@ -285,7 +287,7 @@ BOOL ImgVwWindow::HandleMouseMove(WPARAM wParam, LPARAM lParam)
         if (!mousehidetimerstarted_)
         {
             ShowCursor(TRUE);
-            SetTimer(hwnd_, IDT_HIDEMOUSE, kMouseHideIntervalInMilliseconds, NULL);
+            SetTimer(hwnd_, IDT_HIDEMOUSE, kMouseHideIntervalInMilliseconds, nullptr);
             mousehidetimerstarted_ = TRUE;
         }
     }
@@ -304,7 +306,7 @@ void ImgVwWindow::HandleHideMouseCursor()
 
     if (elapsedmilliseconds < kMouseHideIntervalInMilliseconds)
     {
-        SetTimer(hwnd_, IDT_HIDEMOUSE, kMouseHideIntervalInMilliseconds - elapsedmilliseconds, NULL);
+        SetTimer(hwnd_, IDT_HIDEMOUSE, kMouseHideIntervalInMilliseconds - elapsedmilliseconds, nullptr);
     }
     else
     {
@@ -369,21 +371,21 @@ void ImgVwWindow::SelectDefaultICCProfile()
     ofn.lpstrFilter = L"ICC Profile\0*.icc\0All\0*.*\0";
     ofn.nFilterIndex = 1;
     ofn.lpstrTitle = L"Select default ICC profile...";
-    ofn.lpstrFileTitle = NULL;
+    ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = NULL;
+    ofn.lpstrInitialDir = nullptr;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
     ShowCursor(TRUE);
     if (GetOpenFileName(&ofn))
     {
         TCHAR appdatapath[260];
-        if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, appdatapath)))
+        if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath)))
         {
             TCHAR imgvwappdatapath[260];
             PathCombine(imgvwappdatapath, appdatapath, ImgSettings::kAppDataPath);
 
-            auto result = SHCreateDirectoryEx(hwnd_, imgvwappdatapath, NULL);
+            auto result = SHCreateDirectoryEx(hwnd_, imgvwappdatapath, nullptr);
             if (result == ERROR_SUCCESS || result == ERROR_ALREADY_EXISTS)
             {
                 TCHAR iccpath[260];
@@ -399,7 +401,7 @@ void ImgVwWindow::SelectDefaultICCProfile()
 void ImgVwWindow::HandleContextMenu(LPARAM lParam)
 {
     RECT rc;
-    POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+    POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 
     GetClientRect(hwnd_, &rc);
     ScreenToClient(hwnd_, &pt);
@@ -412,7 +414,7 @@ void ImgVwWindow::HandleContextMenu(LPARAM lParam)
         const auto popup = GetSubMenu(root, 0);
 
         ShowCursor(TRUE);
-        TrackPopupMenu(popup, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd_, NULL);
+        TrackPopupMenu(popup, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd_, nullptr);
         ShowCursor(FALSE);
 
         DestroyMenu(root);

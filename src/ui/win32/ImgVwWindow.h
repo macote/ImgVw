@@ -19,7 +19,7 @@
 
 class ImgVwWindow final : public Window
 {
-public:
+  public:
     static constexpr auto kClassName = L"ImgVwWindow";
     static constexpr auto kAppDataPath = L"A611FF5773EC43EC\\ImgVw";
     static const UINT kInitialSlideShowIntervalInMilliseconds = 1750;
@@ -27,10 +27,13 @@ public:
     static const UINT kMaximumSlideShowIntervalInMilliseconds = 10000;
     static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 125;
     static const UINT kMouseHideIntervalInMilliseconds = 1000;
-public:
-    ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args) : Window(hinst)
+
+  public:
+    ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args)
+        : Window(hinst)
 #if _DEBUG && LOGIMGVWWINDOW
-        , logger_(TimestampLogger(LOGIMGVWWINDOWPATH + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE))
+          ,
+          logger_(TimestampLogger(LOGIMGVWWINDOWPATH + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE))
 #endif
     {
         if (args.size() > 1)
@@ -40,25 +43,29 @@ public:
     }
     ImgVwWindow(const ImgVwWindow&) = delete;
     ImgVwWindow& operator=(const ImgVwWindow&) = delete;
-    LPCWSTR ClassName() const { return kClassName; }
-    static ImgVwWindow* Create(HINSTANCE hInst, const std::vector<std::wstring> args);
-private:
+    LPCWSTR ClassName() const
+    {
+        return kClassName;
+    }
+    static ImgVwWindow* Create(HINSTANCE hInst, const std::vector<std::wstring>& args);
+
+  private:
     ImgBrowser browser_;
     std::wstring path_;
     WORD activeparam_{};
-    HFONT captionfont_{ nullptr };
-    HCURSOR arrowcursor_{ nullptr };
+    HFONT captionfont_{nullptr};
+    HCURSOR arrowcursor_{nullptr};
     LARGE_INTEGER qpcfrequency_{};
     BOOL slideshowrunning_{};
     BOOL slideshowrandom_{};
-    UINT slideshowinterval_{ kInitialSlideShowIntervalInMilliseconds };
+    UINT slideshowinterval_{kInitialSlideShowIntervalInMilliseconds};
     POINTS mousemovelastpoints_{};
     LARGE_INTEGER mousemovelastcounter_{};
-    BOOL mousehidetimerstarted_{ FALSE };
+    BOOL mousehidetimerstarted_{FALSE};
 #if _DEBUG && LOGIMGVWWINDOW
     TimestampLogger logger_;
 #endif
-private:
+  private:
     void InitializeBrowser(const std::wstring& path);
     void PerformAction();
     void BrowseNext();

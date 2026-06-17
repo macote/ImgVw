@@ -23,7 +23,7 @@ void ImgItem::SetupDisplayParameters(BOOL topdownbitmap)
     }
 
     pbitmapinfo_ = reinterpret_cast<PBITMAPINFO>(HeapAlloc(heap_, 0, sizeof(BITMAPINFOHEADER)));
-    if (pbitmapinfo_ == NULL)
+    if (pbitmapinfo_ == nullptr)
     {
         // TODO: handle error.
         return;
@@ -40,16 +40,16 @@ void ImgItem::SetupDisplayParameters(BOOL topdownbitmap)
     offsety_ = (targetheight_ - displaybuffer_.height()) / 2;
 }
 
-ImgBitmap ImgItem::GetDisplayBitmap() const 
+ImgBitmap ImgItem::GetDisplayBitmap() const
 {
     auto filemap = displaybuffer_.GetFileMapView();
-   
+
     return ImgBitmap(pbitmapinfo_, filemap.data(), displaybuffer_.buffersize());
 }
 
 void ImgItem::OpenICCProfile(const PBYTE iccprofiledata, UINT iccprofiledatabytecount)
 {
-	iccprofile_ = cmsOpenProfileFromMem(iccprofiledata, iccprofiledatabytecount);
+    iccprofile_ = cmsOpenProfileFromMem(iccprofiledata, iccprofiledatabytecount);
 }
 
 void ImgItem::LoadDefaultICCProfile()
@@ -58,7 +58,7 @@ void ImgItem::LoadDefaultICCProfile()
     if (DefaultICCProfile == nullptr)
     {
         TCHAR appdatapath[260];
-        if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, appdatapath)))
+        if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath)))
         {
             TCHAR imgvwappdatapath[260];
             PathCombine(imgvwappdatapath, appdatapath, ImgSettings::kAppDataPath);
@@ -108,7 +108,7 @@ BOOL ImgItem::TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT n
     // TODO: determine if other types of transform (TYPE_CMYK_8_REV => TYPE_BGR_8) should be supported.
     auto srgbprofile = cmsCreate_sRGBProfile();
     auto transform = cmsCreateTransform(iccprofile, TYPE_CMYK_8_REV, srgbprofile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
-    if (transform == NULL)
+    if (transform == nullptr)
     {
         iccprofileloadfailed_ = TRUE;
         cmsCloseProfile(srgbprofile);

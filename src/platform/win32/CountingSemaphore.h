@@ -5,8 +5,8 @@
 
 class CountingSemaphore final
 {
-public:
-    CountingSemaphore() { }
+  public:
+    CountingSemaphore() {}
     CountingSemaphore(LONG maximumcount)
     {
         SetupSemaphore(maximumcount);
@@ -35,9 +35,11 @@ public:
     void Notify() const;
     void Wait() const;
     void SetupSemaphore(LONG maximumcount);
-private:
-    HANDLE semaphore_{ INVALID_HANDLE_VALUE };
-private:
+
+  private:
+    HANDLE semaphore_{INVALID_HANDLE_VALUE};
+
+  private:
     void Close()
     {
         if (semaphore_ != INVALID_HANDLE_VALUE)

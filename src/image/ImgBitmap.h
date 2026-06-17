@@ -6,7 +6,7 @@
 
 class ImgBitmap
 {
-public:
+  public:
     ImgBitmap(const PBITMAPINFO pbitmapinfo, const PBYTE buffer, INT buffersize)
     {
         Initialize(pbitmapinfo, buffer, buffersize);
@@ -32,10 +32,15 @@ public:
 
         return *this;
     }
-    HBITMAP bitmap() const { return bitmap_; }
-private:
-    HBITMAP bitmap_{ nullptr };
-private:
+    HBITMAP bitmap() const
+    {
+        return bitmap_;
+    }
+
+  private:
+    HBITMAP bitmap_{nullptr};
+
+  private:
     void Initialize(const PBITMAPINFO pbitmapinfo, const PBYTE buffer, INT buffersize);
     void DeleteBitmap();
 };
@@ -58,7 +63,7 @@ inline void ImgBitmap::Initialize(const PBITMAPINFO pbitmapinfo, const PBYTE buf
     }
 
     const auto usage = pbitmapinfo->bmiHeader.biClrUsed > 0 ? DIB_PAL_COLORS : DIB_RGB_COLORS;
-    PBYTE bits{ nullptr };
+    PBYTE bits{nullptr};
     bitmap_ = CreateDIBSection(dc, pbitmapinfo, usage, reinterpret_cast<void**>(&bits), NULL, 0);
     ReleaseDC(NULL, dc);
     if (bitmap_ == nullptr || bits == nullptr)

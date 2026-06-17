@@ -9,7 +9,7 @@
 
 class ImgItemFactory
 {
-public:
+  public:
     static std::shared_ptr<ImgItem> Create(const std::wstring& filepath, INT targetwidth, INT targetheight)
     {
         const auto imgformat = ImgItemHelper::GetImgFormatFromExtension(filepath);

@@ -8,26 +8,35 @@
 
 class ImgSettings
 {
-public:
+  public:
     static constexpr auto kAppDataPath = L"A611FF5773EC43EC\\ImgVw";
-public:
+
+  public:
     static ImgSettings& GetInstance()
     {
         static ImgSettings settings;
 
         return settings;
     }
-    std::wstring temppath() const { return temppath_; }
+    std::wstring temppath() const
+    {
+        return temppath_;
+    }
     ~ImgSettings()
     {
         DeleteTempPath();
     }
     ImgSettings(const ImgSettings&) = delete;
     ImgSettings& operator=(const ImgSettings&) = delete;
-private:
+
+  private:
     std::wstring temppath_;
-private:
-    ImgSettings() { InitializeTempPath(); }
+
+  private:
+    ImgSettings()
+    {
+        InitializeTempPath();
+    }
     void InitializeTempPath();
     void DeleteTempPath();
 };
@@ -78,8 +87,7 @@ inline void ImgSettings::InitializeTempPath()
         {
             FindClose(find);
         }
-    }
-    while (folderexists);
+    } while (folderexists);
 }
 
 inline void ImgSettings::DeleteTempPath()

@@ -10,8 +10,8 @@
 
 class ImgBuffer
 {
-public:
-    ImgBuffer() { }
+  public:
+    ImgBuffer() {}
     ~ImgBuffer()
     {
         DeleteTempFile();
@@ -43,20 +43,34 @@ public:
     }
     void WriteData(INT width, INT height, INT stride, const PBYTE buffer);
     FileMapView GetFileMapView() const;
-    INT width() const { return width_; }
-    INT height() const { return height_; }
-    INT stride() const { return stride_; }
-    DWORD buffersize() const { return buffersize_; }
-private:
+    INT width() const
+    {
+        return width_;
+    }
+    INT height() const
+    {
+        return height_;
+    }
+    INT stride() const
+    {
+        return stride_;
+    }
+    DWORD buffersize() const
+    {
+        return buffersize_;
+    }
+
+  private:
     INT width_{};
     INT height_{};
     INT stride_{};
-    PBYTE buffer_{ nullptr };
+    PBYTE buffer_{nullptr};
     DWORD buffersize_{};
     std::wstring tempfilename_;
-    HANDLE heap_{ INVALID_HANDLE_VALUE };
-    HANDLE tempfile_{ INVALID_HANDLE_VALUE };
-private:
+    HANDLE heap_{INVALID_HANDLE_VALUE};
+    HANDLE tempfile_{INVALID_HANDLE_VALUE};
+
+  private:
     void CreateTempFile();
     void CloseTempFile();
     void DeleteTempFile();

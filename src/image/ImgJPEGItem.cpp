@@ -5,8 +5,8 @@ void ImgJPEGItem::Load()
 {
     status_ = Status::Loading;
 
-    tjhandle jpegdecompressor{ nullptr };
-    PBYTE buffer{ nullptr };
+    tjhandle jpegdecompressor{nullptr};
+    PBYTE buffer{nullptr};
 
     try
     {
@@ -19,7 +19,7 @@ void ImgJPEGItem::Load()
         }
 
         jpegdecompressor = turbojpeg::InitDecompress();
-        if (jpegdecompressor == NULL)
+        if (jpegdecompressor == nullptr)
         {
             status_ = Status::Error;
             goto done;
@@ -29,8 +29,8 @@ void ImgJPEGItem::Load()
         turbojpeg::SaveMarkers(jpegdecompressor, ICC_MARKER);
 
         INT jpegSubsamp, jpegColorspace;
-        if (turbojpeg::DecompressHeader(jpegdecompressor, jpegfilemap.data(), jpegfilemap.filesize().LowPart,
-            &width_, &height_, &jpegSubsamp, &jpegColorspace, TJFLAG_NOCLEANUP))
+        if (turbojpeg::DecompressHeader(jpegdecompressor, jpegfilemap.data(), jpegfilemap.filesize().LowPart, &width_,
+                                        &height_, &jpegSubsamp, &jpegColorspace, TJFLAG_NOCLEANUP))
         {
             errorstring_ = turbojpeg::GetErrorStr();
             status_ = Status::Error;
@@ -50,7 +50,7 @@ void ImgJPEGItem::Load()
             }
         }
 
-        Gdiplus::RotateFlipType rotateflip{ Gdiplus::RotateNoneFlipNone };
+        Gdiplus::RotateFlipType rotateflip{Gdiplus::RotateNoneFlipNone};
         PBYTE exifdata;
         const auto exifdatabytecount = turbojpeg::LocateEXIFSegment(jpegdecompressor, &exifdata);
         if (exifdatabytecount > 0)
@@ -62,8 +62,8 @@ void ImgJPEGItem::Load()
         turbojpeg::AbortDecompress(jpegdecompressor);
 
         INT targetwidth{}, targetheight{};
-        if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone
-            || rotateflip == Gdiplus::Rotate90FlipX || rotateflip == Gdiplus::Rotate270FlipX)
+        if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone ||
+            rotateflip == Gdiplus::Rotate90FlipX || rotateflip == Gdiplus::Rotate270FlipX)
         {
             targetwidth = targetheight_;
             targetheight = targetwidth_;
@@ -88,8 +88,8 @@ void ImgJPEGItem::Load()
             const auto widthdiff = targetwidth - decompresswidth;
             const auto heightdiff = targetheight - decompressheight;
 
-            if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight))
-                || (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth)))
+            if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight)) ||
+                (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth)))
             {
                 resize = TRUE;
             }
@@ -105,7 +105,7 @@ void ImgJPEGItem::Load()
         const auto buffersize = stride * decompressheight;
         buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, buffersize));
 
-        INT decompressflags{ TJFLAG_FASTDCT };
+        INT decompressflags{TJFLAG_FASTDCT};
         if (!resize)
         {
             decompressflags |= TJFLAG_BOTTOMUP;
@@ -115,7 +115,7 @@ void ImgJPEGItem::Load()
         turbojpeg::SkipMarkers(jpegdecompressor, ICC_MARKER);
 
         if (turbojpeg::Decompress(jpegdecompressor, jpegfilemap.data(), jpegfilemap.filesize().LowPart, buffer,
-            decompresswidth, stride, decompressheight, pixelformat, decompressflags))
+                                  decompresswidth, stride, decompressheight, pixelformat, decompressflags))
         {
             errorstring_ = turbojpeg::GetErrorStr();
             status_ = Status::Error;
@@ -137,7 +137,7 @@ void ImgJPEGItem::Load()
         if (resize)
         {
             displaybuffer_ = ImgItemHelper::ResizeAndRotate24bppRGBImage(decompresswidth, decompressheight, buffer,
-                targetwidth, targetheight, rotateflip);
+                                                                         targetwidth, targetheight, rotateflip);
         }
         else if (rotateflip != Gdiplus::RotateNoneFlipNone)
         {

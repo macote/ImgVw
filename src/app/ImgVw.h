@@ -13,10 +13,11 @@
 
 class ImgVw
 {
-public:
+  public:
     static INT Run(HINSTANCE hInstance, INT nShowCmd);
-private:
-    ImgVw() { }
+
+  private:
+    ImgVw() {}
 };
 
 inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)

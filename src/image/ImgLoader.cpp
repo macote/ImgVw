@@ -2,7 +2,7 @@
 
 void ImgLoader::StopLoading()
 {
-    if (loopthread_ == NULL || loopthread_ == INVALID_HANDLE_VALUE)
+    if (loopthread_ == nullptr || loopthread_ == INVALID_HANDLE_VALUE)
     {
         return;
     }
@@ -15,10 +15,10 @@ void ImgLoader::StopLoading()
         // TODO: handle error
     }
 
-    if (loaderitems_.size() > 0)
+    if (!loaderitems_.empty())
     {
         std::vector<HANDLE> threads;
-        for (const auto & loaderitem : loaderitems_)
+        for (const auto& loaderitem : loaderitems_)
         {
             const auto status = loaderitem->imgitem()->status();
             if (!(status == ImgItem::Status::Error || status == ImgItem::Status::Ready))
@@ -27,7 +27,7 @@ void ImgLoader::StopLoading()
             }
         }
 
-        if (threads.size() > 0)
+        if (!threads.empty())
         {
             if (WaitForMultipleObjects(threads.size(), &threads[0], TRUE, INFINITE) == WAIT_FAILED)
             {
@@ -43,12 +43,12 @@ void ImgLoader::StopLoading()
 
 void ImgLoader::LoadAsync()
 {
-    loopthread_ = CreateThread(NULL, 0, StaticThreadLoop, reinterpret_cast<void*>(this), 0, NULL);
+    loopthread_ = CreateThread(nullptr, 0, StaticThreadLoop, reinterpret_cast<void*>(this), 0, nullptr);
 }
 
 DWORD ImgLoader::Loop()
 {
-    const HANDLE waitevents[2] = { workevent_, cancelevent_ };
+    const HANDLE waitevents[2] = {workevent_, cancelevent_};
     INT cyclecount{};
 
     while (!cancellationflag_)
@@ -72,7 +72,8 @@ DWORD ImgLoader::Loop()
             if (imgitem->status() == ImgItem::Status::Queued)
             {
                 auto loaderitem = std::make_unique<LoaderItem>(imgitem, [&]() { loadersemaphore_.Notify(); });
-                loaderitem->set_loaderitemthread(CreateThread(NULL, 0, StaticThreadLoad, reinterpret_cast<void*>(loaderitem.get()), 0, NULL));
+                loaderitem->set_loaderitemthread(
+                    CreateThread(nullptr, 0, StaticThreadLoad, reinterpret_cast<void*>(loaderitem.get()), 0, nullptr));
                 loaderitems_.push_back(std::move(loaderitem));
             }
             else
@@ -81,7 +82,7 @@ DWORD ImgLoader::Loop()
             }
         }
 
-        if (loaderitems_.size() > 0 && cyclecount % kCleanupCycleCountTrigger == 0)
+        if (!loaderitems_.empty() && cyclecount % kCleanupCycleCountTrigger == 0)
         {
             CleanupItemThreadObjects();
         }
@@ -135,7 +136,7 @@ ImgItem* ImgLoader::GetNextItem()
 {
     ImgItem* imgitem = nullptr;
     EnterCriticalSection(&queuecriticalsection_);
-    if (queue_.size() > 0)
+    if (!queue_.empty())
     {
         imgitem = queue_.front();
         queue_.pop_front();

@@ -11,18 +11,26 @@
 
 class LoaderItem
 {
-public:
-    LoaderItem(ImgItem* imgitem, std::function<void()> handler)
-        : imgitem_(imgitem), loadcompleteevent_(handler) { }
+  public:
+    LoaderItem(ImgItem* imgitem, std::function<void()> handler) : imgitem_(imgitem), loadcompleteevent_(handler) {}
     ~LoaderItem()
     {
         CloseLoaderItemThread();
     }
     LoaderItem(const LoaderItem&) = delete;
     LoaderItem& operator=(const LoaderItem&) = delete;
-    ImgItem* imgitem() const { return imgitem_; }
-    HANDLE loaderitemthread() const { return loaderitemthread_; }
-    void set_loaderitemthread(HANDLE loaderitemthread) { loaderitemthread_ = loaderitemthread; }
+    ImgItem* imgitem() const
+    {
+        return imgitem_;
+    }
+    HANDLE loaderitemthread() const
+    {
+        return loaderitemthread_;
+    }
+    void set_loaderitemthread(HANDLE loaderitemthread)
+    {
+        loaderitemthread_ = loaderitemthread;
+    }
     void CloseLoaderItemThread()
     {
         if (loaderitemthread_ != INVALID_HANDLE_VALUE)
@@ -38,18 +46,21 @@ public:
             loadcompleteevent_();
         }
     }
-private:
-    ImgItem* imgitem_{ nullptr };
-    HANDLE loaderitemthread_{ INVALID_HANDLE_VALUE };
-    std::function<void()> loadcompleteevent_{ nullptr };
+
+  private:
+    ImgItem* imgitem_{nullptr};
+    HANDLE loaderitemthread_{INVALID_HANDLE_VALUE};
+    std::function<void()> loadcompleteevent_{nullptr};
 };
 
 class ImgLoader
 {
-public:
-    static constexpr auto kMaximumLoaderCount = 2;	// TODO: adjust logic around this limit once GDI+ gets replaced completely
+  public:
+    static constexpr auto kMaximumLoaderCount =
+        2; // TODO: adjust logic around this limit once GDI+ gets replaced completely
     static constexpr auto kCleanupCycleCountTrigger = 29;
-public:
+
+  public:
     ImgLoader()
     {
         if (!InitializeCriticalSectionAndSpinCount(&queuecriticalsection_, 0x00000400))
@@ -83,16 +94,18 @@ public:
     ImgLoader& operator=(const ImgLoader&) = delete;
     void QueueItem(ImgItem* imgitem, BOOL loadnext = FALSE);
     void StopLoading();
-private:
+
+  private:
     std::list<ImgItem*> queue_;
     std::list<std::unique_ptr<LoaderItem>> loaderitems_;
     HANDLE workevent_;
     HANDLE cancelevent_;
-    HANDLE loopthread_{ INVALID_HANDLE_VALUE };
+    HANDLE loopthread_{INVALID_HANDLE_VALUE};
     BOOL cancellationflag_{};
     CountingSemaphore loadersemaphore_;
     CRITICAL_SECTION queuecriticalsection_;
-private:
+
+  private:
     void LoadAsync();
     DWORD Loop();
     ImgItem* GetNextItem();

@@ -2,7 +2,7 @@
 
 void ImgBuffer::CreateTempFile()
 {
-    if (tempfilename_.length() == 0)
+    if (tempfilename_.empty())
     {
         TCHAR tempfilenamebuffer[MAX_PATH];
         if (!GetTempFileName(ImgSettings::GetInstance().temppath().c_str(), TEXT("ImgVw"), 0, tempfilenamebuffer))
@@ -13,7 +13,8 @@ void ImgBuffer::CreateTempFile()
         tempfilename_ = tempfilenamebuffer;
     }
 
-    tempfile_ = CreateFile(tempfilename_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    tempfile_ = CreateFile(tempfilename_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL, nullptr);
     if (tempfile_ == INVALID_HANDLE_VALUE)
     {
         std::stringstream ss;
@@ -37,8 +38,8 @@ void ImgBuffer::WriteData(INT width, INT height, INT stride, const PBYTE buffer)
     buffersize_ = stride * height;
 
     DWORD byteswritten{};
-    SetFilePointerEx(tempfile_, LARGE_INTEGER{ 0 }, NULL, FILE_BEGIN);
-    if (!WriteFile(tempfile_, buffer, buffersize_, &byteswritten, NULL))
+    SetFilePointerEx(tempfile_, LARGE_INTEGER{0}, nullptr, FILE_BEGIN);
+    if (!WriteFile(tempfile_, buffer, buffersize_, &byteswritten, nullptr))
     {
         std::stringstream ss;
         ss << "ImgItem.WriteTempFile(WriteFile()) failed with error ";
@@ -50,7 +51,7 @@ void ImgBuffer::WriteData(INT width, INT height, INT stride, const PBYTE buffer)
     CloseTempFile();
 }
 
-FileMapView ImgBuffer::GetFileMapView() const 
+FileMapView ImgBuffer::GetFileMapView() const
 {
     return FileMapView(tempfilename_, FileMapView::Mode::Read);
 }
@@ -68,7 +69,7 @@ void ImgBuffer::DeleteTempFile()
 {
     CloseTempFile();
 
-    if (tempfilename_.length() > 0)
+    if (!tempfilename_.empty())
     {
         DeleteFile(tempfilename_.c_str());
     }

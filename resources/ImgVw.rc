@@ -3,156 +3,97 @@
 #include "resource.h"
 #include "windows.h"
 
-
 /////////////////////////////////////////////////////////////////////////////
 // English (United States) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
-LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+LANGUAGE LANG_ENGLISH,
+    SUBLANG_ENGLISH_US
 #pragma code_page(1252)
 
+        /////////////////////////////////////////////////////////////////////////////
+        //
+        // Icon
+        //
 
-/////////////////////////////////////////////////////////////////////////////
-//
-// Icon
-//
+        // Icon with lowest ID value placed first to ensure application icon
+        // remains consistent on all systems.
+        IDI_ICON ICON "ImgVw.ico" IDI_SMALL ICON "small.ico"
 
-// Icon with lowest ID value placed first to ensure application icon
-// remains consistent on all systems.
-IDI_ICON ICON "ImgVw.ico"
-IDI_SMALL ICON "small.ico"
+    /////////////////////////////////////////////////////////////////////////////
+    //
+    // Menu
+    //
 
+    IMGPOPUP MENU BEGIN POPUP "Root" BEGIN MENUITEM "Next\tRight Arrow | Mouse Wheel Down",
+    IDR_NEXT MENUITEM "Previous\tLeft Arrow | Mouse Wheel Up", IDR_PREVIOUS MENUITEM "First\tHome",
+    IDR_FIRST MENUITEM "Last\tEnd", IDR_LAST MENUITEM SEPARATOR MENUITEM "Display path...\tEnter",
+    IDR_ENTER MENUITEM "Delete\tDelete", IDR_RECYCLE MENUITEM SEPARATOR MENUITEM "Toggle slideshow\tF5",
+    IDR_TOGGLESS MENUITEM "Toggle random slideshow\tShift + F5", IDR_TOGGLESSR MENUITEM "Increase slideshow speed\tF6",
+    IDR_INCSSS MENUITEM "Decrease slideshow speed\tF7",
+    IDR_DECSSS MENUITEM SEPARATOR MENUITEM "Add files found in subfolders\tF8",
+    IDR_RECURSE MENUITEM SEPARATOR MENUITEM "Select default &ICC profile...\tCtrl + I",
+    IDM_LOADICC MENUITEM SEPARATOR MENUITEM "&About...\tCtrl + Shift + A",
+    IDM_ABOUT MENUITEM SEPARATOR MENUITEM "E&xit\tCtrl + Q | Escape",
+    IDM_EXIT END END
 
-/////////////////////////////////////////////////////////////////////////////
-//
-// Menu
-//
+        /////////////////////////////////////////////////////////////////////////////
+        //
+        // Accelerator
+        //
 
-IMGPOPUP MENU
-BEGIN
-    POPUP "Root"
-    BEGIN
-        MENUITEM "Next\tRight Arrow | Mouse Wheel Down", IDR_NEXT
-        MENUITEM "Previous\tLeft Arrow | Mouse Wheel Up", IDR_PREVIOUS
-        MENUITEM "First\tHome", IDR_FIRST
-        MENUITEM "Last\tEnd", IDR_LAST
-        MENUITEM SEPARATOR
-        MENUITEM "Display path...\tEnter", IDR_ENTER
-        MENUITEM "Delete\tDelete", IDR_RECYCLE
-        MENUITEM SEPARATOR
-        MENUITEM "Toggle slideshow\tF5", IDR_TOGGLESS
-        MENUITEM "Toggle random slideshow\tShift + F5", IDR_TOGGLESSR
-        MENUITEM "Increase slideshow speed\tF6", IDR_INCSSS
-        MENUITEM "Decrease slideshow speed\tF7", IDR_DECSSS
-        MENUITEM SEPARATOR
-        MENUITEM "Add files found in subfolders\tF8", IDR_RECURSE
-        MENUITEM SEPARATOR
-        MENUITEM "Select default &ICC profile...\tCtrl + I", IDM_LOADICC
-        MENUITEM SEPARATOR
-        MENUITEM "&About...\tCtrl + Shift + A", IDM_ABOUT
-        MENUITEM SEPARATOR
-        MENUITEM "E&xit\tCtrl + Q | Escape", IDM_EXIT
-    END
-END
+        IDC_IMGVW ACCELERATORS BEGIN "A",
+    IDM_ABOUT, VIRTKEY, SHIFT, CONTROL, NOINVERT "Q", IDM_EXIT, VIRTKEY, CONTROL, NOINVERT "I", IDM_LOADICC, VIRTKEY,
+    CONTROL, NOINVERT VK_RETURN, IDR_ENTER, VIRTKEY VK_ESCAPE, IDR_ESCAPE, VIRTKEY VK_LEFT, IDR_PREVIOUS,
+    VIRTKEY VK_RIGHT, IDR_NEXT, VIRTKEY VK_DELETE, IDR_RECYCLE, VIRTKEY VK_DELETE, IDR_DELETE, VIRTKEY, SHIFT VK_HOME,
+    IDR_FIRST, VIRTKEY VK_END, IDR_LAST, VIRTKEY VK_F5, IDR_TOGGLESS, VIRTKEY VK_F5, IDR_TOGGLESSR, VIRTKEY,
+    SHIFT VK_F6, IDR_INCSSS, VIRTKEY VK_F7, IDR_DECSSS, VIRTKEY VK_F8, IDR_RECURSE,
+    VIRTKEY END
 
+        /////////////////////////////////////////////////////////////////////////////
+        //
+        // Dialog
+        //
 
-/////////////////////////////////////////////////////////////////////////////
-//
-// Accelerator
-//
+        IDD_ABOUTBOX DIALOGEX 100,
+    75, 135,
+    62 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU CAPTION "About ImgVw" FONT 8,
+    "MS Shell Dlg", 0, 0, 0x1 BEGIN ICON IDI_ICON, IDC_STATIC, 14, 14, 21, 20 LTEXT "ImgVw v1.7.0", IDC_STATIC, 42, 14,
+    114, 8, SS_NOPREFIX LTEXT "", IDC_STATIC, 42, 26, 114, 8 DEFPUSHBUTTON "OK", IDOK, 65, 41, 50, 14,
+    WS_GROUP END
 
-IDC_IMGVW ACCELERATORS
-BEGIN
-    "A", IDM_ABOUT, VIRTKEY, SHIFT, CONTROL, NOINVERT
-    "Q", IDM_EXIT, VIRTKEY, CONTROL, NOINVERT
-    "I", IDM_LOADICC, VIRTKEY, CONTROL, NOINVERT
-    VK_RETURN, IDR_ENTER, VIRTKEY
-    VK_ESCAPE, IDR_ESCAPE, VIRTKEY
-    VK_LEFT, IDR_PREVIOUS, VIRTKEY
-    VK_RIGHT, IDR_NEXT, VIRTKEY
-    VK_DELETE, IDR_RECYCLE, VIRTKEY
-    VK_DELETE, IDR_DELETE, VIRTKEY, SHIFT
-    VK_HOME, IDR_FIRST, VIRTKEY
-    VK_END, IDR_LAST, VIRTKEY
-    VK_F5, IDR_TOGGLESS, VIRTKEY
-    VK_F5, IDR_TOGGLESSR, VIRTKEY, SHIFT
-    VK_F6, IDR_INCSSS, VIRTKEY
-    VK_F7, IDR_DECSSS, VIRTKEY
-    VK_F8, IDR_RECURSE, VIRTKEY
-END
+        /////////////////////////////////////////////////////////////////////////////
+        //
+        // RT_MANIFEST
+        //
 
+        CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "application.manifest"
 
-/////////////////////////////////////////////////////////////////////////////
-//
-// Dialog
-//
+    /////////////////////////////////////////////////////////////////////////////
+    //
+    // Version
+    //
 
-IDD_ABOUTBOX DIALOGEX 100, 75, 135, 62
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "About ImgVw"
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
-BEGIN
-    ICON IDI_ICON, IDC_STATIC, 14, 14, 21, 20
-    LTEXT "ImgVw v1.7.0", IDC_STATIC, 42, 14, 114, 8, SS_NOPREFIX
-    LTEXT "", IDC_STATIC, 42, 26, 114, 8
-    DEFPUSHBUTTON "OK", IDOK, 65, 41, 50, 14, WS_GROUP
-END
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// RT_MANIFEST
-//
-
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "application.manifest"
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// Version
-//
-
-VS_VERSION_INFO VERSIONINFO
-    FILEVERSION 1,7,0,0
-    PRODUCTVERSION 1,7,0,0
-    FILEFLAGSMASK 0x3fL
+    VS_VERSION_INFO VERSIONINFO FILEVERSION 1,
+    7, 0, 0 PRODUCTVERSION 1, 7, 0,
+    0 FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
     FILEFLAGS 0x1L
 #else
     FILEFLAGS 0x0L
 #endif
-    FILEOS 0x4L
-    FILETYPE 0x2L
-    FILESUBTYPE 0x0L
-BEGIN
-    BLOCK "StringFileInfo"
-    BEGIN
-        BLOCK "040904e4"
-        BEGIN
-            VALUE "FileDescription", "ImgVw"
-            VALUE "FileVersion", "1.7.0"
-            VALUE "LegalCopyright", "Marc-André Côté"
-            VALUE "ProductName", "ImgVw"
-            VALUE "ProductVersion", "1.7.0"
-        END
-    END
-    BLOCK "VarFileInfo"
-    BEGIN
-        VALUE "Translation", 0x409, 1252
-    END
-END
+    FILEOS 0x4L FILETYPE 0x2L FILESUBTYPE 0x0L BEGIN BLOCK "StringFileInfo" BEGIN BLOCK "040904e4" BEGIN VALUE
+                                                           "FileDescription",
+    "ImgVw" VALUE "FileVersion", "1.7.0" VALUE "LegalCopyright", "Marc-André Côté" VALUE "ProductName",
+    "ImgVw" VALUE "ProductVersion", "1.7.0" END END BLOCK "VarFileInfo" BEGIN VALUE "Translation", 0x409,
+    1252 END END
 
+        /////////////////////////////////////////////////////////////////////////////
+        //
+        // String Table
+        //
 
-/////////////////////////////////////////////////////////////////////////////
-//
-// String Table
-//
+        STRINGTABLE BEGIN IDS_APP_TITLE "ImgVw" IDC_IMGVW "IMGVW" END
 
-STRINGTABLE
-BEGIN
-    IDS_APP_TITLE "ImgVw"
-    IDC_IMGVW "IMGVW"
-END
-
-#endif    // English (United States) resources
-/////////////////////////////////////////////////////////////////////////////
+#endif // English (United States) resources
+    /////////////////////////////////////////////////////////////////////////////

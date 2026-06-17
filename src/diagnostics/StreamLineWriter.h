@@ -6,22 +6,24 @@
 
 class StreamLineWriter
 {
-public:
+  public:
     static constexpr auto kEndOfLine = "\r\n";
-public:
+
+  public:
     enum class Encoding
     {
         UTF8
     };
-    StreamLineWriter(const std::wstring& filepath, bool append)
-        : StreamLineWriter(filepath, Encoding::UTF8, append) { }
+    StreamLineWriter(const std::wstring& filepath, bool append) : StreamLineWriter(filepath, Encoding::UTF8, append) {}
     StreamLineWriter(const std::wstring& filepath, Encoding encoding, bool append)
-        : filestream_(FileStream(filepath, append
-            ? FileStream::Mode::Append
-            : FileStream::Mode::Truncate)), encoding_(encoding) { }
+        : filestream_(FileStream(filepath, append ? FileStream::Mode::Append : FileStream::Mode::Truncate)),
+          encoding_(encoding)
+    {
+    }
     StreamLineWriter(const StreamLineWriter&) = delete;
-    StreamLineWriter(StreamLineWriter&& other)
-        : filestream_(std::move(other.filestream_)), encoding_(other.encoding_) { }
+    StreamLineWriter(StreamLineWriter&& other) : filestream_(std::move(other.filestream_)), encoding_(other.encoding_)
+    {
+    }
     StreamLineWriter& operator=(StreamLineWriter&& other)
     {
         if (this != &other)
@@ -38,19 +40,27 @@ public:
     {
         Close();
     }
-    BOOL autoflush() const { return autoflush_; };
-    void set_autoflush(BOOL autoflush) { autoflush_ = autoflush; };
+    BOOL autoflush() const
+    {
+        return autoflush_;
+    };
+    void set_autoflush(BOOL autoflush)
+    {
+        autoflush_ = autoflush;
+    };
     void Write(const std::wstring& line);
     void WriteLine(const std::wstring& line);
     void Close()
     {
         filestream_.Close();
     }
-private:
+
+  private:
     FileStream filestream_;
     Encoding encoding_;
     BOOL autoflush_{};
-private:
+
+  private:
     void WriteEOL()
     {
         filestream_.Write(reinterpret_cast<PBYTE>(const_cast<char*>(kEndOfLine)), 2);

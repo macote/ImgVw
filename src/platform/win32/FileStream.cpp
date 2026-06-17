@@ -29,161 +29,162 @@ SOFTWARE.
 
 void FileStream::OpenFile()
 {
-	DWORD desiredaccess = (mode_ == Mode::Open || mode_ == Mode::OpenWithoutBuffering) ? GENERIC_READ : GENERIC_WRITE;
+    DWORD desiredaccess = (mode_ == Mode::Open || mode_ == Mode::OpenWithoutBuffering) ? GENERIC_READ : GENERIC_WRITE;
     DWORD createdisposition = OPEN_EXISTING;
-	switch (mode_)
-	{
-	case FileStream::Mode::Create:
-		createdisposition = CREATE_NEW;
-		break;
-	case FileStream::Mode::Truncate:
-		createdisposition = CREATE_ALWAYS;
-		break;
-	case FileStream::Mode::Append:
-		createdisposition = OPEN_ALWAYS;
-		desiredaccess = FILE_APPEND_DATA;
-		break;
-	default:
-		break;
-	}
+    switch (mode_)
+    {
+    case FileStream::Mode::Create:
+        createdisposition = CREATE_NEW;
+        break;
+    case FileStream::Mode::Truncate:
+        createdisposition = CREATE_ALWAYS;
+        break;
+    case FileStream::Mode::Append:
+        createdisposition = OPEN_ALWAYS;
+        desiredaccess = FILE_APPEND_DATA;
+        break;
+    default:
+        break;
+    }
 
-	DWORD flagsandattributes = FILE_ATTRIBUTE_NORMAL;
-	if (mode_ == Mode::OpenWithoutBuffering)
-	{
-		flagsandattributes |= FILE_FLAG_NO_BUFFERING;
-	}
+    DWORD flagsandattributes = FILE_ATTRIBUTE_NORMAL;
+    if (mode_ == Mode::OpenWithoutBuffering)
+    {
+        flagsandattributes |= FILE_FLAG_NO_BUFFERING;
+    }
 
-	filehandle_ = CreateFile(filepath_.c_str(), desiredaccess, FILE_SHARE_READ,
-		NULL, createdisposition, flagsandattributes, NULL);
-	if (filehandle_ == INVALID_HANDLE_VALUE)
-	{
-		std::stringstream ss;
-		ss << "FileStream.Open(CreateFile()) failed with error ";
-		ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase;
-		ss << GetLastError();
-		throw std::runtime_error(ss.str());
-	}
+    filehandle_ = CreateFile(filepath_.c_str(), desiredaccess, FILE_SHARE_READ, nullptr, createdisposition,
+                             flagsandattributes, nullptr);
+    if (filehandle_ == INVALID_HANDLE_VALUE)
+    {
+        std::stringstream ss;
+        ss << "FileStream.Open(CreateFile()) failed with error ";
+        ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase;
+        ss << GetLastError();
+        throw std::runtime_error(ss.str());
+    }
 }
 
 DWORD FileStream::Read(const PBYTE buffer, DWORD offset, DWORD count)
 {
-	DWORD bytesread = 0;
-	if (!ReadFile(filehandle_, buffer + offset, count, &bytesread, NULL))
-	{
-		std::stringstream ss;
-		ss << "FileStream.Read(ReadFile()) failed with error ";
-		ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase;
-		ss << GetLastError();
-		throw std::runtime_error(ss.str());
-	}
+    DWORD bytesread = 0;
+    if (!ReadFile(filehandle_, buffer + offset, count, &bytesread, nullptr))
+    {
+        std::stringstream ss;
+        ss << "FileStream.Read(ReadFile()) failed with error ";
+        ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase;
+        ss << GetLastError();
+        throw std::runtime_error(ss.str());
+    }
 
-	return bytesread;
+    return bytesread;
 }
 
 DWORD FileStream::Write(const PBYTE buffer, DWORD offset, DWORD count)
 {
-	DWORD byteswritten = 0;
-	WriteFile(filehandle_, buffer + offset, count, &byteswritten, NULL);
+    DWORD byteswritten = 0;
+    WriteFile(filehandle_, buffer + offset, count, &byteswritten, nullptr);
 
-	return byteswritten;
+    return byteswritten;
 }
 
 void FileStream::FlushWrite()
 {
-	Write(buffer_, 0, writeindex_);
-	writeindex_ = 0;
+    Write(buffer_, 0, writeindex_);
+    writeindex_ = 0;
 }
 
 void FileStream::CloseFile()
 {
-	if (filehandle_ != INVALID_HANDLE_VALUE)
-	{
-		CloseHandle(filehandle_);
-		filehandle_ = INVALID_HANDLE_VALUE;
-	}
+    if (filehandle_ != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(filehandle_);
+        filehandle_ = INVALID_HANDLE_VALUE;
+    }
 }
 
 DWORD FileStream::Read(const PBYTE buffer, DWORD count)
 {
-	DWORD bufferbytes = readlength_ - readindex_;
-	BOOL eof = FALSE;
-	if (bufferbytes == 0)
-	{
-		DWORD bytesread;
-		if (count >= buffersize_)
-		{
-			bytesread = Read(buffer, 0, count);
-			readindex_ = readlength_ = 0;
+    DWORD bufferbytes = readlength_ - readindex_;
+    BOOL eof = FALSE;
+    if (bufferbytes == 0)
+    {
+        DWORD bytesread;
+        if (count >= buffersize_)
+        {
+            bytesread = Read(buffer, 0, count);
+            readindex_ = readlength_ = 0;
 
-			return bytesread;
-		}
+            return bytesread;
+        }
 
-		bytesread = Read(buffer_, 0, buffersize_);
-		if (bytesread == 0)
-		{
-			return 0;
-		}
+        bytesread = Read(buffer_, 0, buffersize_);
+        if (bytesread == 0)
+        {
+            return 0;
+        }
 
-		readindex_ = 0;
-		readlength_ = bufferbytes = bytesread;
-		eof = bytesread < buffersize_;
-	}
+        readindex_ = 0;
+        readlength_ = bufferbytes = bytesread;
+        eof = bytesread < buffersize_;
+    }
 
-	if (bufferbytes > count)
-	{
-		bufferbytes = count;
-	}
+    if (bufferbytes > count)
+    {
+        bufferbytes = count;
+    }
 
-	CopyMemory(buffer, buffer_ + readindex_, bufferbytes);
-	readindex_ += bufferbytes;
-	if (bufferbytes < count && !eof)
-	{
-		DWORD bytesread = Read(buffer, bufferbytes, count - bufferbytes);
-		bufferbytes += bytesread;
-		readindex_ = readlength_ = 0;
-	}
+    CopyMemory(buffer, buffer_ + readindex_, bufferbytes);
+    readindex_ += bufferbytes;
+    if (bufferbytes < count && !eof)
+    {
+        DWORD bytesread = Read(buffer, bufferbytes, count - bufferbytes);
+        bufferbytes += bytesread;
+        readindex_ = readlength_ = 0;
+    }
 
-	return bufferbytes;
+    return bufferbytes;
 }
 
 void FileStream::Write(const PBYTE buffer, DWORD count)
 {
-	DWORD bufferindex = 0;
-	if (writeindex_ > 0)
-	{
-		DWORD bufferbytes = buffersize_ - writeindex_;
-		if (bufferbytes > 0)
-		{
-			if (bufferbytes > count)
-			{
-				bufferbytes = count;
-			}
+    DWORD bufferindex = 0;
+    if (writeindex_ > 0)
+    {
+        DWORD bufferbytes = buffersize_ - writeindex_;
+        if (bufferbytes > 0)
+        {
+            if (bufferbytes > count)
+            {
+                bufferbytes = count;
+            }
 
-			CopyMemory(buffer_ + writeindex_, buffer, bufferbytes);
-			writeindex_ += bufferbytes;
-			if (bufferbytes == count) return;
-			bufferindex = bufferbytes;
-			count -= bufferbytes;
-		}
+            CopyMemory(buffer_ + writeindex_, buffer, bufferbytes);
+            writeindex_ += bufferbytes;
+            if (bufferbytes == count)
+                return;
+            bufferindex = bufferbytes;
+            count -= bufferbytes;
+        }
 
-		Write(buffer_, 0, writeindex_);
-		writeindex_ = 0;
-	}
-	if (count >= buffersize_)
-	{
-		Write(buffer, 0, count);
-	}
-	else if (count > 0)
-	{
-		CopyMemory(buffer_ + writeindex_, buffer + bufferindex, count);
-		writeindex_ = count;
-	}
+        Write(buffer_, 0, writeindex_);
+        writeindex_ = 0;
+    }
+    if (count >= buffersize_)
+    {
+        Write(buffer, 0, count);
+    }
+    else if (count > 0)
+    {
+        CopyMemory(buffer_ + writeindex_, buffer + bufferindex, count);
+        writeindex_ = count;
+    }
 }
 
 void FileStream::Flush()
 {
-	if (writeindex_ > 0)
-	{
-		FlushWrite();
-	}
+    if (writeindex_ > 0)
+    {
+        FlushWrite();
+    }
 }

@@ -7,8 +7,8 @@
 
 class ImgCache
 {
-public:
-    ImgCache() { }
+  public:
+    ImgCache() {}
     ~ImgCache()
     {
         Clear();
@@ -22,7 +22,8 @@ public:
     void Add(std::wstring filepath, INT targetwidth, INT targetheight);
     void Remove(std::wstring filepath);
     std::shared_ptr<ImgItem> Get(const std::wstring& filepath) const;
-private:
+
+  private:
     std::map<std::wstring, std::shared_ptr<ImgItem>, std::less<std::wstring>> map_;
 };
 

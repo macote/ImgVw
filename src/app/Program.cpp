@@ -18,11 +18,14 @@
 #endif
 
 #if _MSC_VER
-#pragma warning(suppress: 28251)
+#pragma warning(suppress : 28251)
 #ifndef _iob_defined
 #define _iob_defined
-FILE _iob[] = { *stdin, *stdout, *stderr };
-extern "C" FILE * __cdecl __iob_func(void) { return _iob; }
+FILE _iob[] = {*stdin, *stdout, *stderr};
+extern "C" FILE* __cdecl __iob_func(void)
+{
+    return _iob;
+}
 #endif
 #endif
 

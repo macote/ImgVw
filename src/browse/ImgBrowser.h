@@ -12,9 +12,10 @@
 
 class ImgBrowser final
 {
-public:
+  public:
     static const DWORD kIndexPark = 0x80000000;
-public:
+
+  public:
     ImgBrowser()
     {
         readyevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -44,12 +45,13 @@ public:
     BOOL MoveToPrevious();
     BOOL MoveToFirst();
     BOOL MoveToLast();
-    BOOL MoveToItem(std::wstring filepath);
+    BOOL MoveToItem(const std::wstring& filepath);
     BOOL MoveToRandom();
     void RemoveCurrentItem();
     void ReloadCurrentItem();
     void GetReady();
-private:
+
+  private:
     ImgCache cache_;
     ImgLoader loader_;
     BOOL cancellationflag_{};
@@ -59,15 +61,16 @@ private:
     std::set<std::wstring> files_;
     std::vector<std::wstring> randomlist_;
     std::vector<std::wstring> folders_;
-    DWORD currentrandomindex_{ kIndexPark };
+    DWORD currentrandomindex_{kIndexPark};
     std::random_device rd_;
-    std::mt19937 rnge_{ rd_() };
-    HANDLE collectorthread_{ NULL };
+    std::mt19937 rnge_{rd_()};
+    HANDLE collectorthread_{NULL};
     HANDLE readyevent_;
     CRITICAL_SECTION browsecriticalsection_;
     INT targetwidth_{};
     INT targetheight_{};
-private:
+
+  private:
     void CollectFile(const std::wstring& filepath);
     void CollectFolder(const std::wstring& folderpath);
     void CollectSubFolders();

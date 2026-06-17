@@ -5,8 +5,8 @@ const CountingSemaphore ImgItemHelper::kGDIOperationSemaphore = CountingSemaphor
 ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(const std::wstring& filepath)
 {
     const auto extension = PathFindExtension(filepath.c_str());
-    if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".jpg", -1) == CSTR_EQUAL
-        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".jpeg", -1) == CSTR_EQUAL)
+    if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".jpg", -1) == CSTR_EQUAL ||
+        CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".jpeg", -1) == CSTR_EQUAL)
     {
         return ImgItem::Format::JPEG;
     }
@@ -14,11 +14,11 @@ ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(const std::wstring& fil
     {
         return ImgItem::Format::PNG;
     }
-    else if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".bmp", -1) == CSTR_EQUAL
-        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".gif", -1) == CSTR_EQUAL
-        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".ico", -1) == CSTR_EQUAL
-        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".tif", -1) == CSTR_EQUAL
-        || CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".tiff", -1) == CSTR_EQUAL)
+    else if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".bmp", -1) == CSTR_EQUAL ||
+             CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".gif", -1) == CSTR_EQUAL ||
+             CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".ico", -1) == CSTR_EQUAL ||
+             CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".tif", -1) == CSTR_EQUAL ||
+             CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".tiff", -1) == CSTR_EQUAL)
     {
         return ImgItem::Format::Other;
     }
@@ -26,20 +26,22 @@ ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(const std::wstring& fil
     return ImgItem::Format::Unsupported;
 }
 
-ImgBuffer ImgItemHelper::Resize24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth, INT targetheight)
+ImgBuffer ImgItemHelper::Resize24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth,
+                                             INT targetheight)
 {
     return ResizeAndRotate24bppRGBImage(width, height, buffer, targetwidth, targetheight, Gdiplus::RotateNoneFlipNone);
 }
 
-ImgBuffer ImgItemHelper::ResizeAndRotate24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth, INT targetheight,
-    Gdiplus::RotateFlipType rotateflip)
+ImgBuffer ImgItemHelper::ResizeAndRotate24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth,
+                                                      INT targetheight, Gdiplus::RotateFlipType rotateflip)
 {
     auto bitmaptoresize = Get24bppRGBBitmap(width, height, buffer);
 
     return ResizeAndRotateImage(bitmaptoresize.get(), targetwidth, targetheight, rotateflip);
 }
 
-ImgBuffer ImgItemHelper::Rotate24bppRGBImage(INT width, INT height, const PBYTE buffer, Gdiplus::RotateFlipType rotateflip)
+ImgBuffer ImgItemHelper::Rotate24bppRGBImage(INT width, INT height, const PBYTE buffer,
+                                             Gdiplus::RotateFlipType rotateflip)
 {
     auto bitmaptorotate = Get24bppRGBBitmap(width, height, buffer);
 
@@ -52,7 +54,7 @@ ImgBuffer ImgItemHelper::ResizeImage(Gdiplus::Bitmap* bitmap, INT targetwidth, I
 }
 
 ImgBuffer ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
-    Gdiplus::RotateFlipType rotateflip)
+                                              Gdiplus::RotateFlipType rotateflip)
 {
     const auto percentWidth = static_cast<FLOAT>(targetwidth) / bitmap->GetWidth();
     const auto percentHeight = static_cast<FLOAT>(targetheight) / bitmap->GetHeight();
@@ -65,7 +67,7 @@ ImgBuffer ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targe
     graphics.DrawImage(bitmap, 0, 0, newwidth, newheight);
     auto buffer = RotateImage(resizedbitmap.get(), rotateflip, TRUE);
     ImgItemHelper::kGDIOperationSemaphore.Notify();
-    
+
     return buffer;
 }
 
@@ -129,13 +131,13 @@ Gdiplus::RotateFlipType ImgItemHelper::GetRotateFlipTypeFromExifOrientation(UINT
     switch (exiforientation)
     {
 
-    //   1       2       3       4         5           6           7           8
-    //
-    // 888888  888888      88  88      8888888888  88                  88  8888888888
-    // 88          88      88  88      88  88      88  88          88  88      88  88
-    // 8888      8888    8888  8888    88          8888888888  8888888888          88
-    // 88          88      88  88
-    // 88          88  888888  888888
+        //   1       2       3       4         5           6           7           8
+        //
+        // 888888  888888      88  88      8888888888  88                  88  8888888888
+        // 88          88      88  88      88  88      88  88          88  88      88  88
+        // 8888      8888    8888  8888    88          8888888888  8888888888          88
+        // 88          88      88  88
+        // 88          88  888888  888888
 
     case 1:
         return Gdiplus::RotateNoneFlipNone;

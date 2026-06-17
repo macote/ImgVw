@@ -53,8 +53,7 @@ void ImgBrowser::CollectFolder(const std::wstring& folderpath)
                     CollectFile(currentfile);
                 }
             }
-        }
-        while (FindNextFile(hFind, &findfiledata) && !cancellationflag_);
+        } while (FindNextFile(hFind, &findfiledata) && !cancellationflag_);
 
         FindClose(hFind);
     }
@@ -77,7 +76,7 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
     BOOL forcedfolder{};
     std::wstring workpath = path;
 
-    if (workpath.size() == 0)
+    if (workpath.empty())
     {
         const INT BUFFERSIZE = 4096;
         TCHAR currentdirectory[BUFFERSIZE];
@@ -97,7 +96,7 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
         FindClose(findfilehandle);
         if (!(findfiledata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !forcedfolder)
         {
-            const auto backslashposition = workpath.rfind(L"\\");
+            const auto backslashposition = workpath.rfind(L'\\');
             if (backslashposition != std::wstring::npos)
             {
                 folderpath_ = workpath.substr(0, backslashposition + 1);
@@ -118,7 +117,7 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
     else
     {
         TCHAR mypicturespath[MAX_PATH];
-        if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_MYPICTURES, NULL, SHGFP_TYPE_CURRENT, mypicturespath)))
+        if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_MYPICTURES, nullptr, SHGFP_TYPE_CURRENT, mypicturespath)))
         {
             folderpath_ = std::wstring(mypicturespath) + L"\\";
         }
@@ -130,7 +129,7 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
 
     ResetEvent(readyevent_);
 
-    collectorthread_ = CreateThread(NULL, 0, StaticThreadCollect, reinterpret_cast<void*>(this), 0, NULL);
+    collectorthread_ = CreateThread(nullptr, 0, StaticThreadCollect, reinterpret_cast<void*>(this), 0, nullptr);
 }
 
 void ImgBrowser::BrowseSubFoldersAsync()
@@ -147,18 +146,19 @@ void ImgBrowser::BrowseSubFoldersAsync()
         // TODO: handle error
     }
 
-    if (!cancellationflag_ && folders_.size() > 0)
+    if (!cancellationflag_ && !folders_.empty())
     {
         ResetEvent(readyevent_);
 
         CloseHandle(collectorthread_);
-        collectorthread_ = CreateThread(NULL, 0, StaticThreadCollectSubFolders, reinterpret_cast<void*>(this), 0, NULL);
+        collectorthread_ =
+            CreateThread(nullptr, 0, StaticThreadCollectSubFolders, reinterpret_cast<void*>(this), 0, nullptr);
     }
 }
 
 void ImgBrowser::StopCollecting()
 {
-    if (collectorthread_ == NULL || collectorthread_ == INVALID_HANDLE_VALUE)
+    if (collectorthread_ == nullptr || collectorthread_ == INVALID_HANDLE_VALUE)
     {
         return;
     }
@@ -176,10 +176,10 @@ void ImgBrowser::StopCollecting()
 void ImgBrowser::StopBrowsing()
 {
     StopCollecting();
-    if (collectorthread_ != NULL)
+    if (collectorthread_ != nullptr)
     {
         CloseHandle(collectorthread_);
-        collectorthread_ = NULL;
+        collectorthread_ = nullptr;
     }
 
     loader_.StopLoading();
@@ -255,7 +255,7 @@ BOOL ImgBrowser::MoveToNext()
 {
     BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (files_.size() > 0 && std::next(currentfileiterator_) != files_.end())
+    if (!files_.empty() && std::next(currentfileiterator_) != files_.end())
     {
         ++currentfileiterator_;
         moveSuccess = TRUE;
@@ -270,7 +270,7 @@ BOOL ImgBrowser::MoveToPrevious()
 {
     BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (files_.size() > 0 && currentfileiterator_ != files_.begin())
+    if (!files_.empty() && currentfileiterator_ != files_.begin())
     {
         --currentfileiterator_;
         moveSuccess = TRUE;
@@ -285,7 +285,7 @@ BOOL ImgBrowser::MoveToFirst()
 {
     BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (files_.size() > 0 && currentfileiterator_ != files_.begin())
+    if (!files_.empty() && currentfileiterator_ != files_.begin())
     {
         currentfileiterator_ = files_.begin();
         moveSuccess = TRUE;
@@ -300,7 +300,7 @@ BOOL ImgBrowser::MoveToLast()
 {
     BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (files_.size() > 0 && std::next(currentfileiterator_) != files_.end())
+    if (!files_.empty() && std::next(currentfileiterator_) != files_.end())
     {
         currentfileiterator_ = std::prev(files_.end());
         moveSuccess = TRUE;
@@ -311,11 +311,11 @@ BOOL ImgBrowser::MoveToLast()
     return moveSuccess;
 }
 
-BOOL ImgBrowser::MoveToItem(std::wstring filepath)
+BOOL ImgBrowser::MoveToItem(const std::wstring& filepath)
 {
     BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (files_.size() > 0)
+    if (!files_.empty())
     {
         currentfileiterator_ = files_.find(filepath);
         moveSuccess = currentfileiterator_ != files_.end();
@@ -330,7 +330,7 @@ BOOL ImgBrowser::MoveToRandom()
 {
     BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (files_.size() > 0)
+    if (!files_.empty())
     {
         if (currentrandomindex_ >= randomlist_.size())
         {
@@ -346,8 +346,7 @@ BOOL ImgBrowser::MoveToRandom()
                 do
                 {
                     std::shuffle(std::begin(randomlist_), std::end(randomlist_), rnge_);
-                }
-                while (last == *randomlist_.begin());
+                } while (last == *randomlist_.begin());
             }
 
             currentrandomindex_ = 0;
@@ -378,7 +377,7 @@ void ImgBrowser::RemoveCurrentItem()
 
 void ImgBrowser::CollectSubFolders()
 {
-    for (const auto & folder : folders_)
+    for (const auto& folder : folders_)
     {
         CollectFolder(folder);
     }

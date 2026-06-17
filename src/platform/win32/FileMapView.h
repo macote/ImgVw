@@ -8,13 +8,14 @@
 
 class FileMapView final
 {
-public:
+  public:
     enum class Mode
     {
         Read,
         WriteNew
     };
-public:
+
+  public:
     FileMapView(const std::wstring& filepath, Mode mode) : filepath_(filepath), mode_(mode)
     {
         OpenFile();
@@ -49,18 +50,26 @@ public:
 
         return *this;
     }
-    LARGE_INTEGER filesize() const { return filesize_; }
-    PBYTE data() const { return data_; }
+    LARGE_INTEGER filesize() const
+    {
+        return filesize_;
+    }
+    PBYTE data() const
+    {
+        return data_;
+    }
     void Open(const std::wstring& filepath, Mode mode);
     void Close();
-private:
+
+  private:
     std::wstring filepath_;
-    Mode mode_{ Mode::Read };
-    HANDLE file_{ INVALID_HANDLE_VALUE };
-    LARGE_INTEGER filesize_{ 0 };
-    HANDLE mapfile_{ INVALID_HANDLE_VALUE };
-    PBYTE data_{ nullptr };
-private:
+    Mode mode_{Mode::Read};
+    HANDLE file_{INVALID_HANDLE_VALUE};
+    LARGE_INTEGER filesize_{0};
+    HANDLE mapfile_{INVALID_HANDLE_VALUE};
+    PBYTE data_{nullptr};
+
+  private:
     void InitializeMapping();
     void OpenFile();
     void GetFileSize();
@@ -121,11 +130,13 @@ inline void FileMapView::OpenFile()
 {
     if (mode_ == Mode::Read)
     {
-        file_ = CreateFile(filepath_.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        file_ = CreateFile(filepath_.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
+                           NULL);
     }
     else if (mode_ == Mode::WriteNew)
     {
-        file_ = CreateFile(filepath_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        file_ = CreateFile(filepath_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL, NULL);
     }
 
     if (file_ == INVALID_HANDLE_VALUE)

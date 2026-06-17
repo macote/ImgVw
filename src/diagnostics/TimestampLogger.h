@@ -6,11 +6,9 @@
 
 class TimestampLogger
 {
-public:
-    TimestampLogger(const std::wstring& filepath)
-        : TimestampLogger(filepath, FALSE) { }
-    TimestampLogger(const std::wstring& filepath, BOOL autoflush)
-        : streamlinewriter_(StreamLineWriter(filepath, TRUE))
+  public:
+    TimestampLogger(const std::wstring& filepath) : TimestampLogger(filepath, FALSE) {}
+    TimestampLogger(const std::wstring& filepath, BOOL autoflush) : streamlinewriter_(StreamLineWriter(filepath, TRUE))
     {
         pwritecriticalsection_ = new CRITICAL_SECTION();
         if (!InitializeCriticalSectionAndSpinCount(pwritecriticalsection_, 0x00000400))
@@ -37,13 +35,20 @@ public:
     {
         streamlinewriter_.Close();
     }
-    BOOL autoflush() const { return streamlinewriter_.autoflush(); };
-    void set_autoflush(BOOL autoflush) { streamlinewriter_.set_autoflush(autoflush); };
+    BOOL autoflush() const
+    {
+        return streamlinewriter_.autoflush();
+    };
+    void set_autoflush(BOOL autoflush)
+    {
+        streamlinewriter_.set_autoflush(autoflush);
+    };
     static std::wstring GetTimestampString();
     static std::wstring GetTimestampString(BOOL asvalidfilename);
-private:
+
+  private:
     StreamLineWriter streamlinewriter_;
-    PCRITICAL_SECTION pwritecriticalsection_{ nullptr };
+    PCRITICAL_SECTION pwritecriticalsection_{nullptr};
 };
 
 inline void TimestampLogger::WriteLine(const std::wstring& line)

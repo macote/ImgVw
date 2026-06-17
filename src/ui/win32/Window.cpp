@@ -9,18 +9,22 @@ void Window::Register()
     wndclassex.cbClsExtra = 0;
     wndclassex.cbWndExtra = 0;
     wndclassex.hInstance = hinst_;
-    wndclassex.hIcon = reinterpret_cast<HICON>(LoadImage(hinst_, MAKEINTRESOURCE(IDI_ICON), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR | LR_DEFAULTSIZE));
-    wndclassex.hIconSm = reinterpret_cast<HICON>(LoadImage(hinst_, MAKEINTRESOURCE(IDI_SMALL), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
-    wndclassex.hCursor = manualcursor_ ? NULL : LoadCursor(NULL, IDC_ARROW);
-    wndclassex.hbrBackground = dontfillbackground_ ? NULL : backgroundbrush_ != nullptr ? backgroundbrush_ : GetSysColorBrush(COLOR_BTNFACE);
-    wndclassex.lpszMenuName = NULL;
+    wndclassex.hIcon = reinterpret_cast<HICON>(
+        LoadImage(hinst_, MAKEINTRESOURCE(IDI_ICON), IMAGE_ICON, 0, 0, LR_DEFAULTCOLOR | LR_DEFAULTSIZE));
+    wndclassex.hIconSm =
+        reinterpret_cast<HICON>(LoadImage(hinst_, MAKEINTRESOURCE(IDI_SMALL), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
+    wndclassex.hCursor = manualcursor_ ? nullptr : LoadCursor(nullptr, IDC_ARROW);
+    wndclassex.hbrBackground = dontfillbackground_           ? nullptr
+                               : backgroundbrush_ != nullptr ? backgroundbrush_
+                                                             : GetSysColorBrush(COLOR_BTNFACE);
+    wndclassex.lpszMenuName = nullptr;
     wndclassex.lpszClassName = ClassName();
     WinRegisterClass(&wndclassex);
 }
 
 LRESULT CALLBACK Window::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    Window* self{ nullptr };
+    Window* self{nullptr};
     if (uMsg == WM_NCCREATE)
     {
         const auto lpcs = reinterpret_cast<LPCREATESTRUCT>(lParam);
