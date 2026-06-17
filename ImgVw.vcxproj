@@ -69,6 +69,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\diagnostics;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\easyexif;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
+    <OutDir>$(ProjectDir)bin\vs\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\vs\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
