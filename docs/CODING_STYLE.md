@@ -10,6 +10,18 @@ ImgVw follows the C++ Core Guidelines as its engineering baseline, with Microsof
 - Keep lines at or below 120 columns where practical.
 - Do not reformat files under `3rd-party/`.
 
+Run formatting before committing first-party C++ or resource changes:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\format.ps1
+```
+
+To check formatting without modifying files:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\format.ps1 -Check
+```
+
 ## Naming
 
 - Classes, structs, enums, and public functions use `CamelCase`.
@@ -34,3 +46,17 @@ ImgVw follows the C++ Core Guidelines as its engineering baseline, with Microsof
 
 - Preserve Windows XP-compatible behavior unless a change explicitly updates the documented compatibility target.
 - Prefer source that builds for both Win32 and x64.
+
+## Static Analysis
+
+Use `.clang-tidy` with the repository helper script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\tidy.ps1
+```
+
+To apply safe automatic fixes:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\tidy.ps1 -Fix
+```

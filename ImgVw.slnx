@@ -12,6 +12,9 @@
     <File Path="docs/CODING_STYLE.md" />
     <File Path="LICENSE.md" />
     <File Path="README.md" />
+    <File Path="scripts/build-msys.ps1" />
+    <File Path="scripts/format.ps1" />
+    <File Path="scripts/tidy.ps1" />
     <File Path="TODO.md" />
     <File Path="resources/application.manifest" />
   </Folder>

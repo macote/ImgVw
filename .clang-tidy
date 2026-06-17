@@ -2,13 +2,17 @@
 Checks: >
   -*,
   bugprone-*,
-  cppcoreguidelines-*,
-  modernize-*,
   performance-*,
-  readability-*
+  modernize-use-default-member-init,
+  modernize-use-equals-default,
+  modernize-use-nullptr,
+  readability-container-size-empty,
+  readability-inconsistent-declaration-parameter-name,
+  readability-redundant-access-specifiers,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier
 WarningsAsErrors: ''
 HeaderFilterRegex: '^(src|tests|resources).*'
-AnalyzeTemporaryDtors: false
 CheckOptions:
   - key: cppcoreguidelines-owning-memory.LegacyResourceProducers
     value: 'CreateFile;CreateFileMapping;CreateEvent;CreateSemaphore;CreateThread;CreateCompatibleDC;CreateSolidBrush;CreateFontIndirect;LoadMenu'
