@@ -105,11 +105,7 @@ void ImgJPEGItem::Load()
         const auto buffersize = stride * decompressheight;
         buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, buffersize));
 
-        INT decompressflags{TJFLAG_FASTDCT};
-        if (!resize)
-        {
-            decompressflags |= TJFLAG_BOTTOMUP;
-        }
+        INT decompressflags{TJFLAG_FASTDCT | TJFLAG_BOTTOMUP};
 
         turbojpeg::SkipMarkers(jpegdecompressor, EXIF_MARKER);
         turbojpeg::SkipMarkers(jpegdecompressor, ICC_MARKER);

@@ -11,13 +11,13 @@
 #include "ImgVw.h"
 #include <Windows.h>
 
-#if _DEBUG
+#if defined(_DEBUG) && defined(_MSC_VER)
 #define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
 #include <crtdbg.h>
 #endif
 
-#if _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning(suppress : 28251)
 #ifndef _iob_defined
 #define _iob_defined
@@ -31,7 +31,7 @@ extern "C" FILE* __cdecl __iob_func(void)
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, INT nShowCmd)
 {
-#if _DEBUG
+#if defined(_DEBUG) && defined(_MSC_VER)
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 

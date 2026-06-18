@@ -36,9 +36,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="3rd-party\easyexif\exif.h">
-      <Filter>3rd-party</Filter>
-    </ClInclude>
     <ClInclude Include="3rd-party\libjpeg-turbo\jconfig.h">
       <Filter>3rd-party</Filter>
     </ClInclude>
@@ -74,6 +71,9 @@
     </ClInclude>
     <ClInclude Include="src\diagnostics\TimestampLogger.h">
       <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ExifOrientation.h">
+      <Filter>Image</Filter>
     </ClInclude>
     <ClInclude Include="src\image\ImgBitmap.h">
       <Filter>Image</Filter>
@@ -125,14 +125,14 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="3rd-party\easyexif\exif.cpp">
-      <Filter>3rd-party</Filter>
-    </ClCompile>
     <ClCompile Include="src\app\Program.cpp">
       <Filter>App</Filter>
     </ClCompile>
     <ClCompile Include="src\browse\ImgBrowser.cpp">
       <Filter>Browse</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ExifOrientation.cpp">
+      <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ImgBuffer.cpp">
       <Filter>Image</Filter>

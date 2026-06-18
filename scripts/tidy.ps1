@@ -56,7 +56,6 @@ $compileArgs = @(
     "-I$(Join-Path $repoRoot 'src\ui\win32')",
     "-I$(Join-Path $repoRoot 'resources')",
     "-isystem", "$(Join-Path $repoRoot '3rd-party\libjpeg-turbo')",
-    "-isystem", "$(Join-Path $repoRoot '3rd-party\easyexif')",
     "-isystem", "$(Join-Path $repoRoot '3rd-party\Little-CMS')",
     "-DWINVER=0x0501",
     "-D_WIN32_WINNT=0x0501",

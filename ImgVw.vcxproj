@@ -68,7 +68,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\diagnostics;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\easyexif;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
+    <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\diagnostics;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
     <OutDir>$(ProjectDir)bin\vs\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)obj\vs\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
@@ -163,7 +163,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="3rd-party\easyexif\exif.h" />
     <ClInclude Include="3rd-party\libjpeg-turbo\jconfig.h" />
     <ClInclude Include="3rd-party\libjpeg-turbo\jerror.h" />
     <ClInclude Include="3rd-party\libjpeg-turbo\jmorecfg.h" />
@@ -176,6 +175,7 @@
     <ClInclude Include="src\diagnostics\DebugHelper.h" />
     <ClInclude Include="src\diagnostics\StreamLineWriter.h" />
     <ClInclude Include="src\diagnostics\TimestampLogger.h" />
+    <ClInclude Include="src\image\ExifOrientation.h" />
     <ClInclude Include="src\image\ImgBitmap.h" />
     <ClInclude Include="src\image\ImgBuffer.h" />
     <ClInclude Include="src\image\ImgCache.h" />
@@ -194,9 +194,9 @@
     <ClInclude Include="src\ui\win32\Window.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="3rd-party\easyexif\exif.cpp" />
     <ClCompile Include="src\app\Program.cpp" />
     <ClCompile Include="src\browse\ImgBrowser.cpp" />
+    <ClCompile Include="src\image\ExifOrientation.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />
     <ClCompile Include="src\image\ImgGDIItem.cpp" />
     <ClCompile Include="src\image\ImgItem.cpp" />
