@@ -95,10 +95,14 @@ void ImgJPEGItem::Load()
             }
         }
 
-        if (resize)
+        if (resize && scalingfactorindex > 0)
         {
             decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex - 1]);
             decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex - 1]);
+        }
+        else
+        {
+            resize = FALSE;
         }
 
         auto stride = TJPAD(decompresswidth * tjPixelSize[pixelformat]);

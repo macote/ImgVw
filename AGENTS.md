@@ -23,6 +23,13 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 
 - Visual Studio build entrypoint: `ImgVw.slnx` / `ImgVw.vcxproj`.
 - MSYS/Makefile build entrypoint: `make`.
+- Repository build scripts are under `scripts/`. Prefer `scripts/build-msys.ps1` for MSYS application builds; it locates
+  MSYS2, selects the architecture-specific shell/toolchain, invokes the Makefile, and verifies the output executable.
+  For example:
+  - `powershell -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x86 -Clean`
+  - `powershell -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x64 -Clean`
+- Dependency build scripts are `scripts/build-libjpeg-turbo.ps1` and `scripts/build-little-cms.ps1`. Use them when
+  rebuilding vendored library artifacts instead of invoking dependency build systems manually.
 - Useful Makefile variants:
   - `make`
   - `make config=release`
