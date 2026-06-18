@@ -10,6 +10,7 @@ ImgItem::DefaultICCProfileCriticalSectionInitializer ImgItem::defaultICCProfileC
 void ImgItem::Unload()
 {
     status_ = Status::Queued;
+    iccprofileloadfailed_ = FALSE;
     CloseICCProfile();
     ResetEvent(loadedevent_);
 }
@@ -50,6 +51,10 @@ ImgBitmap ImgItem::GetDisplayBitmap() const
 void ImgItem::OpenICCProfile(const PBYTE iccprofiledata, UINT iccprofiledatabytecount)
 {
     iccprofile_ = cmsOpenProfileFromMem(iccprofiledata, iccprofiledatabytecount);
+    if (iccprofile_ != nullptr && cmsGetColorSpace(iccprofile_) != cmsSigCmykData)
+    {
+        CloseICCProfile();
+    }
 }
 
 void ImgItem::LoadDefaultICCProfile()
@@ -70,6 +75,11 @@ void ImgItem::LoadDefaultICCProfile()
             {
                 FileMapView iccfilemap(std::wstring(iccpath), FileMapView::Mode::Read);
                 DefaultICCProfile = cmsOpenProfileFromMem(iccfilemap.data(), iccfilemap.filesize().LowPart);
+                if (DefaultICCProfile != nullptr && cmsGetColorSpace(DefaultICCProfile) != cmsSigCmykData)
+                {
+                    cmsCloseProfile(DefaultICCProfile);
+                    DefaultICCProfile = nullptr;
+                }
             }
         }
     }
@@ -87,6 +97,28 @@ void ImgItem::UnloadDefaultICCProfile()
     }
 
     LeaveCriticalSection(&DefaultICCProfileCriticalSection);
+}
+
+BOOL ImgItem::IsCMYKICCProfile(const std::wstring& filepath)
+{
+    try
+    {
+        FileMapView iccfilemap(filepath, FileMapView::Mode::Read);
+        const auto profile = cmsOpenProfileFromMem(iccfilemap.data(), iccfilemap.filesize().LowPart);
+        if (profile == nullptr)
+        {
+            return FALSE;
+        }
+
+        const auto is_cmyk = cmsGetColorSpace(profile) == cmsSigCmykData;
+        cmsCloseProfile(profile);
+
+        return is_cmyk;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
 BOOL ImgItem::TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer)

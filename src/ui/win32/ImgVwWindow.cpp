@@ -361,7 +361,7 @@ void ImgVwWindow::SelectDefaultICCProfile()
     ofn.nMaxFile = _countof(szFile);
     ofn.lpstrFilter = L"ICC Profile\0*.icc\0All\0*.*\0";
     ofn.nFilterIndex = 1;
-    ofn.lpstrTitle = L"Select default ICC profile...";
+    ofn.lpstrTitle = L"Select default CMYK ICC profile...";
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
     ofn.lpstrInitialDir = nullptr;
@@ -370,6 +370,14 @@ void ImgVwWindow::SelectDefaultICCProfile()
     ShowCursor(TRUE);
     if (GetOpenFileName(&ofn))
     {
+        if (!ImgItem::IsCMYKICCProfile(ofn.lpstrFile))
+        {
+            MessageBox(hwnd_, L"The selected file is not a valid CMYK ICC profile.", L"Invalid CMYK ICC profile",
+                       MB_OK | MB_ICONERROR);
+            ShowCursor(FALSE);
+            return;
+        }
+
         TCHAR appdatapath[260];
         if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath)))
         {

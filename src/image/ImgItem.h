@@ -90,6 +90,7 @@ class ImgItem
     ImgBitmap GetDisplayBitmap() const;
     static void LoadDefaultICCProfile();
     static void UnloadDefaultICCProfile();
+    static BOOL IsCMYKICCProfile(const std::wstring& filepath);
 
   protected:
     std::wstring filepath_;
