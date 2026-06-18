@@ -10,9 +10,22 @@ void ImgLoader::StopLoading()
     cancellationflag_ = TRUE;
     SetEvent(cancelevent_);
 
-    if (WaitForSingleObject(loopthread_, INFINITE) != WAIT_OBJECT_0)
+    const DWORD timeoutMs = 3000;
+    const DWORD loopWaitResult = WaitForSingleObject(loopthread_, timeoutMs);
+    if (loopWaitResult == WAIT_TIMEOUT)
     {
-        // TODO: handle error
+#if _DEBUG
+        OutputDebugString(L"ImgLoader::StopLoading: Warning: loop thread did not terminate within timeout.\n");
+#endif
+    }
+    else if (loopWaitResult == WAIT_FAILED)
+    {
+#if _DEBUG
+        const DWORD error = GetLastError();
+        WCHAR buf[256];
+        swprintf_s(buf, L"ImgLoader::StopLoading: loop thread wait failed with error 0x%08lX\n", static_cast<unsigned long>(error));
+        OutputDebugString(buf);
+#endif
     }
 
     if (!loaderitems_.empty())
@@ -23,15 +36,31 @@ void ImgLoader::StopLoading()
             const auto status = loaderitem->imgitem()->status();
             if (!(status == ImgItem::Status::Error || status == ImgItem::Status::Ready))
             {
-                threads.push_back(loaderitem->loaderitemthread());
+                HANDLE threadHandle = loaderitem->loaderitemthread();
+                if (threadHandle != nullptr && threadHandle != INVALID_HANDLE_VALUE)
+                {
+                    threads.push_back(threadHandle);
+                }
             }
         }
 
         if (!threads.empty())
         {
-            if (WaitForMultipleObjects(threads.size(), &threads[0], TRUE, INFINITE) == WAIT_FAILED)
+            const DWORD workersWaitResult = WaitForMultipleObjects(static_cast<DWORD>(threads.size()), &threads[0], TRUE, timeoutMs);
+            if (workersWaitResult == WAIT_TIMEOUT)
             {
-                // TODO: handle error
+#if _DEBUG
+                OutputDebugString(L"ImgLoader::StopLoading: Warning: worker threads did not terminate within timeout.\n");
+#endif
+            }
+            else if (workersWaitResult == WAIT_FAILED)
+            {
+#if _DEBUG
+                const DWORD error = GetLastError();
+                WCHAR buf[256];
+                swprintf_s(buf, L"ImgLoader::StopLoading: worker threads wait failed with error 0x%08lX\n", static_cast<unsigned long>(error));
+                OutputDebugString(buf);
+#endif
             }
         }
 

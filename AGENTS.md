@@ -67,3 +67,4 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - Keep Visual Studio project files, filters, and the Makefile in sync when adding, moving, or removing source files.
 - Treat `artifacts/imgvw_architecture_refactor_plan.md` as useful direction for larger refactors, especially around
   ownership, async loading, navigation safety, and tests.
+- When executing PowerShell commands, always use the `-NoProfile` flag (e.g., `powershell -NoProfile -ExecutionPolicy Bypass ...`) to prevent profile script loading and potential hangs.
