@@ -4,6 +4,7 @@
 #include "ImgItemHelper.h"
 #include "ImgJPEGItem.h"
 #include "ImgGDIItem.h"
+#include "ImgHEIFItem.h"
 #include <string>
 #include <memory>
 
@@ -20,6 +21,9 @@ class ImgItemFactory
             break;
         case ImgItem::Format::PNG:
             return std::make_shared<ImgGDIItem>(filepath, targetwidth, targetheight);
+            break;
+        case ImgItem::Format::HEIF:
+            return std::make_shared<ImgHEIFItem>(filepath, targetwidth, targetheight);
             break;
         case ImgItem::Format::Other:
             return std::make_shared<ImgGDIItem>(filepath, targetwidth, targetheight);

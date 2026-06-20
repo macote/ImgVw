@@ -54,6 +54,12 @@
     <ClInclude Include="3rd-party\Little-CMS\lcms2.h">
       <Filter>3rd-party</Filter>
     </ClInclude>
+    <ClInclude Include="3rd-party\libheif\libheif\heif.h">
+      <Filter>3rd-party</Filter>
+    </ClInclude>
+    <ClInclude Include="3rd-party\libde265\de265.h">
+      <Filter>3rd-party</Filter>
+    </ClInclude>
     <ClInclude Include="resources\resource.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
@@ -88,6 +94,9 @@
       <Filter>Image</Filter>
     </ClInclude>
     <ClInclude Include="src\image\ImgGDIItem.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImgHEIFItem.h">
       <Filter>Image</Filter>
     </ClInclude>
     <ClInclude Include="src\image\ImgItem.h">
@@ -150,6 +159,9 @@
       <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ImgGDIItem.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ImgHEIFItem.cpp">
       <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ImgItem.cpp">

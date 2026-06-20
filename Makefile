@@ -17,21 +17,21 @@ SOURCE_DIRS = src/app src/browse src/diagnostics src/image src/platform/win32 sr
 vpath %.cpp ${SOURCE_DIRS}
 vpath %.rc resources
 
-OBJECTS = ${OBJDIR}/ExifOrientation.o ${OBJDIR}/FileOperations.o ${OBJDIR}/FileStream.o ${OBJDIR}/ImgFileList.o ${OBJDIR}/ImgRenderer.o ${OBJDIR}/ImgBrowser.o ${OBJDIR}/ImgBuffer.o ${OBJDIR}/ImgGDIItem.o ${OBJDIR}/ImgItem.o ${OBJDIR}/ImgItemHelper.o ${OBJDIR}/ImgJpegDecoder.o ${OBJDIR}/ImgJPEGItem.o ${OBJDIR}/ImgLoader.o ${OBJDIR}/ImgVwWindow.o ${OBJDIR}/Program.o ${OBJDIR}/Window.o ${OBJDIR}/ImgVw.o
+OBJECTS = ${OBJDIR}/ExifOrientation.o ${OBJDIR}/FileOperations.o ${OBJDIR}/FileStream.o ${OBJDIR}/ImgFileList.o ${OBJDIR}/ImgRenderer.o ${OBJDIR}/ImgBrowser.o ${OBJDIR}/ImgBuffer.o ${OBJDIR}/ImgGDIItem.o ${OBJDIR}/ImgHEIFItem.o ${OBJDIR}/ImgItem.o ${OBJDIR}/ImgItemHelper.o ${OBJDIR}/ImgJpegDecoder.o ${OBJDIR}/ImgJPEGItem.o ${OBJDIR}/ImgLoader.o ${OBJDIR}/ImgVwWindow.o ${OBJDIR}/Program.o ${OBJDIR}/Window.o ${OBJDIR}/ImgVw.o
 
-CFLAGS = -std=c++17 -I. -Isrc/app -Isrc/browse -Isrc/diagnostics -Isrc/image -Isrc/platform/win32 -Isrc/ui/win32 -Iresources -isystem 3rd-party/libjpeg-turbo -isystem 3rd-party/Little-CMS -DWINVER=0x0501 -D_WIN32_WINNT=0x0501 -DUNICODE -D_UNICODE -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -O2 ${WARNS} -fmessage-length=0 -fasynchronous-unwind-tables
+CFLAGS = -std=c++17 -I. -Isrc/app -Isrc/browse -Isrc/diagnostics -Isrc/image -Isrc/platform/win32 -Isrc/ui/win32 -Iresources -isystem 3rd-party/libjpeg-turbo -isystem 3rd-party/Little-CMS -isystem 3rd-party/libheif -isystem 3rd-party/libde265 -DWINVER=0x0501 -D_WIN32_WINNT=0x0501 -DUNICODE -D_UNICODE -DLIBHEIF_STATIC_BUILD -DLIBDE265_STATIC_BUILD -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -O2 ${WARNS} -fmessage-length=0 -fasynchronous-unwind-tables
 
 ifeq (${DUMPMACHINE},x86_64-w64-mingw32)
 	CFLAGS := -m64 ${CFLAGS}
 endif
 
 ifeq (${arch},x64)
-	LDPATHS = -L3rd-party/libjpeg-turbo/ucrt64 -L3rd-party/Little-CMS/ucrt64
+	LDPATHS = -L3rd-party/libjpeg-turbo/ucrt64 -L3rd-party/Little-CMS/ucrt64 -L3rd-party/libheif/ucrt64 -L3rd-party/libde265/ucrt64
 else
-	LDPATHS = -L3rd-party/libjpeg-turbo -L3rd-party/Little-CMS
+	LDPATHS = -L3rd-party/libjpeg-turbo -L3rd-party/Little-CMS -L3rd-party/libheif -L3rd-party/libde265
 endif
 
-LDLIBS = -lmsimg32 -lcomctl32 -lshlwapi -lole32 -lgdiplus -luxtheme -ljpeg -llcms2
+LDLIBS = -lmsimg32 -lcomctl32 -lshlwapi -lole32 -lgdiplus -luxtheme -ljpeg -llcms2 -lheif -lde265
 
 ifneq (${config},release)
 	CFLAGS += -D_DEBUG -g

@@ -8,6 +8,7 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 - Copy and run, no installation required
 - Auto-rotate JPEG images based on EXIF information
 - Embedded and fallback ICC color management for CMYK JPEG images
+- HEIC/HEIF still-image display
 - Works on Windows XP and later
 
 ## Usage
@@ -37,6 +38,8 @@ Pass a file or folder as an argument.
 ImgVw uses the following libraries :
 - [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
 - [Little-CMS](https://github.com/mm2/Little-CMS)
+- [libheif](https://github.com/strukturag/libheif)
+- [libde265](https://github.com/strukturag/libde265)
 
 ImgVw includes the unchanged
 [CGATS21 CRPC5](https://registry.color.org/profile-registry/CGATS21_CRPC5) profile as a generic fallback for untagged
@@ -46,7 +49,13 @@ CMYK JPEG files. It is an approximate viewing default, not an exact representati
 
 Visual Studio and MSYS builds support Win32 and x64 configurations. Win32 remains available for legacy Windows
 compatibility. x64 is recommended for large images or large folders, but requires architecture-matched static libraries
-for libjpeg-turbo and Little CMS.
+for libjpeg-turbo, Little CMS, libheif, and libde265.
+
+Rebuild the bundled HEIC dependencies with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libheif.ps1 -Mode all -Arch all -Clean
+```
 
 ## License
 

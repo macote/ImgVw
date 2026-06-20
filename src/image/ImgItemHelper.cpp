@@ -46,6 +46,12 @@ ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(const std::wstring& fil
     {
         return ImgItem::Format::PNG;
     }
+    else if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".heic", -1) == CSTR_EQUAL ||
+             CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".heif", -1) == CSTR_EQUAL ||
+             CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".hif", -1) == CSTR_EQUAL)
+    {
+        return ImgItem::Format::HEIF;
+    }
     else if (CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".bmp", -1) == CSTR_EQUAL ||
              CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".gif", -1) == CSTR_EQUAL ||
              CompareString(LOCALE_INVARIANT, NORM_IGNORECASE, extension, -1, L".ico", -1) == CSTR_EQUAL ||

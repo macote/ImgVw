@@ -68,7 +68,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\diagnostics;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
+    <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\diagnostics;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\Little-CMS;$(ProjectDir)3rd-party\libheif;$(ProjectDir)3rd-party\libde265;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
     <OutDir>$(ProjectDir)bin\vs\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)obj\vs\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
@@ -94,13 +94,13 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;LIBHEIF_STATIC_BUILD;LIBDE265_STATIC_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ImgVwIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\jpeg-static.lib;3rd-party\Little-CMS\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\jpeg-static.lib;3rd-party\Little-CMS\lcms2_static.lib;3rd-party\libheif\heif.lib;3rd-party\libde265\libde265.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ShowProgress>NotSet</ShowProgress>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
@@ -114,7 +114,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;LIBHEIF_STATIC_BUILD;LIBDE265_STATIC_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ImgVwIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -122,7 +122,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\jpeg-static.lib;3rd-party\Little-CMS\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\jpeg-static.lib;3rd-party\Little-CMS\lcms2_static.lib;3rd-party\libheif\heif.lib;3rd-party\libde265\libde265.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -131,13 +131,13 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;LIBHEIF_STATIC_BUILD;LIBDE265_STATIC_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ImgVwIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\x64\jpeg-static.lib;3rd-party\Little-CMS\x64\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\x64\jpeg-static.lib;3rd-party\Little-CMS\x64\lcms2_static.lib;3rd-party\libheif\x64\heif.lib;3rd-party\libde265\x64\libde265.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ShowProgress>NotSet</ShowProgress>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
@@ -151,7 +151,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;LIBHEIF_STATIC_BUILD;LIBDE265_STATIC_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ImgVwIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -159,7 +159,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\x64\jpeg-static.lib;3rd-party\Little-CMS\x64\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;comctl32.lib;msimg32.lib;gdiplus.lib;uxtheme.lib;shlwapi.lib;legacy_stdio_definitions.lib;3rd-party\libjpeg-turbo\x64\jpeg-static.lib;3rd-party\Little-CMS\x64\lcms2_static.lib;3rd-party\libheif\x64\heif.lib;3rd-party\libde265\x64\libde265.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -169,6 +169,8 @@
     <ClInclude Include="3rd-party\libjpeg-turbo\jpeglib.h" />
     <ClInclude Include="3rd-party\libjpeg-turbo\turbojpeg.h" />
     <ClInclude Include="3rd-party\Little-CMS\lcms2.h" />
+    <ClInclude Include="3rd-party\libheif\libheif\heif.h" />
+    <ClInclude Include="3rd-party\libde265\de265.h" />
     <ClInclude Include="resources\resource.h" />
     <ClInclude Include="src\app\ImgVw.h" />
     <ClInclude Include="src\browse\ImgFileList.h" />
@@ -181,6 +183,7 @@
     <ClInclude Include="src\image\ImgBuffer.h" />
     <ClInclude Include="src\image\ImgCache.h" />
     <ClInclude Include="src\image\ImgGDIItem.h" />
+    <ClInclude Include="src\image\ImgHEIFItem.h" />
     <ClInclude Include="src\image\ImgItem.h" />
     <ClInclude Include="src\image\ImgItemFactory.h" />
     <ClInclude Include="src\image\ImgItemHelper.h" />
@@ -203,6 +206,7 @@
     <ClCompile Include="src\image\ExifOrientation.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />
     <ClCompile Include="src\image\ImgGDIItem.cpp" />
+    <ClCompile Include="src\image\ImgHEIFItem.cpp" />
     <ClCompile Include="src\image\ImgItem.cpp" />
     <ClCompile Include="src\image\ImgItemHelper.cpp" />
     <ClCompile Include="src\image\ImgJpegDecoder.cpp" />

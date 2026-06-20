@@ -23,6 +23,7 @@ class ImgItem
     {
         JPEG,
         PNG,
+        HEIF,
         Other,
         Unsupported
     };
