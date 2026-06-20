@@ -18,5 +18,6 @@
     <File Path="TODO.md" />
     <File Path="resources/application.manifest" />
   </Folder>
+  <Project Path="ImgVw.Tests.vcxproj" Id="4a29f3e2-729f-44d0-ac1b-a09d18f03837" />
   <Project Path="ImgVw.vcxproj" Id="f0d77c92-6951-4588-8889-73f090229f4d" />
 </Solution>

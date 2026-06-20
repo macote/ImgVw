@@ -171,6 +171,7 @@
     <ClInclude Include="3rd-party\Little-CMS\lcms2.h" />
     <ClInclude Include="resources\resource.h" />
     <ClInclude Include="src\app\ImgVw.h" />
+    <ClInclude Include="src\browse\ImgFileList.h" />
     <ClInclude Include="src\browse\ImgBrowser.h" />
     <ClInclude Include="src\diagnostics\DebugHelper.h" />
     <ClInclude Include="src\diagnostics\StreamLineWriter.h" />
@@ -195,6 +196,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\app\Program.cpp" />
+    <ClCompile Include="src\browse\ImgFileList.cpp" />
     <ClCompile Include="src\browse\ImgBrowser.cpp" />
     <ClCompile Include="src\image\ExifOrientation.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />

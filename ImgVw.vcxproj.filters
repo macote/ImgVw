@@ -60,6 +60,9 @@
     <ClInclude Include="src\app\ImgVw.h">
       <Filter>App</Filter>
     </ClInclude>
+    <ClInclude Include="src\browse\ImgFileList.h">
+      <Filter>Browse</Filter>
+    </ClInclude>
     <ClInclude Include="src\browse\ImgBrowser.h">
       <Filter>Browse</Filter>
     </ClInclude>
@@ -127,6 +130,9 @@
   <ItemGroup>
     <ClCompile Include="src\app\Program.cpp">
       <Filter>App</Filter>
+    </ClCompile>
+    <ClCompile Include="src\browse\ImgFileList.cpp">
+      <Filter>Browse</Filter>
     </ClCompile>
     <ClCompile Include="src\browse\ImgBrowser.cpp">
       <Filter>Browse</Filter>

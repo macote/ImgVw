@@ -5,14 +5,10 @@ void ImgBrowser::CollectFile(const std::wstring& filepath)
 {
     EnterCriticalSection(&browsecriticalsection_);
 
-    files_.insert(filepath);
-    cache_.Add(filepath, targetwidth_, targetheight_);
-    randomlist_.push_back(filepath);
-    loader_.QueueItem(cache_.Get(filepath));
-
-    if (currentfileiterator_ == files_.end())
+    if (files_.Add(filepath))
     {
-        currentfileiterator_ = files_.begin();
+        cache_.Add(filepath, targetwidth_, targetheight_);
+        loader_.QueueItem(cache_.Get(filepath));
     }
 
     SetEvent(readyevent_);
@@ -186,7 +182,8 @@ void ImgBrowser::StopCollecting()
 #if _DEBUG
         const DWORD error = GetLastError();
         WCHAR buf[256];
-        swprintf_s(buf, L"ImgBrowser::StopCollecting: WaitForSingleObject failed with error 0x%08lX\n", static_cast<unsigned long>(error));
+        swprintf_s(buf, L"ImgBrowser::StopCollecting: WaitForSingleObject failed with error 0x%08lX\n",
+                   static_cast<unsigned long>(error));
         OutputDebugString(buf);
 #endif
     }
@@ -215,38 +212,31 @@ void ImgBrowser::SetNotificationWindow(HWND hwnd, UINT message)
 
 void ImgBrowser::Reset()
 {
-    randomlist_.clear();
-    currentrandomindex_ = 0x80000000;
-    files_.clear();
-    currentfileiterator_ = files_.end();
+    files_.Clear();
 }
 
 std::wstring ImgBrowser::GetCurrentFilePath()
 {
-    if (currentfileiterator_ != files_.end())
-    {
-        return *currentfileiterator_;
-    }
-    else
-    {
-        return std::wstring();
-    }
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto filepath = files_.CurrentPath();
+    LeaveCriticalSection(&browsecriticalsection_);
+    return filepath;
 }
 
 std::shared_ptr<ImgItem> ImgBrowser::GetCurrentItem()
 {
-    if (currentfileiterator_ != files_.end())
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto filepath = files_.CurrentPath();
+    const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : cache_.Get(filepath);
+    LeaveCriticalSection(&browsecriticalsection_);
+    if (imgitem != nullptr)
     {
-        auto imgitem = cache_.Get(*currentfileiterator_);
-        if (imgitem != nullptr)
+        if (imgitem->status() == ImgItem::Status::Queued)
         {
-            if (imgitem->status() == ImgItem::Status::Queued)
-            {
-                loader_.QueueItem(imgitem, TRUE);
-            }
-
-            return imgitem;
+            loader_.QueueItem(imgitem, TRUE);
         }
+
+        return imgitem;
     }
 
     return {};
@@ -254,140 +244,77 @@ std::shared_ptr<ImgItem> ImgBrowser::GetCurrentItem()
 
 void ImgBrowser::ReloadCurrentItem()
 {
-    if (currentfileiterator_ != files_.end())
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto filepath = files_.CurrentPath();
+    const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : cache_.Get(filepath);
+    LeaveCriticalSection(&browsecriticalsection_);
+    if (imgitem != nullptr)
     {
-        auto imgitem = cache_.Get(*currentfileiterator_);
-        if (imgitem != nullptr)
+        if (imgitem->status() != ImgItem::Status::Queued)
         {
-            if (imgitem->status() != ImgItem::Status::Queued)
-            {
-                imgitem->Unload();
-            }
-
-            loader_.QueueItem(imgitem, TRUE);
+            imgitem->Unload();
         }
+
+        loader_.QueueItem(imgitem, TRUE);
     }
 }
 
 BOOL ImgBrowser::MoveToNext()
 {
-    BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (!files_.empty() && std::next(currentfileiterator_) != files_.end())
-    {
-        ++currentfileiterator_;
-        moveSuccess = TRUE;
-    }
-
+    const auto moveSuccess = files_.MoveToNext();
     LeaveCriticalSection(&browsecriticalsection_);
-
     return moveSuccess;
 }
 
 BOOL ImgBrowser::MoveToPrevious()
 {
-    BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (!files_.empty() && currentfileiterator_ != files_.begin())
-    {
-        --currentfileiterator_;
-        moveSuccess = TRUE;
-    }
-
+    const auto moveSuccess = files_.MoveToPrevious();
     LeaveCriticalSection(&browsecriticalsection_);
-
     return moveSuccess;
 }
 
 BOOL ImgBrowser::MoveToFirst()
 {
-    BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (!files_.empty() && currentfileiterator_ != files_.begin())
-    {
-        currentfileiterator_ = files_.begin();
-        moveSuccess = TRUE;
-    }
-
+    const auto moveSuccess = files_.MoveToFirst();
     LeaveCriticalSection(&browsecriticalsection_);
-
     return moveSuccess;
 }
 
 BOOL ImgBrowser::MoveToLast()
 {
-    BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (!files_.empty() && std::next(currentfileiterator_) != files_.end())
-    {
-        currentfileiterator_ = std::prev(files_.end());
-        moveSuccess = TRUE;
-    }
-
+    const auto moveSuccess = files_.MoveToLast();
     LeaveCriticalSection(&browsecriticalsection_);
-
     return moveSuccess;
 }
 
 BOOL ImgBrowser::MoveToItem(const std::wstring& filepath)
 {
-    BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (!files_.empty())
-    {
-        currentfileiterator_ = files_.find(filepath);
-        moveSuccess = currentfileiterator_ != files_.end();
-    }
-
+    const auto moveSuccess = files_.MoveTo(filepath);
     LeaveCriticalSection(&browsecriticalsection_);
-
     return moveSuccess;
 }
 
 BOOL ImgBrowser::MoveToRandom()
 {
-    BOOL moveSuccess = FALSE;
     EnterCriticalSection(&browsecriticalsection_);
-    if (!files_.empty())
-    {
-        if (currentrandomindex_ >= randomlist_.size())
-        {
-            std::wstring last;
-            if (currentrandomindex_ != kIndexPark)
-            {
-                last = randomlist_[currentrandomindex_ - 1];
-            }
-
-            std::shuffle(std::begin(randomlist_), std::end(randomlist_), rnge_);
-            if (last == *randomlist_.begin() && randomlist_.size() > 1)
-            {
-                do
-                {
-                    std::shuffle(std::begin(randomlist_), std::end(randomlist_), rnge_);
-                } while (last == *randomlist_.begin());
-            }
-
-            currentrandomindex_ = 0;
-        }
-
-        const auto filepath = randomlist_[currentrandomindex_];
-        ++currentrandomindex_;
-        currentfileiterator_ = files_.find(filepath);
-        moveSuccess = currentfileiterator_ != files_.end();
-    }
-
+    const auto moveSuccess = files_.MoveToRandom();
     LeaveCriticalSection(&browsecriticalsection_);
-
     return moveSuccess;
 }
 
 void ImgBrowser::RemoveCurrentItem()
 {
     EnterCriticalSection(&browsecriticalsection_);
-    if (currentfileiterator_ != files_.end())
+    const auto filepath = files_.CurrentPath();
+    if (!filepath.empty())
     {
-        cache_.Remove(*currentfileiterator_);
-        files_.erase(currentfileiterator_++);
+        cache_.Remove(filepath);
+        files_.RemoveCurrent();
     }
 
     LeaveCriticalSection(&browsecriticalsection_);

@@ -1,21 +1,15 @@
 #pragma once
 
+#include "ImgFileList.h"
 #include "ImgCache.h"
 #include "ImgLoader.h"
 #include <Windows.h>
-#include <string>
-#include <set>
-#include <vector>
-#include <iterator>
-#include <limits>
 #include <memory>
-#include <random>
+#include <string>
+#include <vector>
 
 class ImgBrowser final
 {
-  public:
-    static const DWORD kIndexPark = 0x80000000;
-
   public:
     ImgBrowser()
     {
@@ -58,13 +52,8 @@ class ImgBrowser final
     BOOL cancellationflag_{};
     BOOL recursive_{};
     std::wstring folderpath_;
-    std::set<std::wstring>::iterator currentfileiterator_;
-    std::set<std::wstring> files_;
-    std::vector<std::wstring> randomlist_;
+    ImgFileList files_;
     std::vector<std::wstring> folders_;
-    DWORD currentrandomindex_{kIndexPark};
-    std::random_device rd_;
-    std::mt19937 rnge_{rd_()};
     HANDLE collectorthread_{NULL};
     HANDLE readyevent_;
     CRITICAL_SECTION browsecriticalsection_;
