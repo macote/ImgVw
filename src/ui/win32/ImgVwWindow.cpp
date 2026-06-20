@@ -48,6 +48,12 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
     const auto imgitem = browser_.GetCurrentItem();
     if (imgitem != nullptr)
     {
+        if (slideshowwaitingforimage_ && imgitem->status() != ImgItem::Status::Ready &&
+            imgitem->status() != ImgItem::Status::Error)
+        {
+            return;
+        }
+
         if (!DisplayImage(pps->hdc, imgitem.get()))
         {
             DisplayFileInformation(pps->hdc, browser_.GetCurrentFilePath());
@@ -115,6 +121,7 @@ void ImgVwWindow::DisplayFileInformation(HDC dc, const std::wstring& filepath)
 
 void ImgVwWindow::InvalidateScreen()
 {
+    slideshowwaitingforimage_ = FALSE;
     InvalidateRect(hwnd_, nullptr, FALSE);
     if (slideshowrunning_)
     {
@@ -197,8 +204,8 @@ void ImgVwWindow::StartSlideShow()
 {
     if (!slideshowrunning_)
     {
-        SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, nullptr);
         slideshowrunning_ = TRUE;
+        DisplayCurrentSlideWhenReady();
     }
 }
 
@@ -208,6 +215,7 @@ void ImgVwWindow::StopSlideShow()
     {
         KillTimer(hwnd_, IDT_SLIDESHOW);
         slideshowrunning_ = FALSE;
+        slideshowwaitingforimage_ = FALSE;
     }
 }
 
@@ -216,7 +224,10 @@ void ImgVwWindow::RestartSlideShowTimer()
     if (slideshowrunning_)
     {
         KillTimer(hwnd_, IDT_SLIDESHOW);
-        SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, nullptr);
+        if (!slideshowwaitingforimage_)
+        {
+            SetTimer(hwnd_, IDT_SLIDESHOW, slideshowinterval_, nullptr);
+        }
     }
 }
 
@@ -242,8 +253,54 @@ void ImgVwWindow::HandleSlideShow()
 {
     if ((slideshowrandom_ && browser_.MoveToRandom()) || browser_.MoveToNext() || browser_.MoveToFirst())
     {
-        InvalidateScreen();
+        DisplayCurrentSlideWhenReady();
     }
+}
+
+void ImgVwWindow::DisplayCurrentSlideWhenReady()
+{
+    KillTimer(hwnd_, IDT_SLIDESHOW);
+
+    const auto imgitem = browser_.GetCurrentItem();
+    if (imgitem == nullptr)
+    {
+        slideshowwaitingforimage_ = FALSE;
+        RestartSlideShowTimer();
+        return;
+    }
+
+    const auto status = imgitem->status();
+    slideshowwaitingforimage_ = status != ImgItem::Status::Ready && status != ImgItem::Status::Error;
+    if (!slideshowwaitingforimage_)
+    {
+        InvalidateRect(hwnd_, nullptr, FALSE);
+        RestartSlideShowTimer();
+    }
+}
+
+void ImgVwWindow::HandleBrowserChanged()
+{
+    if (slideshowrunning_ && slideshowwaitingforimage_)
+    {
+        const auto imgitem = browser_.GetCurrentItem();
+        if (imgitem == nullptr)
+        {
+            return;
+        }
+
+        const auto status = imgitem->status();
+        if (status != ImgItem::Status::Ready && status != ImgItem::Status::Error)
+        {
+            return;
+        }
+
+        slideshowwaitingforimage_ = FALSE;
+        InvalidateRect(hwnd_, nullptr, FALSE);
+        RestartSlideShowTimer();
+        return;
+    }
+
+    InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 BOOL ImgVwWindow::HandleMouseMove(WPARAM wParam, LPARAM lParam)
@@ -432,7 +489,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg)
     {
     case kBrowserChangedMessage:
-        InvalidateScreen();
+        HandleBrowserChanged();
         return 0;
     case WM_ACTIVATE:
         activeparam_ = LOWORD(wParam);

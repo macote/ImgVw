@@ -63,6 +63,7 @@ class ImgVwWindow final : public Window
     LARGE_INTEGER qpcfrequency_{};
     BOOL slideshowrunning_{};
     BOOL slideshowrandom_{};
+    BOOL slideshowwaitingforimage_{};
     UINT slideshowinterval_{kInitialSlideShowIntervalInMilliseconds};
     POINTS mousemovelastpoints_{};
     LARGE_INTEGER mousemovelastcounter_{};
@@ -86,6 +87,8 @@ class ImgVwWindow final : public Window
     void IncreaseSlideShowSpeed();
     void DecreaseSlideShowSpeed();
     void HandleSlideShow();
+    void DisplayCurrentSlideWhenReady();
+    void HandleBrowserChanged();
     void SelectDefaultICCProfile();
     void HandleContextMenu(LPARAM lParam);
     void InvalidateScreen();

@@ -1,5 +1,7 @@
 #include "ImgLoader.h"
 
+#include <algorithm>
+
 void ImgLoader::StopLoading()
 {
     if (loopthread_ == nullptr || loopthread_ == INVALID_HANDLE_VALUE)
@@ -23,7 +25,8 @@ void ImgLoader::StopLoading()
 #if _DEBUG
         const DWORD error = GetLastError();
         WCHAR buf[256];
-        swprintf_s(buf, L"ImgLoader::StopLoading: loop thread wait failed with error 0x%08lX\n", static_cast<unsigned long>(error));
+        swprintf_s(buf, L"ImgLoader::StopLoading: loop thread wait failed with error 0x%08lX\n",
+                   static_cast<unsigned long>(error));
         OutputDebugString(buf);
 #endif
     }
@@ -46,11 +49,13 @@ void ImgLoader::StopLoading()
 
         if (!threads.empty())
         {
-            const DWORD workersWaitResult = WaitForMultipleObjects(static_cast<DWORD>(threads.size()), &threads[0], TRUE, timeoutMs);
+            const DWORD workersWaitResult =
+                WaitForMultipleObjects(static_cast<DWORD>(threads.size()), &threads[0], TRUE, timeoutMs);
             if (workersWaitResult == WAIT_TIMEOUT)
             {
 #if _DEBUG
-                OutputDebugString(L"ImgLoader::StopLoading: Warning: worker threads did not terminate within timeout.\n");
+                OutputDebugString(
+                    L"ImgLoader::StopLoading: Warning: worker threads did not terminate within timeout.\n");
 #endif
             }
             else if (workersWaitResult == WAIT_FAILED)
@@ -58,7 +63,8 @@ void ImgLoader::StopLoading()
 #if _DEBUG
                 const DWORD error = GetLastError();
                 WCHAR buf[256];
-                swprintf_s(buf, L"ImgLoader::StopLoading: worker threads wait failed with error 0x%08lX\n", static_cast<unsigned long>(error));
+                swprintf_s(buf, L"ImgLoader::StopLoading: worker threads wait failed with error 0x%08lX\n",
+                           static_cast<unsigned long>(error));
                 OutputDebugString(buf);
 #endif
             }
@@ -163,6 +169,17 @@ void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext
     EnterCriticalSection(&queuecriticalsection_);
     if (pendingitems_.find(imgitem.get()) != pendingitems_.end())
     {
+        if (loadnext)
+        {
+            const auto queueditem =
+                std::find_if(queue_.begin(), queue_.end(),
+                             [&imgitem](const std::shared_ptr<ImgItem>& item) { return item.get() == imgitem.get(); });
+            if (queueditem != queue_.end() && queueditem != queue_.begin())
+            {
+                queue_.splice(queue_.begin(), queue_, queueditem);
+            }
+        }
+
         LeaveCriticalSection(&queuecriticalsection_);
         return;
     }
