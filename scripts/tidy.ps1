@@ -57,10 +57,14 @@ $compileArgs = @(
     "-I$(Join-Path $repoRoot 'resources')",
     "-isystem", "$(Join-Path $repoRoot '3rd-party\libjpeg-turbo')",
     "-isystem", "$(Join-Path $repoRoot '3rd-party\Little-CMS')",
+    "-isystem", "$(Join-Path $repoRoot '3rd-party\libheif')",
+    "-isystem", "$(Join-Path $repoRoot '3rd-party\libde265')",
     "-DWINVER=0x0501",
     "-D_WIN32_WINNT=0x0501",
     "-DUNICODE",
     "-D_UNICODE",
+    "-DLIBHEIF_STATIC_BUILD",
+    "-DLIBDE265_STATIC_BUILD",
     "-D_CRT_SECURE_NO_WARNINGS"
 )
 

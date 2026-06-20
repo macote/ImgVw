@@ -1,4 +1,5 @@
 #include "FileOperations.h"
+#include "ImgResampler.h"
 #include "ImgFileList.h"
 #include "ImgJpegDecoder.h"
 #include "ImgRenderer.h"
@@ -347,6 +348,50 @@ void TestJpegDecoderRejectsInvalidData()
     Check(!decoder.error().empty(), "JPEG decoder reports invalid-input error");
 }
 
+void TestImgResamplerAreaDownscale()
+{
+    const std::vector<unsigned char> source = {
+        0,   0,   0,   255, 100, 0,   0,   255, 0,   0,   0,   255, 100, 0,   0,   255,
+        0,   100, 0,   255, 100, 100, 0,   255, 0,   100, 0,   255, 100, 100, 0,   255,
+        0,   0,   0,   255, 100, 0,   0,   255, 0,   0,   0,   255, 100, 0,   0,   255,
+        0,   100, 0,   255, 100, 100, 0,   255, 0,   100, 0,   255, 100, 100, 0,   255,
+    };
+    ImgResampler::Result result;
+
+    Check(ImgResampler::DownscaleRgba8(source.data(), 16, 4, 4, 2, 2, ImgResampler::AlphaMode::Straight, &result),
+          "area resampler downscales RGBA pixels");
+    Check(result.stride == 8 && result.pixels.size() == 16, "area resampler returns packed RGBA dimensions");
+    for (std::size_t pixel = 0; pixel < result.pixels.size(); pixel += 4)
+    {
+        Check(result.pixels[pixel] == 50 && result.pixels[pixel + 1] == 50 && result.pixels[pixel + 2] == 0 &&
+                  result.pixels[pixel + 3] == 255,
+              "area resampler averages the complete source footprint");
+    }
+}
+
+void TestImgResamplerPremultipliesAlpha()
+{
+    const unsigned char source[] = {255, 0, 0, 255, 0, 0, 255, 0};
+    ImgResampler::Result result;
+
+    Check(ImgResampler::DownscaleRgba8(source, sizeof(source), 2, 1, 1, 1, ImgResampler::AlphaMode::Straight, &result),
+          "area resampler handles straight alpha");
+    Check(result.pixels == std::vector<unsigned char>({128, 0, 0, 128}),
+          "area resampler filters premultiplied color and alpha");
+}
+
+void TestImgResamplerValidatesInput()
+{
+    const unsigned char source[] = {0, 0, 0, 255};
+    ImgResampler::Result result;
+
+    Check(!ImgResampler::DownscaleRgba8(source, sizeof(source), 1, 1, 2, 1, ImgResampler::AlphaMode::Straight,
+                                        &result),
+          "area resampler rejects upscaling");
+    Check(!ImgResampler::DownscaleRgba8(source, 3, 1, 1, 1, 1, ImgResampler::AlphaMode::Straight, &result),
+          "area resampler rejects a short source stride");
+}
+
 void TestBundledCmykProfile()
 {
     std::ifstream stream("resources/color/CGATS21_CRPC5.icc", std::ios::binary | std::ios::ate);
@@ -421,6 +466,9 @@ int main()
     TestJpegDecoderMetadataAndScaling();
     TestJpegDecoderCmyk();
     TestJpegDecoderRejectsInvalidData();
+    TestImgResamplerAreaDownscale();
+    TestImgResamplerPremultipliesAlpha();
+    TestImgResamplerValidatesInput();
     TestBundledCmykProfile();
 
     if (failures != 0)

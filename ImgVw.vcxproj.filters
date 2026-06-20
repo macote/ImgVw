@@ -84,6 +84,9 @@
     <ClInclude Include="src\image\ExifOrientation.h">
       <Filter>Image</Filter>
     </ClInclude>
+    <ClInclude Include="src\image\ImgResampler.h">
+      <Filter>Image</Filter>
+    </ClInclude>
     <ClInclude Include="src\image\ImgBitmap.h">
       <Filter>Image</Filter>
     </ClInclude>
@@ -153,6 +156,9 @@
       <Filter>Browse</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ExifOrientation.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ImgResampler.cpp">
       <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ImgBuffer.cpp">

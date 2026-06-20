@@ -179,6 +179,7 @@
     <ClInclude Include="src\diagnostics\StreamLineWriter.h" />
     <ClInclude Include="src\diagnostics\TimestampLogger.h" />
     <ClInclude Include="src\image\ExifOrientation.h" />
+    <ClInclude Include="src\image\ImgResampler.h" />
     <ClInclude Include="src\image\ImgBitmap.h" />
     <ClInclude Include="src\image\ImgBuffer.h" />
     <ClInclude Include="src\image\ImgCache.h" />
@@ -204,6 +205,7 @@
     <ClCompile Include="src\browse\ImgFileList.cpp" />
     <ClCompile Include="src\browse\ImgBrowser.cpp" />
     <ClCompile Include="src\image\ExifOrientation.cpp" />
+    <ClCompile Include="src\image\ImgResampler.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />
     <ClCompile Include="src\image\ImgGDIItem.cpp" />
     <ClCompile Include="src\image\ImgHEIFItem.cpp" />

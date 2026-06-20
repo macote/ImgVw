@@ -1,4 +1,5 @@
 #include "ImgHEIFItem.h"
+#include "ImgResampler.h"
 
 #include <libheif/heif.h>
 #include <lcms2.h>
@@ -244,11 +245,10 @@ bool TransformEmbeddedRgbProfile(const std::vector<std::uint8_t>& profile_data, 
     return true;
 }
 
-bool ConvertRgbaToBottomUpBgr(const std::vector<std::uint8_t>& embedded_profile, heif_image* image, int width,
-                              int height, std::vector<std::uint8_t>* output, int* output_stride)
+bool ConvertRgbaToBottomUpBgr(const std::vector<std::uint8_t>& embedded_profile, const std::uint8_t* source,
+                              std::size_t source_stride, bool premultiplied, int width, int height,
+                              std::vector<std::uint8_t>* output, int* output_stride)
 {
-    std::size_t source_stride{};
-    const auto source = heif_image_get_plane_readonly2(image, heif_channel_interleaved, &source_stride);
     const auto destination_stride = PaddedBgrStride(width);
     if (source == nullptr || destination_stride == 0 || source_stride < static_cast<std::size_t>(width) * 4U ||
         static_cast<std::size_t>(destination_stride) >
@@ -259,7 +259,6 @@ bool ConvertRgbaToBottomUpBgr(const std::vector<std::uint8_t>& embedded_profile,
 
     output->assign(static_cast<std::size_t>(destination_stride) * height, 0);
     std::vector<std::uint8_t> color_managed(static_cast<std::size_t>(destination_stride) * height, 0);
-    const auto premultiplied = heif_image_is_premultiplied_alpha(image) != 0;
     const auto* transform_source = source;
     auto transform_source_stride = source_stride;
     std::vector<std::uint8_t> unpremultiplied;
@@ -402,6 +401,9 @@ void ImgHEIFItem::Load()
         }
         decoding_options->convert_hdr_to_8bit = 1;
         decoding_options->output_image_nclx_profile_passthrough = has_embedded_profile ? 1 : 0;
+        decoding_options->color_conversion_options.preferred_chroma_upsampling_algorithm =
+            heif_chroma_upsampling_bilinear;
+        decoding_options->color_conversion_options.only_use_preferred_chroma_algorithm = 1;
 
         heif_image* raw_image{};
         error = heif_decode_image(handle.get(), &raw_image, heif_colorspace_RGB, heif_chroma_interleaved_RGBA,
@@ -423,25 +425,30 @@ void ImgHEIFItem::Load()
             return;
         }
 
+        std::size_t source_stride{};
+        auto source = heif_image_get_plane_readonly2(image.get(), heif_channel_interleaved, &source_stride);
+        auto premultiplied = heif_image_is_premultiplied_alpha(image.get()) != 0;
+        ImgResampler::Result resized;
         if (display_width != width_ || display_height != height_)
         {
-            heif_image* raw_scaled_image{};
-            error = heif_image_scale_image(image.get(), &raw_scaled_image, display_width, display_height, nullptr);
-            std::unique_ptr<heif_image, ImageDeleter> scaled_image(raw_scaled_image);
-            if (error.code != heif_error_Ok || !scaled_image)
+            const auto alpha_mode =
+                premultiplied ? ImgResampler::AlphaMode::Premultiplied : ImgResampler::AlphaMode::Straight;
+            if (!ImgResampler::DownscaleRgba8(source, source_stride, width_, height_, display_width, display_height,
+                                              alpha_mode, &resized))
             {
-                errormessage_ = FormatError(L"Scaling HEIF primary image", error);
+                errormessage_ = L"Scaling HEIF primary image failed.";
                 status_ = Status::Error;
                 return;
             }
-
-            image = std::move(scaled_image);
+            source = resized.pixels.data();
+            source_stride = resized.stride;
+            premultiplied = true;
         }
 
         std::vector<std::uint8_t> output;
         int output_stride{};
-        if (!ConvertRgbaToBottomUpBgr(embedded_profile, image.get(), display_width, display_height, &output,
-                                      &output_stride))
+        if (!ConvertRgbaToBottomUpBgr(embedded_profile, source, source_stride, premultiplied, display_width,
+                                      display_height, &output, &output_stride))
         {
             errormessage_ = L"Could not convert HEIF pixels to the display format.";
             status_ = Status::Error;

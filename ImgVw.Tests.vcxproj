@@ -86,12 +86,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\browse\ImgFileList.h" />
+    <ClInclude Include="src\image\ImgResampler.h" />
     <ClInclude Include="src\image\ImgJpegDecoder.h" />
     <ClInclude Include="src\platform\win32\FileOperations.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\browse\ImgFileList.cpp" />
+    <ClCompile Include="src\image\ImgResampler.cpp" />
     <ClCompile Include="src\image\ImgLoader.cpp" />
     <ClCompile Include="src\image\ImgJpegDecoder.cpp" />
     <ClCompile Include="src\platform\win32\FileOperations.cpp" />

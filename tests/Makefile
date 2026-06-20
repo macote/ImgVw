@@ -4,7 +4,7 @@ CXXFLAGS ?= -std=c++17 -Wall -Wextra -Werror -Wno-missing-field-initializers -DU
 	-I../src/browse -I../src/image -I../src/platform/win32 -I../src/ui/win32 \
 	-isystem ../3rd-party/libjpeg-turbo -isystem ../3rd-party/Little-CMS
 TARGET = ImgVwTests.exe
-SOURCES = ImgVwTests.cpp ../src/browse/ImgFileList.cpp ../src/image/ImgLoader.cpp \
+SOURCES = ImgVwTests.cpp ../src/browse/ImgFileList.cpp ../src/image/ImgResampler.cpp ../src/image/ImgLoader.cpp \
 	../src/image/ImgJpegDecoder.cpp ../src/platform/win32/FileOperations.cpp ../src/ui/win32/ImgRenderer.cpp
 
 ifeq ($(DUMPMACHINE),x86_64-w64-mingw32)
