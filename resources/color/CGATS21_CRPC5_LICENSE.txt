@@ -1,0 +1,18 @@
+CGATS21_CRPC5.icc
+
+Profile provider: IDEAlliance
+Copyright: X-Rite, Inc.
+
+License from the ICC Profile Registry:
+
+This profile is made available by IDEAlliance, with permission of X-Rite, Inc., and may be used, embedded, exchanged,
+and shared without restriction. It may not be altered, or sold without written permission of IDEAlliance.
+
+Source:
+https://registry.color.org/profile-registry/CGATS21_CRPC5
+https://registry.color.org/profile-registry/profiles/CGATS21_CRPC5.icc
+
+Retrieved: 2026-06-20
+File size: 3,339,888 bytes
+ICC profile ID: b0eb43159bf229c6eedfaaaaa54ff497
+SHA-256: 6c201673f030227dc4cd15209ab381c4427ce2b6de26dd2cade38dabc0d31e8c

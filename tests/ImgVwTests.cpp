@@ -4,7 +4,11 @@
 #include "ImgRenderer.h"
 #include "ImgLoader.h"
 
+#include <lcms2.h>
+
 #include <cstdlib>
+#include <cstring>
+#include <fstream>
 #include <iostream>
 #include <set>
 #include <string>
@@ -342,6 +346,63 @@ void TestJpegDecoderRejectsInvalidData()
     Check(!decoder.Initialize(invalid, sizeof(invalid)), "JPEG decoder rejects invalid input");
     Check(!decoder.error().empty(), "JPEG decoder reports invalid-input error");
 }
+
+void TestBundledCmykProfile()
+{
+    std::ifstream stream("resources/color/CGATS21_CRPC5.icc", std::ios::binary | std::ios::ate);
+    if (!stream.is_open())
+    {
+        stream.open("../resources/color/CGATS21_CRPC5.icc", std::ios::binary | std::ios::ate);
+    }
+
+    Check(stream.is_open(), "bundled CMYK profile is present");
+    if (!stream.is_open())
+    {
+        return;
+    }
+
+    const auto size = stream.tellg();
+    Check(size == 3339888, "bundled CMYK profile has the validated size");
+    if (size <= 0)
+    {
+        return;
+    }
+
+    stream.seekg(0);
+    std::vector<unsigned char> profile_data(static_cast<std::size_t>(size));
+    stream.read(reinterpret_cast<char*>(profile_data.data()), static_cast<std::streamsize>(size));
+    Check(stream.good(), "bundled CMYK profile can be read");
+
+    const auto profile = cmsOpenProfileFromMem(profile_data.data(), static_cast<cmsUInt32Number>(profile_data.size()));
+    Check(profile != nullptr, "Little CMS opens the bundled CMYK profile");
+    if (profile == nullptr)
+    {
+        return;
+    }
+
+    Check(cmsGetColorSpace(profile) == cmsSigCmykData, "bundled profile uses the CMYK color space");
+    const unsigned char expected_profile_id[] = {0xB0, 0xEB, 0x43, 0x15, 0x9B, 0xF2, 0x29, 0xC6,
+                                                 0xEE, 0xDF, 0xAA, 0xAA, 0xA5, 0x4F, 0xF4, 0x97};
+    unsigned char profile_id[sizeof(expected_profile_id)]{};
+    cmsGetHeaderProfileID(profile, profile_id);
+    Check(std::memcmp(profile_id, expected_profile_id, sizeof(profile_id)) == 0,
+          "bundled profile has the validated ICC profile ID");
+
+    const auto srgb_profile = cmsCreate_sRGBProfile();
+    const auto transform =
+        cmsCreateTransform(profile, TYPE_CMYK_8_REV, srgb_profile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
+    Check(transform != nullptr, "bundled profile creates the required CMYK-to-BGR transform");
+
+    if (transform != nullptr)
+    {
+        cmsDeleteTransform(transform);
+    }
+    if (srgb_profile != nullptr)
+    {
+        cmsCloseProfile(srgb_profile);
+    }
+    cmsCloseProfile(profile);
+}
 } // namespace
 
 int main()
@@ -360,6 +421,7 @@ int main()
     TestJpegDecoderMetadataAndScaling();
     TestJpegDecoderCmyk();
     TestJpegDecoderRejectsInvalidData();
+    TestBundledCmykProfile();
 
     if (failures != 0)
     {

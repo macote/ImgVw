@@ -13,7 +13,13 @@ else
 	JPEGLIBDIR = ../3rd-party/libjpeg-turbo
 endif
 
-LDLIBS = -L$(JPEGLIBDIR) -lshell32 -lgdi32 -ljpeg
+ifeq ($(DUMPMACHINE),x86_64-w64-mingw32)
+	LCMSLIBDIR = ../3rd-party/Little-CMS/ucrt64
+else
+	LCMSLIBDIR = ../3rd-party/Little-CMS
+endif
+
+LDLIBS = -L$(JPEGLIBDIR) -L$(LCMSLIBDIR) -lshell32 -lgdi32 -ljpeg -llcms2
 
 .PHONY: all clean test
 

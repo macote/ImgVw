@@ -77,20 +77,7 @@ bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
 {
     if (item->status() != ImgItem::Status::Ready)
     {
-        if (item->iccprofileloadfailed())
-        {
-            SelectDefaultICCProfile();
-            browser_.ReloadCurrentItem();
-
-            if (item->status() != ImgItem::Status::Ready)
-            {
-                return false;
-            }
-        }
-        else
-        {
-            return false;
-        }
+        return false;
     }
 
     RECT windowrectangle{};
@@ -135,6 +122,19 @@ void ImgVwWindow::PerformAction()
     ShowCursor(TRUE);
     MessageBox(hwnd_, filepath.c_str(), L"ImgVw", 0);
     ShowCursor(FALSE);
+}
+
+void ImgVwWindow::UseBuiltInICCProfile()
+{
+    if (!ImgItem::ResetDefaultICCProfile())
+    {
+        MessageBox(hwnd_, L"Could not remove the stored CMYK ICC profile.", L"CMYK profile error",
+                   MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    browser_.ReloadCurrentItem();
+    InvalidateScreen();
 }
 
 void ImgVwWindow::BrowseNext()
@@ -371,10 +371,11 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
     }
 }
 
-void ImgVwWindow::SelectDefaultICCProfile()
+BOOL ImgVwWindow::SelectDefaultICCProfile()
 {
     OPENFILENAME ofn;
     TCHAR szFile[MAX_PATH]{};
+    BOOL profile_selected = FALSE;
 
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
@@ -397,27 +398,33 @@ void ImgVwWindow::SelectDefaultICCProfile()
         {
             MessageBox(hwnd_, L"The selected file is not a valid CMYK ICC profile.", L"Invalid CMYK ICC profile",
                        MB_OK | MB_ICONERROR);
-            ShowCursor(FALSE);
-            return;
         }
-
-        TCHAR appdatapath[260];
-        if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath)))
+        else
         {
-            TCHAR imgvwappdatapath[260];
-            PathCombine(imgvwappdatapath, appdatapath, ImgSettings::kAppDataPath);
-
-            auto result = SHCreateDirectoryEx(hwnd_, imgvwappdatapath, nullptr);
-            if (result == ERROR_SUCCESS || result == ERROR_ALREADY_EXISTS)
+            TCHAR appdatapath[MAX_PATH]{};
+            TCHAR imgvwappdatapath[MAX_PATH]{};
+            TCHAR iccpath[MAX_PATH]{};
+            if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath)) &&
+                PathCombine(imgvwappdatapath, appdatapath, ImgSettings::kAppDataPath) != nullptr)
             {
-                TCHAR iccpath[260];
-                PathCombine(iccpath, imgvwappdatapath, ImgItem::kDefaultICCProfileFilename);
-                CopyFile(ofn.lpstrFile, iccpath, FALSE);
+                const auto result = SHCreateDirectoryEx(hwnd_, imgvwappdatapath, nullptr);
+                if ((result == ERROR_SUCCESS || result == ERROR_ALREADY_EXISTS) &&
+                    PathCombine(iccpath, imgvwappdatapath, ImgItem::kDefaultICCProfileFilename) != nullptr)
+                {
+                    profile_selected = CopyFile(ofn.lpstrFile, iccpath, FALSE);
+                }
+            }
+
+            if (!profile_selected)
+            {
+                MessageBox(hwnd_, L"Could not store the selected CMYK ICC profile.", L"CMYK profile error",
+                           MB_OK | MB_ICONERROR);
             }
         }
     }
 
     ShowCursor(FALSE);
+    return profile_selected;
 }
 
 void ImgVwWindow::HandleContextMenu(LPARAM lParam)
@@ -543,10 +550,15 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             BrowseSubFolders();
             break;
         case IDM_LOADICC:
-            SelectDefaultICCProfile();
-            ImgItem::UnloadDefaultICCProfile();
-            browser_.ReloadCurrentItem();
-            InvalidateScreen();
+            if (SelectDefaultICCProfile())
+            {
+                ImgItem::UnloadDefaultICCProfile();
+                browser_.ReloadCurrentItem();
+                InvalidateScreen();
+            }
+            break;
+        case IDM_USEBUILTINICC:
+            UseBuiltInICCProfile();
             break;
         case IDM_EXIT:
         case IDR_ESCAPE:

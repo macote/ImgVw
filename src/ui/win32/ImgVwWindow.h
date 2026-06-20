@@ -89,7 +89,8 @@ class ImgVwWindow final : public Window
     void HandleSlideShow();
     void DisplayCurrentSlideWhenReady();
     void HandleBrowserChanged();
-    void SelectDefaultICCProfile();
+    BOOL SelectDefaultICCProfile();
+    void UseBuiltInICCProfile();
     void HandleContextMenu(LPARAM lParam);
     void InvalidateScreen();
     bool DisplayImage(HDC dc, const ImgItem* item);

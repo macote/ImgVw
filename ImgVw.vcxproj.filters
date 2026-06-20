@@ -184,6 +184,14 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="resources\color\CGATS21_CRPC5.icc">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resources\color\CGATS21_CRPC5_LICENSE.txt">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <ResourceCompile Include="resources\ImgVw.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>

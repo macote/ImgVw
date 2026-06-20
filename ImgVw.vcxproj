@@ -215,6 +215,10 @@
     <ClCompile Include="src\ui\win32\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="resources\color\CGATS21_CRPC5.icc" />
+    <None Include="resources\color\CGATS21_CRPC5_LICENSE.txt" />
+  </ItemGroup>
+  <ItemGroup>
     <ResourceCompile Include="resources\ImgVw.rc" />
   </ItemGroup>
   <ItemGroup>

@@ -7,6 +7,7 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 - Fast display caching
 - Copy and run, no installation required
 - Auto-rotate JPEG images based on EXIF information
+- Embedded and fallback ICC color management for CMYK JPEG images
 - Works on Windows XP and later
 
 ## Usage
@@ -24,7 +25,8 @@ Pass a file or folder as an argument.
 | F6 | Increase slideshow speed |
 | F7 | Decrease slideshow speed |
 | F8 | Add images found in subfolders |
-| Ctrl + I | Select default ICC profile |
+| Ctrl + I | Select default CMYK ICC profile |
+| Ctrl + Shift + I | Use the built-in CMYK ICC profile |
 | Delete | Move to recycle bin if possible or delete |
 | Shift + Delete | Delete |
 | Enter | Display current file path |
@@ -35,6 +37,10 @@ Pass a file or folder as an argument.
 ImgVw uses the following libraries :
 - [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
 - [Little-CMS](https://github.com/mm2/Little-CMS)
+
+ImgVw includes the unchanged
+[CGATS21 CRPC5](https://registry.color.org/profile-registry/CGATS21_CRPC5) profile as a generic fallback for untagged
+CMYK JPEG files. It is an approximate viewing default, not an exact representation of every printing condition.
 
 ## Builds
 

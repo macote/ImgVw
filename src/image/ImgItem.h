@@ -33,6 +33,13 @@ class ImgItem
         Ready,
         Error
     };
+    enum class CmykProfileSource
+    {
+        None,
+        Embedded,
+        UserDefault,
+        BundledFallback
+    };
 
   public:
     ImgItem(std::wstring filepath, INT targetwidth, INT targetheight)
@@ -90,7 +97,12 @@ class ImgItem
     ImgBitmap GetDisplayBitmap() const;
     static void LoadDefaultICCProfile();
     static void UnloadDefaultICCProfile();
+    static BOOL ResetDefaultICCProfile();
     static BOOL IsCMYKICCProfile(const std::wstring& filepath);
+    CmykProfileSource cmykprofilesource() const
+    {
+        return cmykprofilesource_;
+    }
 
   protected:
     std::wstring filepath_;
@@ -122,6 +134,7 @@ class ImgItem
 
   private:
     static cmsHPROFILE DefaultICCProfile;
+    static CmykProfileSource DefaultICCProfileSource;
     static CRITICAL_SECTION DefaultICCProfileCriticalSection;
     static struct DefaultICCProfileCriticalSectionInitializer
     {
@@ -138,4 +151,5 @@ class ImgItem
     PBITMAPINFO pbitmapinfo_{nullptr};
     cmsHPROFILE iccprofile_{nullptr};
     BOOL iccprofileloadfailed_{};
+    CmykProfileSource cmykprofilesource_{CmykProfileSource::None};
 };

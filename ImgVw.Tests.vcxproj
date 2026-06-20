@@ -64,12 +64,12 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Platform)'=='Win32'">
     <Link>
-      <AdditionalDependencies>$(ProjectDir)3rd-party\libjpeg-turbo\jpeg-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(ProjectDir)3rd-party\libjpeg-turbo\jpeg-static.lib;$(ProjectDir)3rd-party\Little-CMS\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
     <Link>
-      <AdditionalDependencies>$(ProjectDir)3rd-party\libjpeg-turbo\x64\jpeg-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(ProjectDir)3rd-party\libjpeg-turbo\x64\jpeg-static.lib;$(ProjectDir)3rd-party\Little-CMS\x64\lcms2_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
