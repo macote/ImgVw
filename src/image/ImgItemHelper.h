@@ -24,7 +24,7 @@ class ImgItemHelper
         return RotateImage(bitmap, rotateflip, FALSE);
     };
     static std::unique_ptr<Gdiplus::Bitmap> Get24bppRGBBitmap(INT width, INT height, const PBYTE buffer);
-    static UINT GetExifOrientationFromData(const PBYTE exifdata, UINT exifdatabytecount);
+    static UINT GetExifOrientationFromData(const BYTE* exifdata, UINT exifdatabytecount);
     static Gdiplus::RotateFlipType GetRotateFlipTypeFromExifOrientation(UINT exiforientation);
     static ImgBuffer RotateImage(Gdiplus::Bitmap* bitmap, Gdiplus::RotateFlipType rotateflip, BOOL gdiinuse);
     static ImgBuffer GetBuffer(Gdiplus::Bitmap* bitmap);

@@ -48,7 +48,7 @@ ImgBitmap ImgItem::GetDisplayBitmap() const
     return ImgBitmap(pbitmapinfo_, filemap.data(), displaybuffer_.buffersize());
 }
 
-void ImgItem::OpenICCProfile(const PBYTE iccprofiledata, UINT iccprofiledatabytecount)
+void ImgItem::OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabytecount)
 {
     iccprofile_ = cmsOpenProfileFromMem(iccprofiledata, iccprofiledatabytecount);
     if (iccprofile_ != nullptr && cmsGetColorSpace(iccprofile_) != cmsSigCmykData)

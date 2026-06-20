@@ -160,7 +160,7 @@ ImgBuffer ImgItemHelper::GetBuffer(Gdiplus::Bitmap* bitmap)
     return buffer;
 }
 
-UINT ImgItemHelper::GetExifOrientationFromData(const PBYTE exifdata, UINT exifdatabytecount)
+UINT ImgItemHelper::GetExifOrientationFromData(const BYTE* exifdata, UINT exifdatabytecount)
 {
     return exif::GetOrientation(exifdata, exifdatabytecount);
 }

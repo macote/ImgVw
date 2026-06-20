@@ -46,7 +46,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader />
-      <AdditionalIncludeDirectories>$(ProjectDir)src\browse;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\browse;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -60,6 +60,16 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='Win32'">
+    <Link>
+      <AdditionalDependencies>$(ProjectDir)3rd-party\libjpeg-turbo\jpeg-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
+    <Link>
+      <AdditionalDependencies>$(ProjectDir)3rd-party\libjpeg-turbo\x64\jpeg-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
@@ -76,12 +86,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\browse\ImgFileList.h" />
+    <ClInclude Include="src\image\ImgJpegDecoder.h" />
     <ClInclude Include="src\platform\win32\FileOperations.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\browse\ImgFileList.cpp" />
     <ClCompile Include="src\image\ImgLoader.cpp" />
+    <ClCompile Include="src\image\ImgJpegDecoder.cpp" />
     <ClCompile Include="src\platform\win32\FileOperations.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
     <ClCompile Include="tests\ImgVwTests.cpp" />

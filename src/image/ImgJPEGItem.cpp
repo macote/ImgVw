@@ -1,65 +1,87 @@
 #include "ImgJPEGItem.h"
 #include "ImgItemHelper.h"
 
+#include <array>
+#include <cstddef>
+
+namespace
+{
+struct ScalingFactor
+{
+    unsigned int numerator;
+    unsigned int denominator;
+};
+
+constexpr std::array<ScalingFactor, 16> kScalingFactors = {
+    ScalingFactor{2, 1}, ScalingFactor{15, 8}, ScalingFactor{7, 4}, ScalingFactor{13, 8},
+    ScalingFactor{3, 2}, ScalingFactor{11, 8}, ScalingFactor{5, 4}, ScalingFactor{9, 8},
+    ScalingFactor{1, 1}, ScalingFactor{7, 8},  ScalingFactor{3, 4}, ScalingFactor{5, 8},
+    ScalingFactor{1, 2}, ScalingFactor{3, 8},  ScalingFactor{1, 4}, ScalingFactor{1, 8}};
+
+int ScaleDimension(int dimension, const ScalingFactor& factor)
+{
+    return ((dimension * static_cast<int>(factor.numerator)) + static_cast<int>(factor.denominator) - 1) /
+           static_cast<int>(factor.denominator);
+}
+
+std::size_t GetScalingFactorIndex(int width, int height, int target_width, int target_height)
+{
+    std::size_t index{};
+    while (index < kScalingFactors.size())
+    {
+        if (ScaleDimension(width, kScalingFactors[index]) <= target_width &&
+            ScaleDimension(height, kScalingFactors[index]) <= target_height)
+        {
+            break;
+        }
+
+        ++index;
+    }
+
+    return index;
+}
+
+int PaddedStride(int width, int component_count)
+{
+    return ((width * component_count) + 3) & ~3;
+}
+} // namespace
+
 void ImgJPEGItem::Load()
 {
     status_ = Status::Loading;
-
-    tjhandle jpegdecompressor{nullptr};
     PBYTE buffer{nullptr};
 
     try
     {
         FileMapView jpegfilemap(filepath_, FileMapView::Mode::Read);
-
         if (jpegfilemap.filesize().HighPart > 0)
         {
             status_ = Status::Error;
             goto done;
         }
 
-        jpegdecompressor = turbojpeg::InitDecompress();
-        if (jpegdecompressor == nullptr)
+        ImgJpegDecoder decoder;
+        if (!decoder.Initialize(jpegfilemap.data(), jpegfilemap.filesize().LowPart))
         {
+            errorstring_ = decoder.error();
             status_ = Status::Error;
             goto done;
         }
 
-        turbojpeg::SaveMarkers(jpegdecompressor, EXIF_MARKER);
-        turbojpeg::SaveMarkers(jpegdecompressor, ICC_MARKER);
-
-        INT jpegSubsamp, jpegColorspace;
-        if (turbojpeg::DecompressHeader(jpegdecompressor, jpegfilemap.data(), jpegfilemap.filesize().LowPart, &width_,
-                                        &height_, &jpegSubsamp, &jpegColorspace, TJFLAG_NOCLEANUP))
+        width_ = decoder.width();
+        height_ = decoder.height();
+        if (decoder.is_cmyk() && !decoder.icc_profile().empty())
         {
-            errorstring_ = turbojpeg::GetErrorStr();
-            status_ = Status::Error;
-            goto done;
-        }
-
-        INT pixelformat = TJPF_BGR;
-        if (jpegColorspace == TJCS::TJCS_CMYK || jpegColorspace == TJCS::TJCS_YCCK)
-        {
-            pixelformat = TJPF_CMYK;
-            PBYTE iccprofiledata;
-            INT iccprofiledatabytecount;
-            if (turbojpeg::ReadICCProfile(jpegdecompressor, &iccprofiledata, &iccprofiledatabytecount))
-            {
-                OpenICCProfile(iccprofiledata, iccprofiledatabytecount);
-                free(iccprofiledata);
-            }
+            OpenICCProfile(decoder.icc_profile().data(), static_cast<UINT>(decoder.icc_profile().size()));
         }
 
         Gdiplus::RotateFlipType rotateflip{Gdiplus::RotateNoneFlipNone};
-        PBYTE exifdata;
-        const auto exifdatabytecount = turbojpeg::LocateEXIFSegment(jpegdecompressor, &exifdata);
-        if (exifdatabytecount > 0)
+        if (decoder.exif_data() != nullptr)
         {
             rotateflip = ImgItemHelper::GetRotateFlipTypeFromExifOrientation(
-                ImgItemHelper::GetExifOrientationFromData(exifdata, exifdatabytecount));
+                ImgItemHelper::GetExifOrientationFromData(decoder.exif_data(), static_cast<UINT>(decoder.exif_size())));
         }
-
-        turbojpeg::AbortDecompress(jpegdecompressor);
 
         INT targetwidth{}, targetheight{};
         if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone ||
@@ -75,18 +97,17 @@ void ImgJPEGItem::Load()
         }
 
         BOOL resize = FALSE;
-        INT decompresswidth{}, decompressheight{};
-        const auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
-        if (scalingfactorindex >= scalingfactorcount_)
+        auto scalingfactorindex = GetScalingFactorIndex(width_, height_, targetwidth, targetheight);
+        if (scalingfactorindex >= kScalingFactors.size())
         {
             resize = TRUE;
         }
         else
         {
-            decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex]);
-            decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex]);
-            const auto widthdiff = targetwidth - decompresswidth;
-            const auto heightdiff = targetheight - decompressheight;
+            const auto scaledwidth = ScaleDimension(width_, kScalingFactors[scalingfactorindex]);
+            const auto scaledheight = ScaleDimension(height_, kScalingFactors[scalingfactorindex]);
+            const auto widthdiff = targetwidth - scaledwidth;
+            const auto heightdiff = targetheight - scaledheight;
 
             if ((widthdiff >= heightdiff && heightdiff > (kResizePercentThreshold * targetheight)) ||
                 (heightdiff >= widthdiff && widthdiff > (kResizePercentThreshold * targetwidth)))
@@ -97,34 +118,43 @@ void ImgJPEGItem::Load()
 
         if (resize && scalingfactorindex > 0)
         {
-            decompresswidth = TJSCALED(width_, scalingfactors_[scalingfactorindex - 1]);
-            decompressheight = TJSCALED(height_, scalingfactors_[scalingfactorindex - 1]);
+            --scalingfactorindex;
         }
         else
         {
             resize = FALSE;
         }
 
-        auto stride = TJPAD(decompresswidth * tjPixelSize[pixelformat]);
-        const auto buffersize = stride * decompressheight;
-        buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, buffersize));
-
-        INT decompressflags{TJFLAG_FASTDCT | TJFLAG_BOTTOMUP};
-
-        turbojpeg::SkipMarkers(jpegdecompressor, EXIF_MARKER);
-        turbojpeg::SkipMarkers(jpegdecompressor, ICC_MARKER);
-
-        if (turbojpeg::Decompress(jpegdecompressor, jpegfilemap.data(), jpegfilemap.filesize().LowPart, buffer,
-                                  decompresswidth, stride, decompressheight, pixelformat, decompressflags))
+        const auto& scalingfactor = kScalingFactors[scalingfactorindex];
+        if (!decoder.ConfigureOutput(scalingfactor.numerator, scalingfactor.denominator, decoder.is_cmyk()))
         {
-            errorstring_ = turbojpeg::GetErrorStr();
+            errorstring_ = decoder.error();
             status_ = Status::Error;
             goto done;
         }
 
-        if (pixelformat == TJPF_CMYK)
+        const auto decompresswidth = decoder.output_width();
+        const auto decompressheight = decoder.output_height();
+        auto stride = PaddedStride(decompresswidth, decoder.is_cmyk() ? 4 : 3);
+        const auto buffersize = static_cast<std::size_t>(stride) * decompressheight;
+        buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, buffersize));
+        if (buffer == nullptr)
         {
-            const auto newstride = TJPAD(decompresswidth * tjPixelSize[TJPF_BGR]);
+            errorstring_ = "Could not allocate JPEG output buffer.";
+            status_ = Status::Error;
+            goto done;
+        }
+
+        if (!decoder.Decode(buffer, stride, true))
+        {
+            errorstring_ = decoder.error();
+            status_ = Status::Error;
+            goto done;
+        }
+
+        if (decoder.is_cmyk())
+        {
+            const auto newstride = PaddedStride(decompresswidth, 3);
             if (!TranformCMYK8ColorsToBGR8(decompresswidth, decompressheight, stride, newstride, &buffer))
             {
                 status_ = Status::Error;
@@ -155,41 +185,14 @@ void ImgJPEGItem::Load()
     }
 
     SetupDisplayParameters();
-
     status_ = Status::Ready;
 
 done:
-
-    if (jpegdecompressor != nullptr)
-    {
-        turbojpeg::Destroy(jpegdecompressor);
-    }
-
     if (buffer != nullptr)
     {
         HeapFree(heap_, 0, buffer);
     }
 
     CloseICCProfile();
-
     SetEvent(loadedevent_);
-}
-
-INT ImgJPEGItem::GetScalingFactorIndex(INT width, INT height, INT targetwidth, INT targetheight) const
-{
-    INT i{}, scaledwidth{}, scaledheight{};
-
-    while (i < scalingfactorcount_)
-    {
-        scaledwidth = TJSCALED(width, scalingfactors_[i]);
-        scaledheight = TJSCALED(height, scalingfactors_[i]);
-        if (scaledwidth <= targetwidth && scaledheight <= targetheight)
-        {
-            break;
-        }
-
-        ++i;
-    }
-
-    return i;
 }

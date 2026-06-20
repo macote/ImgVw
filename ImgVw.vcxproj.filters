@@ -99,13 +99,13 @@
     <ClInclude Include="src\image\ImgItemHelper.h">
       <Filter>Image</Filter>
     </ClInclude>
+    <ClInclude Include="src\image\ImgJpegDecoder.h">
+      <Filter>Image</Filter>
+    </ClInclude>
     <ClInclude Include="src\image\ImgJPEGItem.h">
       <Filter>Image</Filter>
     </ClInclude>
     <ClInclude Include="src\image\ImgLoader.h">
-      <Filter>Image</Filter>
-    </ClInclude>
-    <ClInclude Include="src\image\turbojpeg_ImgVw.h">
       <Filter>Image</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\CountingSemaphore.h">
@@ -158,13 +158,13 @@
     <ClCompile Include="src\image\ImgItemHelper.cpp">
       <Filter>Image</Filter>
     </ClCompile>
+    <ClCompile Include="src\image\ImgJpegDecoder.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
     <ClCompile Include="src\image\ImgJPEGItem.cpp">
       <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ImgLoader.cpp">
-      <Filter>Image</Filter>
-    </ClCompile>
-    <ClCompile Include="src\image\turbojpeg_ImgVw.cpp">
       <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="src\platform\win32\FileStream.cpp">

@@ -112,7 +112,7 @@ class ImgItem
         SetupDisplayParameters(FALSE);
     }
     void SetupDisplayParameters(BOOL topdownbitmap);
-    void OpenICCProfile(const PBYTE iccprofiledata, UINT iccprofiledatabytecount);
+    void OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabytecount);
     BOOL IsICCProfileLoaded() const
     {
         return iccprofile_ != nullptr;

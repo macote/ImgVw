@@ -1,10 +1,19 @@
 CXX ?= g++
+DUMPMACHINE = $(shell $(CXX) -dumpmachine)
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -Werror -Wno-missing-field-initializers -DUNICODE -D_UNICODE \
-	-I../src/browse -I../src/image -I../src/platform/win32 -I../src/ui/win32 -isystem ../3rd-party/Little-CMS
+	-I../src/browse -I../src/image -I../src/platform/win32 -I../src/ui/win32 \
+	-isystem ../3rd-party/libjpeg-turbo -isystem ../3rd-party/Little-CMS
 TARGET = ImgVwTests.exe
 SOURCES = ImgVwTests.cpp ../src/browse/ImgFileList.cpp ../src/image/ImgLoader.cpp \
-	../src/platform/win32/FileOperations.cpp ../src/ui/win32/ImgRenderer.cpp
-LDLIBS = -lshell32 -lgdi32
+	../src/image/ImgJpegDecoder.cpp ../src/platform/win32/FileOperations.cpp ../src/ui/win32/ImgRenderer.cpp
+
+ifeq ($(DUMPMACHINE),x86_64-w64-mingw32)
+	JPEGLIBDIR = ../3rd-party/libjpeg-turbo/ucrt64
+else
+	JPEGLIBDIR = ../3rd-party/libjpeg-turbo
+endif
+
+LDLIBS = -L$(JPEGLIBDIR) -lshell32 -lgdi32 -ljpeg
 
 .PHONY: all clean test
 
