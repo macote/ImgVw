@@ -1,5 +1,7 @@
 #pragma once
 
+#include "FileOperations.h"
+#include "ImgRenderer.h"
 #include "Window.h"
 #include "ImgBrowser.h"
 #include "ImgItem.h"
@@ -52,6 +54,8 @@ class ImgVwWindow final : public Window
 
   private:
     ImgBrowser browser_;
+    FileOperations file_operations_;
+    ImgRenderer image_renderer_;
     std::wstring path_;
     WORD activeparam_{};
     HFONT captionfont_{nullptr};
@@ -85,7 +89,7 @@ class ImgVwWindow final : public Window
     void SelectDefaultICCProfile();
     void HandleContextMenu(LPARAM lParam);
     void InvalidateScreen();
-    BOOL DisplayImage(HDC dc, const ImgItem* item);
+    bool DisplayImage(HDC dc, const ImgItem* item);
     void DisplayFileInformation(HDC dc, const std::wstring& filepath);
     void PaintContent(PAINTSTRUCT* pps);
     void DeleteCurrentItem(BOOL allowundo);

@@ -46,7 +46,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader />
-      <AdditionalIncludeDirectories>$(ProjectDir)src\browse;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\browse;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)3rd-party\Little-CMS;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -76,11 +76,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\browse\ImgFileList.h" />
+    <ClInclude Include="src\platform\win32\FileOperations.h" />
+    <ClInclude Include="src\ui\win32\ImgRenderer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\browse\ImgFileList.cpp" />
     <ClCompile Include="src\image\ImgLoader.cpp" />
-    <ClCompile Include="tests\ImgFileListTests.cpp" />
+    <ClCompile Include="src\platform\win32\FileOperations.cpp" />
+    <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
+    <ClCompile Include="tests\ImgVwTests.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

@@ -67,7 +67,7 @@ void ImgVwWindow::InitializeBrowser(const std::wstring& path)
     browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom);
 }
 
-BOOL ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
+bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
 {
     if (item->status() != ImgItem::Status::Ready)
     {
@@ -78,48 +78,31 @@ BOOL ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
 
             if (item->status() != ImgItem::Status::Ready)
             {
-                return FALSE;
+                return false;
             }
         }
         else
         {
-            return FALSE;
+            return false;
         }
     }
 
     RECT windowrectangle{};
     if (!GetClientRect(hwnd_, &windowrectangle))
     {
-        return FALSE;
+        return false;
     }
 
-    const auto memorydc = CreateCompatibleDC(dc);
     const auto imgbitmap = item->GetDisplayBitmap();
-    const auto replacedobject = SelectObject(memorydc, imgbitmap.bitmap());
-
-    if (ExcludeClipRect(dc, item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(),
-                        item->offsety() + item->displayheight()) == RGN_ERROR)
-    {
-        // TODO: handle error
-    }
-    else if (FillRect(dc, &windowrectangle, backgroundbrush_) == 0)
-    {
-        // TODO: handle error
-    }
-    else if (SelectClipRgn(dc, nullptr) == RGN_ERROR)
-    {
-        // TODO: handle error
-    }
-    else if (!BitBlt(dc, item->offsetx(), item->offsety(), item->displaywidth(), item->displayheight(), memorydc, 0, 0,
-                     SRCCOPY))
-    {
-        // TODO: handle error
-    }
-
-    SelectObject(memorydc, replacedobject);
-    DeleteDC(memorydc);
-
-    return TRUE;
+    const ImgRenderInput input{dc,
+                               backgroundbrush_,
+                               windowrectangle,
+                               imgbitmap.bitmap(),
+                               item->offsetx(),
+                               item->offsety(),
+                               item->displaywidth(),
+                               item->displayheight()};
+    return image_renderer_.Render(input).Succeeded();
 }
 
 void ImgVwWindow::DisplayFileInformation(HDC dc, const std::wstring& filepath)
@@ -313,27 +296,10 @@ void ImgVwWindow::DeleteCurrentItem(BOOL allowundo)
         return;
     }
 
-    SHFILEOPSTRUCT shfileopstruct{};
     const auto filepath = browser_.GetCurrentFilePath();
-    if (filepath.empty())
-    {
-        return;
-    }
-
-    std::vector<TCHAR> deletepaths(filepath.begin(), filepath.end());
-    deletepaths.push_back(L'\0');
-    deletepaths.push_back(L'\0');
-
-    shfileopstruct.hwnd = hwnd_;
-    shfileopstruct.wFunc = FO_DELETE;
-    shfileopstruct.pFrom = deletepaths.data();
-    shfileopstruct.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR | FOF_WANTNUKEWARNING;
-    if (allowundo)
-    {
-        shfileopstruct.fFlags |= FOF_ALLOWUNDO;
-    }
-
-    if (!SHFileOperation(&shfileopstruct) && !shfileopstruct.fAnyOperationsAborted)
+    const auto mode = allowundo ? FileDeleteMode::Recycle : FileDeleteMode::Permanent;
+    const auto result = file_operations_.Delete(hwnd_, filepath, mode);
+    if (result.status == FileOperationStatus::Succeeded)
     {
         browser_.RemoveCurrentItem();
         if (browser_.GetCurrentItem() == nullptr)

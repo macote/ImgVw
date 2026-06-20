@@ -111,6 +111,9 @@
     <ClInclude Include="src\platform\win32\CountingSemaphore.h">
       <Filter>Platform</Filter>
     </ClInclude>
+    <ClInclude Include="src\platform\win32\FileOperations.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
     <ClInclude Include="src\platform\win32\FileMapView.h">
       <Filter>Platform</Filter>
     </ClInclude>
@@ -121,6 +124,9 @@
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\win32\ImgVwWindow.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\ImgRenderer.h">
       <Filter>UI</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\win32\Window.h">
@@ -163,6 +169,12 @@
     </ClCompile>
     <ClCompile Include="src\platform\win32\FileStream.cpp">
       <Filter>Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\win32\FileOperations.cpp">
+      <Filter>Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\win32\ImgRenderer.cpp">
+      <Filter>UI</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\win32\ImgVwWindow.cpp">
       <Filter>UI</Filter>
