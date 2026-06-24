@@ -69,6 +69,12 @@
     <ClInclude Include="src\browse\ImgBrowser.h">
       <Filter>Browse</Filter>
     </ClInclude>
+    <ClInclude Include="src\image\ColorProfile.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ColorTransform.h">
+      <Filter>Image</Filter>
+    </ClInclude>
     <ClInclude Include="src\image\ImageFormatDetector.h">
       <Filter>Image</Filter>
     </ClInclude>
@@ -145,6 +151,12 @@
     </ClCompile>
     <ClCompile Include="src\browse\ImgBrowser.cpp">
       <Filter>Browse</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ColorProfile.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ColorTransform.cpp">
+      <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ImageFormatDetector.cpp">
       <Filter>Image</Filter>

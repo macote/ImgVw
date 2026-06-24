@@ -86,6 +86,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\browse\ImgFileList.h" />
+    <ClInclude Include="src\image\ColorProfile.h" />
+    <ClInclude Include="src\image\ColorTransform.h" />
     <ClInclude Include="src\image\ImageFormatDetector.h" />
     <ClInclude Include="src\image\ImgBuffer.h" />
     <ClInclude Include="src\image\ImgGDIItem.h" />
@@ -99,6 +101,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\browse\ImgFileList.cpp" />
+    <ClCompile Include="src\image\ColorProfile.cpp" />
+    <ClCompile Include="src\image\ColorTransform.cpp" />
     <ClCompile Include="src\image\ExifOrientation.cpp" />
     <ClCompile Include="src\image\ImageFormatDetector.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />

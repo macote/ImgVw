@@ -1,3 +1,5 @@
+#include "ColorProfile.h"
+#include "ColorTransform.h"
 #include "FileOperations.h"
 #include "ImageFormatDetector.h"
 #include "ImgResampler.h"
@@ -560,6 +562,28 @@ void TestBundledCmykProfile()
     cmsGetHeaderProfileID(profile, profile_id);
     Check(std::memcmp(profile_id, expected_profile_id, sizeof(profile_id)) == 0,
           "bundled profile has the validated ICC profile ID");
+
+    auto color_profile =
+        ColorProfile::OpenFromMemory(profile_data.data(), static_cast<cmsUInt32Number>(profile_data.size()));
+    Check(color_profile.IsValid(), "ColorProfile opens the bundled CMYK profile");
+    Check(color_profile.IsCmyk(), "ColorProfile validates the bundled CMYK color space");
+
+    auto heap = GetProcessHeap();
+    constexpr INT source_stride = 4;
+    constexpr INT destination_stride = 4;
+    auto transform_source = reinterpret_cast<PBYTE>(HeapAlloc(heap, 0, source_stride));
+    Check(transform_source != nullptr, "CMYK transform test buffer is allocated");
+    if (transform_source != nullptr)
+    {
+        transform_source[0] = 0;
+        transform_source[1] = 0;
+        transform_source[2] = 0;
+        transform_source[3] = 0;
+        const auto transform_result = ColorTransform::TransformCmyk8ReversedToBgr8(
+            color_profile, 1, 1, source_stride, destination_stride, &transform_source, heap);
+        Check(transform_result.Succeeded(), "ColorTransform converts reversed CMYK to BGR");
+        HeapFree(heap, 0, transform_source);
+    }
 
     const auto srgb_profile = cmsCreate_sRGBProfile();
     const auto transform =

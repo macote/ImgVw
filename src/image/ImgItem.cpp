@@ -1,9 +1,9 @@
 #include "ImgItem.h"
 #include "resource.h"
 
-#include <limits>
+#include "ColorTransform.h"
 
-cmsHPROFILE ImgItem::DefaultICCProfile = nullptr;
+ColorProfile ImgItem::DefaultICCProfile;
 
 ImgItem::CmykProfileSource ImgItem::DefaultICCProfileSource = ImgItem::CmykProfileSource::None;
 
@@ -55,12 +55,12 @@ ImgBitmap ImgItem::GetDisplayBitmap() const
 
 void ImgItem::OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabytecount)
 {
-    iccprofile_ = cmsOpenProfileFromMem(iccprofiledata, iccprofiledatabytecount);
-    if (iccprofile_ != nullptr && cmsGetColorSpace(iccprofile_) != cmsSigCmykData)
+    iccprofile_ = ColorProfile::OpenFromMemory(iccprofiledata, iccprofiledatabytecount);
+    if (iccprofile_.IsValid() && !iccprofile_.IsCmyk())
     {
         CloseICCProfile();
     }
-    else if (iccprofile_ != nullptr)
+    else if (iccprofile_.IsValid())
     {
         cmykprofilesource_ = CmykProfileSource::Embedded;
     }
@@ -69,7 +69,7 @@ void ImgItem::OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabyte
 void ImgItem::LoadDefaultICCProfile()
 {
     EnterCriticalSection(&DefaultICCProfileCriticalSection);
-    if (DefaultICCProfile == nullptr)
+    if (!DefaultICCProfile.IsValid())
     {
         try
         {
@@ -85,16 +85,16 @@ void ImgItem::LoadDefaultICCProfile()
                     FileMapView iccfilemap(std::wstring(iccpath), FileMapView::Mode::Read);
                     if (iccfilemap.filesize().HighPart == 0)
                     {
-                        DefaultICCProfile = cmsOpenProfileFromMem(iccfilemap.data(), iccfilemap.filesize().LowPart);
+                        DefaultICCProfile =
+                            ColorProfile::OpenFromMemory(iccfilemap.data(), iccfilemap.filesize().LowPart);
                     }
                 }
 
-                if (DefaultICCProfile != nullptr && cmsGetColorSpace(DefaultICCProfile) != cmsSigCmykData)
+                if (DefaultICCProfile.IsValid() && !DefaultICCProfile.IsCmyk())
                 {
-                    cmsCloseProfile(DefaultICCProfile);
-                    DefaultICCProfile = nullptr;
+                    DefaultICCProfile.Reset();
                 }
-                else if (DefaultICCProfile != nullptr)
+                else if (DefaultICCProfile.IsValid())
                 {
                     DefaultICCProfileSource = CmykProfileSource::UserDefault;
                 }
@@ -102,10 +102,10 @@ void ImgItem::LoadDefaultICCProfile()
         }
         catch (...)
         {
-            DefaultICCProfile = nullptr;
+            DefaultICCProfile.Reset();
         }
 
-        if (DefaultICCProfile == nullptr)
+        if (!DefaultICCProfile.IsValid())
         {
             const auto resource = FindResource(nullptr, MAKEINTRESOURCE(IDR_DEFAULT_CMYK_ICC), RT_RCDATA);
             const auto resource_size = resource == nullptr ? 0 : SizeofResource(nullptr, resource);
@@ -113,13 +113,12 @@ void ImgItem::LoadDefaultICCProfile()
             const auto resource_data = resource_handle == nullptr ? nullptr : LockResource(resource_handle);
             if (resource_data != nullptr && resource_size > 0)
             {
-                DefaultICCProfile = cmsOpenProfileFromMem(resource_data, resource_size);
-                if (DefaultICCProfile != nullptr && cmsGetColorSpace(DefaultICCProfile) != cmsSigCmykData)
+                DefaultICCProfile = ColorProfile::OpenFromMemory(resource_data, resource_size);
+                if (DefaultICCProfile.IsValid() && !DefaultICCProfile.IsCmyk())
                 {
-                    cmsCloseProfile(DefaultICCProfile);
-                    DefaultICCProfile = nullptr;
+                    DefaultICCProfile.Reset();
                 }
-                else if (DefaultICCProfile != nullptr)
+                else if (DefaultICCProfile.IsValid())
                 {
                     DefaultICCProfileSource = CmykProfileSource::BundledFallback;
                 }
@@ -133,11 +132,7 @@ void ImgItem::LoadDefaultICCProfile()
 void ImgItem::UnloadDefaultICCProfile()
 {
     EnterCriticalSection(&DefaultICCProfileCriticalSection);
-    if (DefaultICCProfile != nullptr)
-    {
-        cmsCloseProfile(DefaultICCProfile);
-        DefaultICCProfile = nullptr;
-    }
+    DefaultICCProfile.Reset();
     DefaultICCProfileSource = CmykProfileSource::None;
 
     LeaveCriticalSection(&DefaultICCProfileCriticalSection);
@@ -183,16 +178,13 @@ BOOL ImgItem::IsCMYKICCProfile(const std::wstring& filepath)
     try
     {
         FileMapView iccfilemap(filepath, FileMapView::Mode::Read);
-        const auto profile = cmsOpenProfileFromMem(iccfilemap.data(), iccfilemap.filesize().LowPart);
-        if (profile == nullptr)
+        const auto profile = ColorProfile::OpenFromMemory(iccfilemap.data(), iccfilemap.filesize().LowPart);
+        if (!profile.IsValid())
         {
             return FALSE;
         }
 
-        const auto is_cmyk = cmsGetColorSpace(profile) == cmsSigCmykData;
-        cmsCloseProfile(profile);
-
-        return is_cmyk;
+        return profile.IsCmyk();
     }
     catch (...)
     {
@@ -202,79 +194,36 @@ BOOL ImgItem::IsCMYKICCProfile(const std::wstring& filepath)
 
 BOOL ImgItem::TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer)
 {
-    if (iccprofile_ == nullptr)
+    if (!iccprofile_.IsValid())
     {
         LoadDefaultICCProfile();
     }
 
-    // TODO: determine if other types of transform (TYPE_CMYK_8_REV => TYPE_BGR_8) should be supported.
-    auto srgbprofile = cmsCreate_sRGBProfile();
-    if (srgbprofile == nullptr)
+    ColorTransformResult result;
+    if (iccprofile_.IsValid())
     {
-        iccprofileloadfailed_ = TRUE;
-        return FALSE;
-    }
-
-    cmsHTRANSFORM transform{};
-    if (iccprofile_ != nullptr)
-    {
-        transform = cmsCreateTransform(iccprofile_, TYPE_CMYK_8_REV, srgbprofile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
+        result =
+            ColorTransform::TransformCmyk8ReversedToBgr8(iccprofile_, width, height, stride, newstride, buffer, heap_);
     }
     else
     {
         EnterCriticalSection(&DefaultICCProfileCriticalSection);
         cmykprofilesource_ = DefaultICCProfileSource;
-        if (DefaultICCProfile != nullptr)
-        {
-            transform =
-                cmsCreateTransform(DefaultICCProfile, TYPE_CMYK_8_REV, srgbprofile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
-        }
+        result = ColorTransform::TransformCmyk8ReversedToBgr8(DefaultICCProfile, width, height, stride, newstride,
+                                                              buffer, heap_);
         LeaveCriticalSection(&DefaultICCProfileCriticalSection);
     }
 
-    if (transform == nullptr)
+    if (!result.Succeeded())
     {
         iccprofileloadfailed_ = TRUE;
-        cmsCloseProfile(srgbprofile);
-
         return FALSE;
     }
-
-    if (newstride <= 0 || height <= 0 ||
-        static_cast<std::size_t>(newstride) > (std::numeric_limits<std::size_t>::max)() / height)
-    {
-        iccprofileloadfailed_ = TRUE;
-        cmsDeleteTransform(transform);
-        cmsCloseProfile(srgbprofile);
-        return FALSE;
-    }
-
-    const auto newbuffersize = static_cast<std::size_t>(newstride) * height;
-    auto newbuffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, newbuffersize));
-    if (newbuffer == nullptr)
-    {
-        iccprofileloadfailed_ = TRUE;
-        cmsDeleteTransform(transform);
-        cmsCloseProfile(srgbprofile);
-        return FALSE;
-    }
-
-    cmsDoTransformLineStride(transform, *buffer, newbuffer, width, height, stride, newstride, 0, 0);
-
-    HeapFree(heap_, 0, *buffer);
-    *buffer = newbuffer;
-
-    cmsDeleteTransform(transform);
-    cmsCloseProfile(srgbprofile);
 
     return TRUE;
 }
 
 void ImgItem::CloseICCProfile()
 {
-    if (iccprofile_ != nullptr)
-    {
-        cmsCloseProfile(iccprofile_);
-        iccprofile_ = nullptr;
-    }
+    iccprofile_.Reset();
 }

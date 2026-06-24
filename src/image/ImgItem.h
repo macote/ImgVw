@@ -1,10 +1,10 @@
 #pragma once
 
+#include "ColorProfile.h"
 #include "ImgBitmap.h"
 #include "ImgBuffer.h"
 #include "ImgSettings.h"
 #include "FileMapView.h"
-#include <lcms2.h>
 #include <Windows.h>
 #include <Shlwapi.h>
 #include <string>
@@ -128,13 +128,13 @@ class ImgItem
     void OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabytecount);
     BOOL IsICCProfileLoaded() const
     {
-        return iccprofile_ != nullptr;
+        return iccprofile_.IsValid();
     }
     BOOL TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer);
     void CloseICCProfile();
 
   private:
-    static cmsHPROFILE DefaultICCProfile;
+    static ColorProfile DefaultICCProfile;
     static CmykProfileSource DefaultICCProfileSource;
     static CRITICAL_SECTION DefaultICCProfileCriticalSection;
     static struct DefaultICCProfileCriticalSectionInitializer
@@ -150,7 +150,7 @@ class ImgItem
 
   private:
     PBITMAPINFO pbitmapinfo_{nullptr};
-    cmsHPROFILE iccprofile_{nullptr};
+    ColorProfile iccprofile_;
     BOOL iccprofileloadfailed_{};
     CmykProfileSource cmykprofilesource_{CmykProfileSource::None};
 };

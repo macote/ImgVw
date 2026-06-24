@@ -17,7 +17,7 @@ SOURCE_DIRS = src/app src/browse src/image src/platform/win32 src/ui/win32
 vpath %.cpp ${SOURCE_DIRS}
 vpath %.rc resources
 
-OBJECTS = ${OBJDIR}/ExifOrientation.o ${OBJDIR}/FileOperations.o ${OBJDIR}/ImageFormatDetector.o ${OBJDIR}/ImageHeaderProbe.o ${OBJDIR}/ImgResampler.o ${OBJDIR}/ImgFileList.o ${OBJDIR}/ImgRenderer.o ${OBJDIR}/ImgBrowser.o ${OBJDIR}/ImgBuffer.o ${OBJDIR}/ImgGDIItem.o ${OBJDIR}/ImgHEIFItem.o ${OBJDIR}/ImgItem.o ${OBJDIR}/ImgItemHelper.o ${OBJDIR}/ImgJpegDecoder.o ${OBJDIR}/ImgJPEGItem.o ${OBJDIR}/ImgLoader.o ${OBJDIR}/ImgVwWindow.o ${OBJDIR}/Program.o ${OBJDIR}/Window.o ${OBJDIR}/ImgVw.o
+OBJECTS = ${OBJDIR}/ColorProfile.o ${OBJDIR}/ColorTransform.o ${OBJDIR}/ExifOrientation.o ${OBJDIR}/FileOperations.o ${OBJDIR}/ImageFormatDetector.o ${OBJDIR}/ImageHeaderProbe.o ${OBJDIR}/ImgResampler.o ${OBJDIR}/ImgFileList.o ${OBJDIR}/ImgRenderer.o ${OBJDIR}/ImgBrowser.o ${OBJDIR}/ImgBuffer.o ${OBJDIR}/ImgGDIItem.o ${OBJDIR}/ImgHEIFItem.o ${OBJDIR}/ImgItem.o ${OBJDIR}/ImgItemHelper.o ${OBJDIR}/ImgJpegDecoder.o ${OBJDIR}/ImgJPEGItem.o ${OBJDIR}/ImgLoader.o ${OBJDIR}/ImgVwWindow.o ${OBJDIR}/Program.o ${OBJDIR}/Window.o ${OBJDIR}/ImgVw.o
 
 CFLAGS = -std=c++17 -I. -Isrc/app -Isrc/browse -Isrc/image -Isrc/platform/win32 -Isrc/ui/win32 -Iresources -isystem 3rd-party/libjpeg-turbo -isystem 3rd-party/Little-CMS -isystem 3rd-party/libheif -isystem 3rd-party/libde265 -DWINVER=0x0501 -D_WIN32_WINNT=0x0501 -DUNICODE -D_UNICODE -DLIBHEIF_STATIC_BUILD -DLIBDE265_STATIC_BUILD -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -O2 ${WARNS} -fmessage-length=0 -fasynchronous-unwind-tables
 
