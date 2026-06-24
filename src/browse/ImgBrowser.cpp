@@ -1,13 +1,13 @@
 #include "ImgBrowser.h"
 #include <Shlwapi.h>
 
-void ImgBrowser::CollectFile(const std::wstring& filepath)
+void ImgBrowser::CollectFile(const std::wstring& filepath, ImgItem::Format imgformat)
 {
     EnterCriticalSection(&browsecriticalsection_);
 
     if (files_.Add(filepath))
     {
-        cache_.Add(filepath, targetwidth_, targetheight_);
+        cache_.Add(filepath, targetwidth_, targetheight_, imgformat);
         loader_.QueueItem(cache_.Get(filepath));
     }
 
@@ -44,10 +44,11 @@ void ImgBrowser::CollectFolder(const std::wstring& folderpath)
             }
             else
             {
-                if (IsFileFormatSupported(findfiledata.cFileName))
+                std::wstring currentfile(folderpath + findfiledata.cFileName);
+                const auto imgformat = ResolveFileFormat(currentfile);
+                if (imgformat != ImgItem::Format::Unsupported)
                 {
-                    std::wstring currentfile(folderpath + findfiledata.cFileName);
-                    CollectFile(currentfile);
+                    CollectFile(currentfile, imgformat);
                 }
             }
         } while (FindNextFile(hFind, &findfiledata) && !cancellationflag_);
@@ -56,9 +57,9 @@ void ImgBrowser::CollectFolder(const std::wstring& folderpath)
     }
 }
 
-BOOL ImgBrowser::IsFileFormatSupported(LPCTSTR filename)
+ImgItem::Format ImgBrowser::ResolveFileFormat(const std::wstring& filepath)
 {
-    return ImgItemHelper::GetImgFormatFromExtension(filename) != ImgItem::Format::Unsupported;
+    return ImgItemFactory::ResolveFormat(filepath);
 }
 
 void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight)
@@ -104,7 +105,11 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
                 workpath = folderpath_ + workpath;
             }
 
-            CollectFile(workpath);
+            const auto imgformat = ResolveFileFormat(workpath);
+            if (imgformat != ImgItem::Format::Unsupported)
+            {
+                CollectFile(workpath, imgformat);
+            }
         }
         else
         {

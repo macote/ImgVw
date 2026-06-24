@@ -20,6 +20,7 @@ class ImgCache
         map_.clear();
     }
     void Add(std::wstring filepath, INT targetwidth, INT targetheight);
+    void Add(std::wstring filepath, INT targetwidth, INT targetheight, ImgItem::Format imgformat);
     void Remove(std::wstring filepath);
     std::shared_ptr<ImgItem> Get(const std::wstring& filepath) const;
 
@@ -30,6 +31,12 @@ class ImgCache
 inline void ImgCache::Add(std::wstring filepath, INT targetwidth, INT targetheight)
 {
     const auto imgitem = ImgItemFactory::Create(filepath, targetwidth, targetheight);
+    map_.emplace(std::pair<std::wstring, std::shared_ptr<ImgItem>>(filepath, std::move(imgitem)));
+}
+
+inline void ImgCache::Add(std::wstring filepath, INT targetwidth, INT targetheight, ImgItem::Format imgformat)
+{
+    const auto imgitem = ImgItemFactory::Create(filepath, targetwidth, targetheight, imgformat);
     map_.emplace(std::pair<std::wstring, std::shared_ptr<ImgItem>>(filepath, std::move(imgitem)));
 }
 

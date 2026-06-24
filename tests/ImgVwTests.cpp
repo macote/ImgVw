@@ -1,6 +1,9 @@
 #include "FileOperations.h"
+#include "ImageFormatDetector.h"
 #include "ImgResampler.h"
 #include "ImgFileList.h"
+#include "ImgGDIItem.h"
+#include "ImgItemFactory.h"
 #include "ImgJpegDecoder.h"
 #include "ImgRenderer.h"
 #include "ImgLoader.h"
@@ -90,6 +93,30 @@ void Check(bool condition, const char* description)
         std::cerr << "FAILED: " << description << '\n';
         ++failures;
     }
+}
+
+void WriteBytes(const std::wstring& path, const std::vector<unsigned char>& bytes)
+{
+    const HANDLE file =
+        CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    Check(file != INVALID_HANDLE_VALUE, "test file can be created");
+    if (file == INVALID_HANDLE_VALUE)
+    {
+        return;
+    }
+
+    DWORD bytes_written{};
+    Check(WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &bytes_written, nullptr) &&
+              bytes_written == bytes.size(),
+          "test file bytes are written");
+    CloseHandle(file);
+}
+
+std::wstring TempPath(const wchar_t* filename)
+{
+    wchar_t path[MAX_PATH]{};
+    GetTempPathW(MAX_PATH, path);
+    return std::wstring(path) + filename;
 }
 
 void TestEmptyList()
@@ -190,6 +217,107 @@ void TestLoaderShutdown()
         loader.StopLoading();
         loader.StopLoading();
     }
+}
+
+void TestImageFormatDetectorSignatures()
+{
+    const unsigned char jpeg[] = {0xFF, 0xD8, 0xFF, 0xE0};
+    Check(ImageFormatDetector::Detect(jpeg, sizeof(jpeg)) == DetectedImageFormat::JPEG, "JPEG signature is detected");
+
+    const unsigned char png[] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+    Check(ImageFormatDetector::Detect(png, sizeof(png)) == DetectedImageFormat::PNG, "PNG signature is detected");
+
+    const unsigned char gif[] = {'G', 'I', 'F', '8', '9', 'a'};
+    Check(ImageFormatDetector::Detect(gif, sizeof(gif)) == DetectedImageFormat::GIF, "GIF signature is detected");
+
+    const unsigned char bmp[] = {'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    Check(ImageFormatDetector::Detect(bmp, sizeof(bmp)) == DetectedImageFormat::BMP, "BMP signature is detected");
+
+    const unsigned char tiff[] = {'I', 'I', 0x2A, 0x00};
+    Check(ImageFormatDetector::Detect(tiff, sizeof(tiff)) == DetectedImageFormat::TIFF, "TIFF signature is detected");
+
+    const unsigned char ico[] = {0, 0, 1, 0, 1, 0};
+    Check(ImageFormatDetector::Detect(ico, sizeof(ico)) == DetectedImageFormat::ICO, "ICO header is detected");
+
+    const unsigned char heif[] = {0, 0, 0, 24, 'f', 't', 'y', 'p', 'h', 'e', 'i', 'c', 0, 0, 0, 0, 'm', 'i', 'f', '1'};
+    Check(ImageFormatDetector::Detect(heif, sizeof(heif)) == DetectedImageFormat::HEIF, "HEIF brand is detected");
+
+    const unsigned char mp4[] = {0, 0, 0, 24, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0, 0, 0, 0, 'm', 'p', '4', '2'};
+    Check(ImageFormatDetector::Detect(mp4, sizeof(mp4)) == DetectedImageFormat::Unknown,
+          "generic MP4 is not detected as HEIF");
+
+    const unsigned char short_png[] = {0x89, 'P', 'N'};
+    Check(ImageFormatDetector::Detect(short_png, sizeof(short_png)) == DetectedImageFormat::Unknown,
+          "truncated signatures are unknown");
+}
+
+void TestImgItemFactoryResolvesSupportedExtensionsOnly()
+{
+    const auto png_named_heic = TempPath(L"imgvw_png_named_heic.heic");
+    const auto jpeg_named_png = TempPath(L"imgvw_jpeg_named_png.png");
+    const auto random_named_jpg = TempPath(L"imgvw_random_named_jpg.jpg");
+    const auto jpeg_named_bin = TempPath(L"imgvw_jpeg_named_bin.bin");
+
+    WriteBytes(png_named_heic, {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A});
+    WriteBytes(jpeg_named_png, {0xFF, 0xD8, 0xFF, 0xE0});
+    WriteBytes(random_named_jpg, {1, 2, 3, 4});
+    WriteBytes(jpeg_named_bin, {0xFF, 0xD8, 0xFF, 0xE0});
+
+    Check(ImgItemFactory::ResolveFormat(png_named_heic) == ImgItem::Format::PNG,
+          "PNG bytes with supported HEIC extension route to GDI PNG path");
+    Check(ImgItemFactory::ResolveFormat(jpeg_named_png) == ImgItem::Format::JPEG,
+          "JPEG bytes with supported PNG extension route to JPEG path");
+    Check(ImgItemFactory::ResolveFormat(random_named_jpg) == ImgItem::Format::JPEG,
+          "unknown bytes with supported extension use extension fallback");
+    Check(ImgItemFactory::ResolveFormat(jpeg_named_bin) == ImgItem::Format::Unsupported,
+          "supported bytes with unsupported extension are not probed");
+
+    DeleteFileW(png_named_heic.c_str());
+    DeleteFileW(jpeg_named_png.c_str());
+    DeleteFileW(random_named_jpg.c_str());
+    DeleteFileW(jpeg_named_bin.c_str());
+}
+
+void TestGdiItemPreservesTopRowOrientation()
+{
+    const auto bmp_path = TempPath(L"imgvw_orientation.bmp");
+    const std::vector<unsigned char> bmp = {
+        'B', 'M', 62, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0, 40, 0, 0, 0, 1, 0, 0, 0, 2,   0, 0, 0, 1, 0, 24,  0, 0, 0,
+        0,   0,   8,  0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 255, 0, 0, 0,
+    };
+    WriteBytes(bmp_path, bmp);
+
+    ULONG_PTR gdiplus_token{};
+    Gdiplus::GdiplusStartupInput gdiplus_startup_input;
+    Check(Gdiplus::GdiplusStartup(&gdiplus_token, &gdiplus_startup_input, nullptr) == Gdiplus::Ok,
+          "GDI+ starts for GDI item orientation test");
+
+    ImgGDIItem item(bmp_path, 1, 2);
+    item.Load();
+    Check(item.status() == ImgItem::Status::Ready, "GDI item loads orientation test BMP");
+
+    if (item.status() == ImgItem::Status::Ready)
+    {
+        const auto bitmap = item.GetDisplayBitmap();
+        const auto dc = CreateCompatibleDC(nullptr);
+        Check(dc != nullptr, "orientation test memory DC is created");
+        if (dc != nullptr)
+        {
+            const auto oldbitmap = SelectObject(dc, bitmap.bitmap());
+            Check(GetPixel(dc, 0, 0) == RGB(255, 0, 0), "GDI item top row remains the image top row");
+            if (oldbitmap != nullptr && oldbitmap != HGDI_ERROR)
+            {
+                SelectObject(dc, oldbitmap);
+            }
+            DeleteDC(dc);
+        }
+    }
+
+    if (gdiplus_token != 0)
+    {
+        Gdiplus::GdiplusShutdown(gdiplus_token);
+    }
+    DeleteFileW(bmp_path.c_str());
 }
 
 void TestFileOperationPathList()
@@ -458,6 +586,9 @@ int main()
     TestRandomNavigation();
     TestClear();
     TestLoaderShutdown();
+    TestImageFormatDetectorSignatures();
+    TestImgItemFactoryResolvesSupportedExtensionsOnly();
+    TestGdiItemPreservesTopRowOrientation();
     TestFileOperationPathList();
     TestFileOperationFlags();
     TestFileOperationResults();

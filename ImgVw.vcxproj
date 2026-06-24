@@ -175,6 +175,7 @@
     <ClInclude Include="src\app\ImgVw.h" />
     <ClInclude Include="src\browse\ImgFileList.h" />
     <ClInclude Include="src\browse\ImgBrowser.h" />
+    <ClInclude Include="src\image\ImageFormatDetector.h" />
     <ClInclude Include="src\image\ExifOrientation.h" />
     <ClInclude Include="src\image\ImgResampler.h" />
     <ClInclude Include="src\image\ImgBitmap.h" />
@@ -191,6 +192,7 @@
     <ClInclude Include="src\platform\win32\CountingSemaphore.h" />
     <ClInclude Include="src\platform\win32\FileOperations.h" />
     <ClInclude Include="src\platform\win32\FileMapView.h" />
+    <ClInclude Include="src\platform\win32\ImageHeaderProbe.h" />
     <ClInclude Include="src\platform\win32\ImgSettings.h" />
     <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
@@ -200,6 +202,7 @@
     <ClCompile Include="src\app\Program.cpp" />
     <ClCompile Include="src\browse\ImgFileList.cpp" />
     <ClCompile Include="src\browse\ImgBrowser.cpp" />
+    <ClCompile Include="src\image\ImageFormatDetector.cpp" />
     <ClCompile Include="src\image\ExifOrientation.cpp" />
     <ClCompile Include="src\image\ImgResampler.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />
@@ -211,6 +214,7 @@
     <ClCompile Include="src\image\ImgJPEGItem.cpp" />
     <ClCompile Include="src\image\ImgLoader.cpp" />
     <ClCompile Include="src\platform\win32\FileOperations.cpp" />
+    <ClCompile Include="src\platform\win32\ImageHeaderProbe.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
     <ClCompile Include="src\ui\win32\ImgVwWindow.cpp" />
     <ClCompile Include="src\ui\win32\Window.cpp" />

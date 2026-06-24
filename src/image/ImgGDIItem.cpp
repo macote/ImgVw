@@ -24,7 +24,7 @@ void ImgGDIItem::Load()
         displaybuffer_ = ImgItemHelper::GetBuffer(bitmap.get());
     }
 
-    SetupDisplayParameters(true);
+    SetupDisplayParameters(false);
 
     status_ = Status::Ready;
 

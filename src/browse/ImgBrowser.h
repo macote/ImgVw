@@ -63,7 +63,7 @@ class ImgBrowser final
     UINT notificationmessage_{};
 
   private:
-    void CollectFile(const std::wstring& filepath);
+    void CollectFile(const std::wstring& filepath, ImgItem::Format imgformat);
     void CollectFolder(const std::wstring& folderpath);
     void CollectSubFolders();
     void StopCollecting();
@@ -71,5 +71,5 @@ class ImgBrowser final
     static DWORD WINAPI StaticThreadCollect(void* browserinstance);
     static DWORD WINAPI StaticThreadCollectSubFolders(void* browserinstance);
     void Reset();
-    BOOL IsFileFormatSupported(LPCTSTR fileName);
+    ImgItem::Format ResolveFileFormat(const std::wstring& filepath);
 };
