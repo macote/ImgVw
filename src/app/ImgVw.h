@@ -5,12 +5,6 @@
 #include <Windows.h>
 #include <shellapi.h>
 
-#define LOGIMGVW 0
-#if _DEBUG && LOGIMGVW
-#define LOGIMGVWPATH L"C:\\Temp\\ImgVw_"
-#include "DebugHelper.h"
-#endif
-
 class ImgVw
 {
   public:
@@ -32,10 +26,6 @@ inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 
     LocalFree(args);
 
-#if _DEBUG && LOGIMGVW
-    TimestampLogger logger(LOGIMGVWPATH + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE);
-#endif
-
     if (SUCCEEDED(CoInitialize(NULL)))
     {
         InitCommonControls();
@@ -54,9 +44,6 @@ inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 
             while (GetMessage(&msg, NULL, 0, 0))
             {
-#if _DEBUG && LOGIMGVW
-                logger.WriteLine(DebugHelper::FormatWindowMessage(msg));
-#endif
                 if (!TranslateAccelerator(imgvwwindow->hwnd(), hacc, &msg))
                 {
                     TranslateMessage(&msg);

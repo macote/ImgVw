@@ -68,7 +68,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\diagnostics;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\Little-CMS;$(ProjectDir)3rd-party\libheif;$(ProjectDir)3rd-party\libde265;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
+    <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\Little-CMS;$(ProjectDir)3rd-party\libheif;$(ProjectDir)3rd-party\libde265;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
     <OutDir>$(ProjectDir)bin\vs\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)obj\vs\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
@@ -175,9 +175,6 @@
     <ClInclude Include="src\app\ImgVw.h" />
     <ClInclude Include="src\browse\ImgFileList.h" />
     <ClInclude Include="src\browse\ImgBrowser.h" />
-    <ClInclude Include="src\diagnostics\DebugHelper.h" />
-    <ClInclude Include="src\diagnostics\StreamLineWriter.h" />
-    <ClInclude Include="src\diagnostics\TimestampLogger.h" />
     <ClInclude Include="src\image\ExifOrientation.h" />
     <ClInclude Include="src\image\ImgResampler.h" />
     <ClInclude Include="src\image\ImgBitmap.h" />
@@ -194,7 +191,6 @@
     <ClInclude Include="src\platform\win32\CountingSemaphore.h" />
     <ClInclude Include="src\platform\win32\FileOperations.h" />
     <ClInclude Include="src\platform\win32\FileMapView.h" />
-    <ClInclude Include="src\platform\win32\FileStream.h" />
     <ClInclude Include="src\platform\win32\ImgSettings.h" />
     <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
@@ -214,7 +210,6 @@
     <ClCompile Include="src\image\ImgJpegDecoder.cpp" />
     <ClCompile Include="src\image\ImgJPEGItem.cpp" />
     <ClCompile Include="src\image\ImgLoader.cpp" />
-    <ClCompile Include="src\platform\win32\FileStream.cpp" />
     <ClCompile Include="src\platform\win32\FileOperations.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
     <ClCompile Include="src\ui\win32\ImgVwWindow.cpp" />

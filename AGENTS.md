@@ -14,7 +14,6 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - `src/browse/`: image list state, folder enumeration, and navigation behavior.
 - `src/image/`: image item abstractions, JPEG loading, image buffers, cache, and decode helpers.
 - `src/platform/win32/`: Win32 platform helpers and RAII wrappers.
-- `src/diagnostics/`: logging and debug helpers.
 - `resources/`: Windows resources, manifest, icons, and `resource.h`.
 - `3rd-party/`: vendored dependencies. Do not reformat or refactor these files.
 - `artifacts/`: planning/reference material. Use it for context, but prefer the current source tree when it disagrees.

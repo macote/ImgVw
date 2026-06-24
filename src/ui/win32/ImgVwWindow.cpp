@@ -489,10 +489,6 @@ void ImgVwWindow::OnNCDestroy()
 
 LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-#if _DEBUG && LOGIMGVWWINDOW
-    logger_.WriteLine(DebugHelper::FormatWindowMessage(uMsg, wParam, lParam));
-#endif
-
     switch (uMsg)
     {
     case kBrowserChangedMessage:

@@ -50,7 +50,6 @@ $compileArgs = @(
     "-I$repoRoot",
     "-I$(Join-Path $repoRoot 'src\app')",
     "-I$(Join-Path $repoRoot 'src\browse')",
-    "-I$(Join-Path $repoRoot 'src\diagnostics')",
     "-I$(Join-Path $repoRoot 'src\image')",
     "-I$(Join-Path $repoRoot 'src\platform\win32')",
     "-I$(Join-Path $repoRoot 'src\ui\win32')",

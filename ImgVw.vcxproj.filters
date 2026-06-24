@@ -22,9 +22,6 @@
     <Filter Include="Browse">
       <UniqueIdentifier>{2A7E8D05-4743-48EE-8B35-9B536434F4F7}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Diagnostics">
-      <UniqueIdentifier>{4E71339B-0B3F-4075-95D4-17DC858482E6}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Image">
       <UniqueIdentifier>{8FE35DB1-E510-4577-A6FC-F784C8211D87}</UniqueIdentifier>
     </Filter>
@@ -72,15 +69,6 @@
     <ClInclude Include="src\browse\ImgBrowser.h">
       <Filter>Browse</Filter>
     </ClInclude>
-    <ClInclude Include="src\diagnostics\DebugHelper.h">
-      <Filter>Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="src\diagnostics\StreamLineWriter.h">
-      <Filter>Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="src\diagnostics\TimestampLogger.h">
-      <Filter>Diagnostics</Filter>
-    </ClInclude>
     <ClInclude Include="src\image\ExifOrientation.h">
       <Filter>Image</Filter>
     </ClInclude>
@@ -127,9 +115,6 @@
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\FileMapView.h">
-      <Filter>Platform</Filter>
-    </ClInclude>
-    <ClInclude Include="src\platform\win32\FileStream.h">
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\ImgSettings.h">
@@ -184,9 +169,6 @@
     </ClCompile>
     <ClCompile Include="src\image\ImgLoader.cpp">
       <Filter>Image</Filter>
-    </ClCompile>
-    <ClCompile Include="src\platform\win32\FileStream.cpp">
-      <Filter>Platform</Filter>
     </ClCompile>
     <ClCompile Include="src\platform\win32\FileOperations.cpp">
       <Filter>Platform</Filter>

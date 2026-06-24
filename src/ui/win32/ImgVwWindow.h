@@ -13,12 +13,6 @@
 #include <string>
 #include <vector>
 
-#define LOGIMGVWWINDOW 0
-#if _DEBUG && LOGIMGVWWINDOW
-#define LOGIMGVWWINDOWPATH L"C:\\Temp\\ImgVwWindow_"
-#include "DebugHelper.h"
-#endif
-
 class ImgVwWindow final : public Window
 {
   public:
@@ -34,10 +28,6 @@ class ImgVwWindow final : public Window
   public:
     ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args)
         : Window(hinst)
-#if _DEBUG && LOGIMGVWWINDOW
-          ,
-          logger_(TimestampLogger(LOGIMGVWWINDOWPATH + TimestampLogger::GetTimestampString(TRUE) + L".log", TRUE))
-#endif
     {
         if (args.size() > 1)
         {
@@ -68,9 +58,6 @@ class ImgVwWindow final : public Window
     POINTS mousemovelastpoints_{};
     LARGE_INTEGER mousemovelastcounter_{};
     BOOL mousehidetimerstarted_{FALSE};
-#if _DEBUG && LOGIMGVWWINDOW
-    TimestampLogger logger_;
-#endif
   private:
     void InitializeBrowser(const std::wstring& path);
     void PerformAction();
