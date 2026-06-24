@@ -60,7 +60,7 @@ LANGUAGE LANG_ENGLISH,
         IDD_ABOUTBOX DIALOGEX 100,
     75, 135,
     62 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU CAPTION "About ImgVw" FONT 8,
-    "MS Shell Dlg", 0, 0, 0x1 BEGIN ICON IDI_ICON, IDC_STATIC, 14, 14, 21, 20 LTEXT "ImgVw v1.7.0", IDC_STATIC, 42, 14,
+    "MS Shell Dlg", 0, 0, 0x1 BEGIN ICON IDI_ICON, IDC_STATIC, 14, 14, 21, 20 LTEXT "ImgVw v1.8.0", IDC_STATIC, 42, 14,
     114, 8, SS_NOPREFIX LTEXT "", IDC_STATIC, 42, 26, 114, 8 DEFPUSHBUTTON "OK", IDOK, 65, 41, 50, 14,
     WS_GROUP END
 
@@ -84,7 +84,7 @@ LANGUAGE LANG_ENGLISH,
     //
 
     VS_VERSION_INFO VERSIONINFO FILEVERSION 1,
-    7, 0, 0 PRODUCTVERSION 1, 7, 0,
+    8, 0, 0 PRODUCTVERSION 1, 8, 0,
     0 FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
     FILEFLAGS 0x1L
@@ -93,8 +93,8 @@ LANGUAGE LANG_ENGLISH,
 #endif
     FILEOS 0x4L FILETYPE 0x2L FILESUBTYPE 0x0L BEGIN BLOCK "StringFileInfo" BEGIN BLOCK "040904e4" BEGIN VALUE
                                                            "FileDescription",
-    "ImgVw" VALUE "FileVersion", "1.7.0" VALUE "LegalCopyright", "Marc-André Côté" VALUE "ProductName",
-    "ImgVw" VALUE "ProductVersion", "1.7.0" END END BLOCK "VarFileInfo" BEGIN VALUE "Translation", 0x409,
+    "ImgVw" VALUE "FileVersion", "1.8.0" VALUE "LegalCopyright", "Marc-André Côté" VALUE "ProductName",
+    "ImgVw" VALUE "ProductVersion", "1.8.0" END END BLOCK "VarFileInfo" BEGIN VALUE "Translation", 0x409,
     1252 END END
 
         /////////////////////////////////////////////////////////////////////////////
@@ -106,3 +106,4 @@ LANGUAGE LANG_ENGLISH,
 
 #endif // English (United States) resources
     /////////////////////////////////////////////////////////////////////////////
+

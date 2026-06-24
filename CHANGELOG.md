@@ -1,3 +1,13 @@
+## 1.8.0 (2026-06-24)
+
+- Add HEIF/HEIC format display support
+- Replace external easyexif dependency with a native orientation parser and direct pixel buffer rotation
+- Implement content-based image format detection and dispatch using header signatures
+- Bundle CGATS21 CRPC5 profile as generic CMYK fallback and add profile validation
+- Upgrade Little CMS to 2.19.1 and libjpeg-turbo to 3.1.4.1
+- Reorganize folder structure to separate UI, image, browser, and platform layers
+- Remove UI thread blocking during image loading, restore slideshow loading priority, and implement bounded thread shutdown waits
+
 ## 1.7.0 (2019-01-08)
 
 - Add the ability to browse subfolders
