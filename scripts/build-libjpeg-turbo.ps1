@@ -1,12 +1,12 @@
-<#
+﻿<#
 Builds the static libjpeg-turbo artifacts consumed by ImgVw.
 
 MSYS artifacts are the deployment path:
-  powershell -ExecutionPolicy Bypass -File scripts\build-libjpeg-turbo.ps1 -Mode msys -Arch x86
-  powershell -ExecutionPolicy Bypass -File scripts\build-libjpeg-turbo.ps1 -Mode msys -Arch x64
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libjpeg-turbo.ps1 -Mode msys -Arch x86
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libjpeg-turbo.ps1 -Mode msys -Arch x64
 
 Visual C++ artifacts are only for Visual Studio local development:
-  powershell -ExecutionPolicy Bypass -File scripts\build-libjpeg-turbo.ps1 -Mode vs -Arch all
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libjpeg-turbo.ps1 -Mode vs -Arch all
 #>
 
 param(
@@ -172,7 +172,7 @@ function Invoke-InMsysShell {
         "set -e",
         "export $MsysShellMarker=1",
         "cd $(Quote-BashArgument $repoMsysPath)",
-        "powershell -ExecutionPolicy Bypass -File scripts/build-libjpeg-turbo.ps1 -Mode msys -Arch $TargetArch -RepoRoot $(Quote-BashArgument $RepoRoot) -WorkRoot $(Quote-BashArgument $WorkRoot) -MsysRoot $(Quote-BashArgument $resolvedMsysRoot)$cleanArg"
+        "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-libjpeg-turbo.ps1 -Mode msys -Arch $TargetArch -RepoRoot $(Quote-BashArgument $RepoRoot) -WorkRoot $(Quote-BashArgument $WorkRoot) -MsysRoot $(Quote-BashArgument $resolvedMsysRoot)$cleanArg"
     ) -join "; "
     $escapedCommand = $command.Replace('"', '\"')
 
@@ -184,6 +184,7 @@ function Initialize-Source {
     $archive = Join-Path $WorkRoot "libjpeg-turbo-$Version.tar.gz"
     $sourceDir = Join-Path $WorkRoot "libjpeg-turbo-$Version"
     $url = "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/$Version/libjpeg-turbo-$Version.tar.gz"
+    $windowsTar = Join-Path $env:SystemRoot "System32\tar.exe"
 
     New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
 
@@ -206,8 +207,13 @@ function Initialize-Source {
     }
 
     if (-not (Test-Path $sourceDir)) {
-        Require-Command tar
-        Invoke-Checked tar @("-xzf", $archive, "-C", $WorkRoot)
+        if (Test-Path $windowsTar) {
+            Invoke-Checked $windowsTar @("-xzf", $archive, "-C", $WorkRoot)
+        }
+        else {
+            Require-Command tar
+            Invoke-Checked tar @("-xzf", $archive, "-C", $WorkRoot)
+        }
     }
 
     return $sourceDir
@@ -268,6 +274,8 @@ function Build-Vs {
         Invoke-Checked cmake @(
             "-G", "NMake Makefiles",
             "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL",
+            "-DWITH_CRT_DLL=1",
             "-DENABLE_SHARED=0",
             "-DWITH_JAVA=0",
             "-DWITH_TESTS=0",

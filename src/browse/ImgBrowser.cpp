@@ -1,4 +1,4 @@
-#include "ImgBrowser.h"
+﻿#include "ImgBrowser.h"
 #include <Shlwapi.h>
 
 void ImgBrowser::CollectFile(const std::wstring& filepath, ImgItem::Format imgformat)
@@ -178,13 +178,13 @@ void ImgBrowser::StopCollecting()
     const DWORD waitResult = WaitForSingleObject(collectorthread_, timeoutMs);
     if (waitResult == WAIT_TIMEOUT)
     {
-#if _DEBUG
+#if defined(IMGVW_DEBUG)
         OutputDebugString(L"ImgBrowser::StopCollecting: Warning: collector thread did not terminate within timeout.\n");
 #endif
     }
     else if (waitResult == WAIT_FAILED)
     {
-#if _DEBUG
+#if defined(IMGVW_DEBUG)
         const DWORD error = GetLastError();
         WCHAR buf[256];
         swprintf_s(buf, L"ImgBrowser::StopCollecting: WaitForSingleObject failed with error 0x%08lX\n",

@@ -1,4 +1,6 @@
-#include "ImgVwWindow.h"
+﻿#include "ImgVwWindow.h"
+
+#include <climits>
 
 ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring>& args)
 {
@@ -103,7 +105,9 @@ void ImgVwWindow::DisplayFileInformation(HDC dc, const std::wstring& filepath)
     RECT windowrectangle;
     GetWindowRect(hwnd_, &windowrectangle);
     FillRect(dc, &windowrectangle, backgroundbrush_);
-    TextOut(dc, 0, 0, filepath.c_str(), filepath.size());
+    const auto text_length =
+        static_cast<int>(filepath.size() > static_cast<size_t>(INT_MAX) ? INT_MAX : filepath.size());
+    TextOut(dc, 0, 0, filepath.c_str(), text_length);
 }
 
 void ImgVwWindow::InvalidateScreen()

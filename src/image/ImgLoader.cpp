@@ -1,4 +1,4 @@
-#include "ImgLoader.h"
+﻿#include "ImgLoader.h"
 
 #include <algorithm>
 
@@ -16,13 +16,13 @@ void ImgLoader::StopLoading()
     const DWORD loopWaitResult = WaitForSingleObject(loopthread_, timeoutMs);
     if (loopWaitResult == WAIT_TIMEOUT)
     {
-#if _DEBUG
+#if defined(IMGVW_DEBUG)
         OutputDebugString(L"ImgLoader::StopLoading: Warning: loop thread did not terminate within timeout.\n");
 #endif
     }
     else if (loopWaitResult == WAIT_FAILED)
     {
-#if _DEBUG
+#if defined(IMGVW_DEBUG)
         const DWORD error = GetLastError();
         WCHAR buf[256];
         swprintf_s(buf, L"ImgLoader::StopLoading: loop thread wait failed with error 0x%08lX\n",
@@ -53,14 +53,14 @@ void ImgLoader::StopLoading()
                 WaitForMultipleObjects(static_cast<DWORD>(threads.size()), &threads[0], TRUE, timeoutMs);
             if (workersWaitResult == WAIT_TIMEOUT)
             {
-#if _DEBUG
+#if defined(IMGVW_DEBUG)
                 OutputDebugString(
                     L"ImgLoader::StopLoading: Warning: worker threads did not terminate within timeout.\n");
 #endif
             }
             else if (workersWaitResult == WAIT_FAILED)
             {
-#if _DEBUG
+#if defined(IMGVW_DEBUG)
                 const DWORD error = GetLastError();
                 WCHAR buf[256];
                 swprintf_s(buf, L"ImgLoader::StopLoading: worker threads wait failed with error 0x%08lX\n",

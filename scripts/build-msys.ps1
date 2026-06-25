@@ -79,7 +79,7 @@ $commandLines = @(
     "cd $(Quote-BashArgument $repoMsysPath)"
 )
 if ($Clean) {
-    $commandLines += "make clean"
+    $commandLines += "make clean arch=$Arch"
 }
 $commandLines += "make config=$Config arch=$Arch CC=$toolchain/bin/g++ WINDRES=$(Quote-BashArgument $windres)"
 
