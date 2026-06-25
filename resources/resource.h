@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by HashCheck.rc
+// Used by ImgVw.rc
 //
 #define IDI_ICON 101
 #define IDI_SMALL 102

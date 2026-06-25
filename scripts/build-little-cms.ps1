@@ -2,11 +2,11 @@
 Builds the static Little CMS artifacts consumed by ImgVw.
 
 MSYS artifacts are the deployment path:
-  powershell -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode msys -Arch x86
-  powershell -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode msys -Arch x64
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode msys -Arch x86
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode msys -Arch x64
 
 Visual C++ artifacts are only for Visual Studio local development:
-  powershell -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode vs -Arch all
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode vs -Arch all
 #>
 
 param(
@@ -170,7 +170,7 @@ function Invoke-InMsysShell {
         "set -e",
         "export $MsysShellMarker=1",
         "cd $(Quote-BashArgument $repoMsysPath)",
-        "powershell -ExecutionPolicy Bypass -File scripts/build-little-cms.ps1 -Mode msys -Arch $TargetArch -RepoRoot $(Quote-BashArgument $RepoRoot) -WorkRoot $(Quote-BashArgument $WorkRoot) -MsysRoot $(Quote-BashArgument $resolvedMsysRoot)$cleanArg"
+        "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-little-cms.ps1 -Mode msys -Arch $TargetArch -RepoRoot $(Quote-BashArgument $RepoRoot) -WorkRoot $(Quote-BashArgument $WorkRoot) -MsysRoot $(Quote-BashArgument $resolvedMsysRoot)$cleanArg"
     ) -join "; "
     $escapedCommand = $command.Replace('"', '\"')
 

@@ -35,7 +35,7 @@ Pass a file or folder as an argument.
 
 ## 3rd-party libraries
 
-ImgVw uses the following libraries :
+ImgVw uses the following libraries:
 - [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
 - [Little-CMS](https://github.com/mm2/Little-CMS)
 - [libheif](https://github.com/strukturag/libheif)
@@ -51,9 +51,11 @@ Visual Studio and MSYS builds support Win32 and x64 configurations. Win32 remain
 compatibility. x64 is recommended for large images or large folders, but requires architecture-matched static libraries
 for libjpeg-turbo, Little CMS, libheif, and libde265.
 
-Rebuild the bundled HEIC dependencies with:
+Rebuild the bundled dependencies with:
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libjpeg-turbo.ps1 -Mode all -Arch all -Clean
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode all -Arch all -Clean
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libheif.ps1 -Mode all -Arch all -Clean
 ```
 
