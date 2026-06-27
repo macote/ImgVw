@@ -25,6 +25,7 @@ class ImgFileList final
     bool MoveTo(const std::wstring& filepath);
     bool MoveToRandom();
     bool RemoveCurrent();
+    std::vector<std::wstring> PathsFromCurrent() const;
 
   private:
     std::set<std::wstring> files_;

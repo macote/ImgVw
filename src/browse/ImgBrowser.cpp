@@ -68,6 +68,7 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
 
     targetwidth_ = targetwidth;
     targetheight_ = targetheight;
+    loader_.PrioritizeTargetSize(targetwidth_, targetheight_);
 
     WIN32_FIND_DATA findfiledata{};
     HANDLE findfilehandle{};
@@ -150,6 +151,12 @@ BOOL ImgBrowser::UpdateTargetSize(INT targetwidth, INT targetheight)
     }
 
     LeaveCriticalSection(&browsecriticalsection_);
+    if (changed)
+    {
+        loader_.PrioritizeTargetSize(targetwidth, targetheight);
+        QueueTargetSizeFromCurrent();
+    }
+
     return changed ? TRUE : FALSE;
 }
 
@@ -237,6 +244,34 @@ void ImgBrowser::SetNotificationWindow(HWND hwnd, UINT message)
 void ImgBrowser::Reset()
 {
     files_.Clear();
+}
+
+void ImgBrowser::QueueTargetSizeFromCurrent()
+{
+    std::vector<std::wstring> paths;
+    EnterCriticalSection(&browsecriticalsection_);
+    paths = files_.PathsFromCurrent();
+    LeaveCriticalSection(&browsecriticalsection_);
+
+    BOOL loadnext = TRUE;
+    std::size_t queued_count{};
+    for (const auto& filepath : paths)
+    {
+        if (queued_count >= kTargetSizeSeedQueueLimit)
+        {
+            break;
+        }
+
+        EnterCriticalSection(&browsecriticalsection_);
+        const auto imgitem = GetOrCreateCachedItem(filepath);
+        LeaveCriticalSection(&browsecriticalsection_);
+        if (imgitem != nullptr)
+        {
+            loader_.QueueItem(imgitem, loadnext);
+            loadnext = FALSE;
+            ++queued_count;
+        }
+    }
 }
 
 std::wstring ImgBrowser::GetCurrentFilePath()

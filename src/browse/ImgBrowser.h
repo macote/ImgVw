@@ -11,6 +11,9 @@
 class ImgBrowser final
 {
   public:
+    static constexpr std::size_t kTargetSizeSeedQueueLimit = 64;
+
+  public:
     ImgBrowser()
     {
         readyevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -73,6 +76,7 @@ class ImgBrowser final
     static DWORD WINAPI StaticThreadCollect(void* browserinstance);
     static DWORD WINAPI StaticThreadCollectSubFolders(void* browserinstance);
     void Reset();
+    void QueueTargetSizeFromCurrent();
     ImgItem::Format ResolveFileFormat(const std::wstring& filepath);
     std::shared_ptr<ImgItem> GetOrCreateCachedItem(const std::wstring& filepath);
 };

@@ -91,6 +91,14 @@ class ImgItem
     {
         return offsety_;
     }
+    INT targetwidth() const
+    {
+        return targetwidth_;
+    }
+    INT targetheight() const
+    {
+        return targetheight_;
+    }
     HANDLE loadedevent() const
     {
         return loadedevent_;

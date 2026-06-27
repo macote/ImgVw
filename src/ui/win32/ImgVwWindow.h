@@ -102,6 +102,7 @@ class ImgVwWindow final : public Window
     void BrowseSubFolders();
     void EnableBrowseSubFolders();
     void HandleMouseWheel(WORD distance);
+    void HandleMultiMonitorMouseWheel(ImgVwWindow* target);
     void ToggleSlideShow(BOOL slideshowrandom);
     void StartSlideShow();
     void StopSlideShow();
