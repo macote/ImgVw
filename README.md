@@ -23,6 +23,7 @@ Pass a file or folder as an argument.
 | End | Go to last |
 | F5 | Toggle slideshow |
 | Shift + F5 | Toggle slideshow (random mode) |
+| Ctrl + Shift + F5 | Toggle slideshow on all monitors (random mode) |
 | F6 | Increase slideshow speed |
 | F7 | Decrease slideshow speed |
 | F8 | Add images found in subfolders |
