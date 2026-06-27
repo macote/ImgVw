@@ -15,6 +15,7 @@ or Windows XP compatibility target.
 
 - Refit the current image when the window moves to a monitor with a different usable size.
 - Refit the current image when the client area changes for any reason.
+- Allow dragging the displayed image/window to another monitor when multiple monitors are present.
 - Keep newly collected or loaded items using the latest viewport target.
 - Cache viewport-specific display items without mutating an item that was loaded for a different target size.
 - Preserve current navigation, slideshow, cursor, and borderless popup behavior.
@@ -123,6 +124,15 @@ Open question for implementation: choose `rcMonitor` or `rcWork`. The existing `
 to `rcMonitor`, but the user-facing "fit target monitor" complaint may be better served by `rcWork` if the taskbar should
 remain visible.
 
+### PR 3a: Enable Multi-Monitor Drag
+
+Because the app uses a borderless popup, users need an explicit way to move the displayed image to another monitor.
+Enable left-button drag only when `GetSystemMetrics(SM_CMONITORS)` reports more than one monitor. While dragging, move the
+popup with `SetWindowPos(..., SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER)`. When the nearest monitor changes, reuse the
+monitor-bound clamping and viewport refit path above.
+
+This keeps single-monitor behavior unchanged and relies only on XP-compatible monitor APIs.
+
 ### PR 4: Centralize Presentation Fit Calculation
 
 After the conservative reload/refit fix is in place, reduce recurrence risk:
@@ -167,6 +177,8 @@ architecture reference.
 - Moving ImgVw from a larger monitor to a smaller monitor cannot leave the current image scaled or centered against the
   old viewport.
 - Moving ImgVw from a smaller monitor to a larger monitor refreshes the current image presentation.
+- On multi-monitor systems, left-button dragging can move the displayed image/window to another monitor.
+- On single-monitor systems, left-button dragging is disabled.
 - Resizing or otherwise changing the client area refreshes the current image presentation.
 - Newly discovered files use the latest target dimensions.
 - Returning to a previously used client size can reuse the matching viewport-specific cached item.

@@ -61,6 +61,9 @@ class ImgVwWindow final : public Window
     INT clientwidth_{};
     INT clientheight_{};
     HMONITOR currentmonitor_{nullptr};
+    BOOL draggingwindow_{FALSE};
+    POINT dragstartpoint_{};
+    RECT dragstartwindowrect_{};
   private:
     void InitializeBrowser(const std::wstring& path);
     BOOL UpdateClientSize(INT width, INT height);
@@ -68,6 +71,10 @@ class ImgVwWindow final : public Window
     void InitializeMonitorState();
     void HandleWindowPosChanged();
     BOOL ApplyMonitorBounds(HMONITOR monitor);
+    BOOL HasMultipleMonitors() const;
+    BOOL BeginWindowDrag(LPARAM lParam);
+    BOOL UpdateWindowDrag(WPARAM wParam, LPARAM lParam);
+    void EndWindowDrag();
     void PerformAction();
     void BrowseNext();
     void BrowsePrevious();

@@ -124,6 +124,7 @@ void ImgVwWindow::HandleWindowPosChanged()
 
     currentmonitor_ = monitor;
     ApplyMonitorBounds(monitor);
+    EndWindowDrag();
 }
 
 BOOL ImgVwWindow::ApplyMonitorBounds(HMONITOR monitor)
@@ -144,6 +145,70 @@ BOOL ImgVwWindow::ApplyMonitorBounds(HMONITOR monitor)
 
     return SetWindowPos(hwnd_, nullptr, monitorinfo.rcMonitor.left, monitorinfo.rcMonitor.top, width, height,
                         SWP_NOACTIVATE | SWP_NOZORDER);
+}
+
+BOOL ImgVwWindow::HasMultipleMonitors() const
+{
+    return GetSystemMetrics(SM_CMONITORS) > 1;
+}
+
+BOOL ImgVwWindow::BeginWindowDrag(LPARAM lParam)
+{
+    if (!HasMultipleMonitors())
+    {
+        return FALSE;
+    }
+
+    POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    if (!ClientToScreen(hwnd_, &point))
+    {
+        return FALSE;
+    }
+
+    if (!GetWindowRect(hwnd_, &dragstartwindowrect_))
+    {
+        return FALSE;
+    }
+
+    dragstartpoint_ = point;
+    draggingwindow_ = TRUE;
+    ShowCursor(TRUE);
+    return TRUE;
+}
+
+BOOL ImgVwWindow::UpdateWindowDrag(WPARAM wParam, LPARAM lParam)
+{
+    if (!draggingwindow_)
+    {
+        return FALSE;
+    }
+
+    if ((wParam & MK_LBUTTON) == 0)
+    {
+        EndWindowDrag();
+        return FALSE;
+    }
+
+    POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    if (!ClientToScreen(hwnd_, &point))
+    {
+        return FALSE;
+    }
+
+    const auto x = dragstartwindowrect_.left + (point.x - dragstartpoint_.x);
+    const auto y = dragstartwindowrect_.top + (point.y - dragstartpoint_.y);
+    return SetWindowPos(hwnd_, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
+}
+
+void ImgVwWindow::EndWindowDrag()
+{
+    if (!draggingwindow_)
+    {
+        return;
+    }
+
+    draggingwindow_ = FALSE;
+    ShowCursor(FALSE);
 }
 
 bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
@@ -646,7 +711,22 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_CONTEXTMENU:
         HandleContextMenu(lParam);
         return TRUE;
+    case WM_LBUTTONDOWN:
+        if (BeginWindowDrag(lParam))
+        {
+            return 0;
+        }
+
+        break;
+    case WM_LBUTTONUP:
+        EndWindowDrag();
+        return 0;
     case WM_MOUSEMOVE:
+        if (UpdateWindowDrag(wParam, lParam))
+        {
+            return 0;
+        }
+
         if (HandleMouseMove(wParam, lParam))
         {
             return 0;
