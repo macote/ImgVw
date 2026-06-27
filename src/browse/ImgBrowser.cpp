@@ -7,8 +7,8 @@ void ImgBrowser::CollectFile(const std::wstring& filepath, ImgItem::Format imgfo
 
     if (files_.Add(filepath))
     {
-        cache_.Add(filepath, targetwidth_, targetheight_, imgformat);
-        loader_.QueueItem(cache_.Get(filepath));
+        const auto imgitem = cache_.Add(filepath, targetwidth_, targetheight_, imgformat);
+        loader_.QueueItem(imgitem);
     }
 
     SetEvent(readyevent_);
@@ -134,6 +134,25 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
     collectorthread_ = CreateThread(nullptr, 0, StaticThreadCollect, reinterpret_cast<void*>(this), 0, nullptr);
 }
 
+BOOL ImgBrowser::UpdateTargetSize(INT targetwidth, INT targetheight)
+{
+    if (targetwidth <= 0 || targetheight <= 0)
+    {
+        return FALSE;
+    }
+
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto changed = targetwidth_ != targetwidth || targetheight_ != targetheight;
+    if (changed)
+    {
+        targetwidth_ = targetwidth;
+        targetheight_ = targetheight;
+    }
+
+    LeaveCriticalSection(&browsecriticalsection_);
+    return changed ? TRUE : FALSE;
+}
+
 void ImgBrowser::BrowseSubFoldersAsync()
 {
     if (recursive_)
@@ -232,7 +251,7 @@ std::shared_ptr<ImgItem> ImgBrowser::GetCurrentItem()
 {
     EnterCriticalSection(&browsecriticalsection_);
     const auto filepath = files_.CurrentPath();
-    const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : cache_.Get(filepath);
+    const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : GetOrCreateCachedItem(filepath);
     LeaveCriticalSection(&browsecriticalsection_);
     if (imgitem != nullptr)
     {
@@ -251,7 +270,7 @@ void ImgBrowser::ReloadCurrentItem()
 {
     EnterCriticalSection(&browsecriticalsection_);
     const auto filepath = files_.CurrentPath();
-    const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : cache_.Get(filepath);
+    const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : GetOrCreateCachedItem(filepath);
     LeaveCriticalSection(&browsecriticalsection_);
     if (imgitem != nullptr)
     {
@@ -337,6 +356,21 @@ void ImgBrowser::CollectSubFolders()
     }
 
     folders_.clear();
+}
+
+std::shared_ptr<ImgItem> ImgBrowser::GetOrCreateCachedItem(const std::wstring& filepath)
+{
+    auto imgitem = cache_.Get(filepath, targetwidth_, targetheight_);
+    if (imgitem == nullptr)
+    {
+        const auto imgformat = ResolveFileFormat(filepath);
+        if (imgformat != ImgItem::Format::Unsupported)
+        {
+            imgitem = cache_.Add(filepath, targetwidth_, targetheight_, imgformat);
+        }
+    }
+
+    return imgitem;
 }
 
 void ImgBrowser::NotifyChanged()

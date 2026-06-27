@@ -40,6 +40,7 @@ LRESULT ImgVwWindow::OnCreate()
     SetCursor(arrowcursor_);
     SetCapture(hwnd_);
     ShowCursor(FALSE);
+    InitializeMonitorState();
     InitializeBrowser(path_);
 
     return FALSE;
@@ -72,7 +73,142 @@ void ImgVwWindow::InitializeBrowser(const std::wstring& path)
     }
 
     browser_.SetNotificationWindow(hwnd_, kBrowserChangedMessage);
+    UpdateClientSize(windowrectangle.right, windowrectangle.bottom);
     browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom);
+}
+
+BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
+{
+    if (width <= 0 || height <= 0)
+    {
+        return FALSE;
+    }
+
+    if (clientwidth_ == width && clientheight_ == height)
+    {
+        return FALSE;
+    }
+
+    clientwidth_ = width;
+    clientheight_ = height;
+    return browser_.UpdateTargetSize(width, height);
+}
+
+void ImgVwWindow::HandleSize(WPARAM wParam, LPARAM lParam)
+{
+    if (wParam == SIZE_MINIMIZED)
+    {
+        return;
+    }
+
+    const auto width = static_cast<INT>(LOWORD(lParam));
+    const auto height = static_cast<INT>(HIWORD(lParam));
+    if (UpdateClientSize(width, height))
+    {
+        InvalidateScreen();
+    }
+}
+
+void ImgVwWindow::InitializeMonitorState()
+{
+    currentmonitor_ = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+}
+
+void ImgVwWindow::HandleWindowPosChanged()
+{
+    const auto monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+    if (monitor == nullptr || monitor == currentmonitor_)
+    {
+        return;
+    }
+
+    currentmonitor_ = monitor;
+    ApplyMonitorBounds(monitor);
+    EndWindowDrag();
+}
+
+BOOL ImgVwWindow::ApplyMonitorBounds(HMONITOR monitor)
+{
+    MONITORINFO monitorinfo{};
+    monitorinfo.cbSize = sizeof(monitorinfo);
+    if (!GetMonitorInfo(monitor, &monitorinfo))
+    {
+        return FALSE;
+    }
+
+    const auto width = monitorinfo.rcMonitor.right - monitorinfo.rcMonitor.left;
+    const auto height = monitorinfo.rcMonitor.bottom - monitorinfo.rcMonitor.top;
+    if (width <= 0 || height <= 0)
+    {
+        return FALSE;
+    }
+
+    return SetWindowPos(hwnd_, nullptr, monitorinfo.rcMonitor.left, monitorinfo.rcMonitor.top, width, height,
+                        SWP_NOACTIVATE | SWP_NOZORDER);
+}
+
+BOOL ImgVwWindow::HasMultipleMonitors() const
+{
+    return GetSystemMetrics(SM_CMONITORS) > 1;
+}
+
+BOOL ImgVwWindow::BeginWindowDrag(LPARAM lParam)
+{
+    if (!HasMultipleMonitors())
+    {
+        return FALSE;
+    }
+
+    POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    if (!ClientToScreen(hwnd_, &point))
+    {
+        return FALSE;
+    }
+
+    if (!GetWindowRect(hwnd_, &dragstartwindowrect_))
+    {
+        return FALSE;
+    }
+
+    dragstartpoint_ = point;
+    draggingwindow_ = TRUE;
+    ShowCursor(TRUE);
+    return TRUE;
+}
+
+BOOL ImgVwWindow::UpdateWindowDrag(WPARAM wParam, LPARAM lParam)
+{
+    if (!draggingwindow_)
+    {
+        return FALSE;
+    }
+
+    if ((wParam & MK_LBUTTON) == 0)
+    {
+        EndWindowDrag();
+        return FALSE;
+    }
+
+    POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    if (!ClientToScreen(hwnd_, &point))
+    {
+        return FALSE;
+    }
+
+    const auto x = dragstartwindowrect_.left + (point.x - dragstartpoint_.x);
+    const auto y = dragstartwindowrect_.top + (point.y - dragstartpoint_.y);
+    return SetWindowPos(hwnd_, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
+}
+
+void ImgVwWindow::EndWindowDrag()
+{
+    if (!draggingwindow_)
+    {
+        return;
+    }
+
+    draggingwindow_ = FALSE;
+    ShowCursor(FALSE);
 }
 
 bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
@@ -506,6 +642,11 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_ERASEBKGND:
         return TRUE;
     case WM_SIZE:
+        HandleSize(wParam, lParam);
+        return FALSE;
+    case WM_WINDOWPOSCHANGED:
+        HandleWindowPosChanged();
+        break;
     case WM_SETFOCUS:
         return FALSE;
     case WM_COMMAND:
@@ -570,7 +711,22 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_CONTEXTMENU:
         HandleContextMenu(lParam);
         return TRUE;
+    case WM_LBUTTONDOWN:
+        if (BeginWindowDrag(lParam))
+        {
+            return 0;
+        }
+
+        break;
+    case WM_LBUTTONUP:
+        EndWindowDrag();
+        return 0;
     case WM_MOUSEMOVE:
+        if (UpdateWindowDrag(wParam, lParam))
+        {
+            return 0;
+        }
+
         if (HandleMouseMove(wParam, lParam))
         {
             return 0;
