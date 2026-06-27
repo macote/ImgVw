@@ -323,6 +323,31 @@ BOOL ImgBrowser::MoveToItem(const std::wstring& filepath)
     return moveSuccess;
 }
 
+BOOL ImgBrowser::MoveToOrAddItem(const std::wstring& filepath)
+{
+    const auto imgformat = ResolveFileFormat(filepath);
+    if (imgformat == ImgItem::Format::Unsupported)
+    {
+        return FALSE;
+    }
+
+    EnterCriticalSection(&browsecriticalsection_);
+    if (files_.Add(filepath))
+    {
+        const auto imgitem = cache_.Add(filepath, targetwidth_, targetheight_, imgformat);
+        loader_.QueueItem(imgitem);
+    }
+
+    const auto moveSuccess = files_.MoveTo(filepath);
+    LeaveCriticalSection(&browsecriticalsection_);
+    if (moveSuccess)
+    {
+        NotifyChanged();
+    }
+
+    return moveSuccess;
+}
+
 BOOL ImgBrowser::MoveToRandom()
 {
     EnterCriticalSection(&browsecriticalsection_);

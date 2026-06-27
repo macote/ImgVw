@@ -43,6 +43,7 @@ class ImgBrowser final
     BOOL MoveToFirst();
     BOOL MoveToLast();
     BOOL MoveToItem(const std::wstring& filepath);
+    BOOL MoveToOrAddItem(const std::wstring& filepath);
     BOOL MoveToRandom();
     void RemoveCurrentItem();
     void ReloadCurrentItem();

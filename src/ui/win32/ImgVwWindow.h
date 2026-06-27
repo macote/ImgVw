@@ -54,6 +54,7 @@ class ImgVwWindow final : public Window
     FileOperations file_operations_;
     ImgRenderer image_renderer_;
     std::wstring path_;
+    std::wstring displayslidepath_;
     WORD activeparam_{};
     HFONT captionfont_{nullptr};
     HCURSOR arrowcursor_{nullptr};
@@ -120,6 +121,10 @@ class ImgVwWindow final : public Window
     void DecreaseSlideShowSpeed();
     void HandleSlideShow();
     BOOL AdvanceRandomSlide(BOOL restarttimer);
+    BOOL AdvanceSharedRandomSlide(ImgVwWindow* target);
+    void RestoreSharedRandomOwnerDisplayCursor();
+    BOOL IsSlidePathVisible(const std::wstring& filepath);
+    BOOL DisplaySlidePath(const std::wstring& filepath);
     void DisplayCurrentSlideWhenReady();
     void DisplayCurrentSlideWithoutTimer();
     void HandleBrowserChanged();

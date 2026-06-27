@@ -83,7 +83,6 @@ BOOL CALLBACK ImgVwWindow::CreateSlideShowWindowForMonitor(HMONITOR monitor, HDC
         window->slideshowrandom_ = TRUE;
         window->slideshowrunning_ = TRUE;
         ShowWindow(window->hwnd(), SW_SHOWNOACTIVATE);
-        window->DisplayCurrentSlideWithoutTimer();
         if (context->owner->browsesubfolders_)
         {
             window->EnableBrowseSubFolders();
@@ -112,9 +111,9 @@ LRESULT ImgVwWindow::OnCreate()
     if (primarywindow_)
     {
         SetCapture(hwnd_);
+        ShowCursor(FALSE);
     }
 
-    ShowCursor(FALSE);
     InitializeMonitorState();
     InitializeBrowser(path_);
 
@@ -231,7 +230,7 @@ BOOL ImgVwWindow::HasMultipleMonitors() const
 
 BOOL ImgVwWindow::BeginWindowDrag(LPARAM lParam)
 {
-    if (!HasMultipleMonitors())
+    if (multimonitorslideshowrunning_ || owner_ != nullptr || !HasMultipleMonitors())
     {
         return FALSE;
     }
@@ -491,7 +490,11 @@ void ImgVwWindow::StartMultiMonitorRandomSlideShow()
     MonitorCreateContext context{hinst_, path_, primarymonitor, this};
     EnumDisplayMonitors(nullptr, nullptr, CreateSlideShowWindowForMonitor, reinterpret_cast<LPARAM>(&context));
 
-    DisplayCurrentSlideWithoutTimer();
+    for (std::size_t index = 0; index < MultiMonitorSlideShowWindowCount(); ++index)
+    {
+        AdvanceSharedRandomSlide(MultiMonitorSlideShowWindowAt(index));
+    }
+
     RestartMultiMonitorSlideShowTimer();
 }
 
@@ -529,7 +532,7 @@ void ImgVwWindow::HandleMultiMonitorSlideShow()
     multimonitorslideshowindex_ = (multimonitorslideshowindex_ + 1) % count;
     if (window != nullptr)
     {
-        window->AdvanceRandomSlide(FALSE);
+        AdvanceSharedRandomSlide(window);
     }
 
     RestartMultiMonitorSlideShowTimer();
@@ -674,6 +677,93 @@ BOOL ImgVwWindow::AdvanceRandomSlide(BOOL restarttimer)
     return TRUE;
 }
 
+BOOL ImgVwWindow::AdvanceSharedRandomSlide(ImgVwWindow* target)
+{
+    if (target == nullptr || target->slideshowwaitingforimage_)
+    {
+        return FALSE;
+    }
+
+    std::wstring filepath;
+    BOOL foundpath = FALSE;
+    const auto maxattempts = MultiMonitorSlideShowWindowCount() * 4 + 8;
+    for (std::size_t attempt = 0; attempt < maxattempts; ++attempt)
+    {
+        if (!browser_.MoveToRandom())
+        {
+            RestoreSharedRandomOwnerDisplayCursor();
+            return FALSE;
+        }
+
+        filepath = browser_.GetCurrentFilePath();
+        if (!filepath.empty() && !IsSlidePathVisible(filepath))
+        {
+            foundpath = TRUE;
+            break;
+        }
+    }
+
+    if (!foundpath)
+    {
+        RestoreSharedRandomOwnerDisplayCursor();
+        return FALSE;
+    }
+
+    if (target == this)
+    {
+        target->DisplayCurrentSlideWithoutTimer();
+        target->slideshowneedsinitialadvance_ = FALSE;
+        return TRUE;
+    }
+
+    const auto displayed = target->DisplaySlidePath(filepath);
+    RestoreSharedRandomOwnerDisplayCursor();
+    return displayed;
+}
+
+void ImgVwWindow::RestoreSharedRandomOwnerDisplayCursor()
+{
+    if (!displayslidepath_.empty())
+    {
+        browser_.MoveToItem(displayslidepath_);
+    }
+}
+
+BOOL ImgVwWindow::IsSlidePathVisible(const std::wstring& filepath)
+{
+    if (filepath.empty())
+    {
+        return FALSE;
+    }
+
+    if (displayslidepath_ == filepath)
+    {
+        return TRUE;
+    }
+
+    for (const auto window : slideshowwindows_)
+    {
+        if (window != nullptr && window->displayslidepath_ == filepath)
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+BOOL ImgVwWindow::DisplaySlidePath(const std::wstring& filepath)
+{
+    if (filepath.empty() || !browser_.MoveToOrAddItem(filepath))
+    {
+        return FALSE;
+    }
+
+    DisplayCurrentSlideWithoutTimer();
+    slideshowneedsinitialadvance_ = FALSE;
+    return TRUE;
+}
+
 void ImgVwWindow::DisplayCurrentSlideWhenReady()
 {
     KillTimer(hwnd_, IDT_SLIDESHOW);
@@ -686,12 +776,14 @@ void ImgVwWindow::DisplayCurrentSlideWithoutTimer()
     const auto imgitem = browser_.GetCurrentItem();
     if (imgitem == nullptr)
     {
+        displayslidepath_.clear();
         slideshowwaitingforimage_ = FALSE;
         slideshowneedsinitialadvance_ = slideshowrunning_ && slideshowrandom_;
         return;
     }
 
     slideshowneedsinitialadvance_ = FALSE;
+    displayslidepath_ = browser_.GetCurrentFilePath();
     const auto status = imgitem->status();
     slideshowwaitingforimage_ = status != ImgItem::Status::Ready && status != ImgItem::Status::Error;
     if (!slideshowwaitingforimage_)
@@ -728,8 +820,19 @@ void ImgVwWindow::HandleBrowserChanged()
 
     if (slideshowneedsinitialadvance_ && slideshowrunning_ && slideshowrandom_)
     {
-        const auto restarttimer = owner_ == nullptr && !multimonitorslideshowrunning_;
-        AdvanceRandomSlide(restarttimer);
+        if (owner_ != nullptr)
+        {
+            owner_->AdvanceSharedRandomSlide(this);
+        }
+        else if (multimonitorslideshowrunning_)
+        {
+            AdvanceSharedRandomSlide(this);
+        }
+        else
+        {
+            AdvanceRandomSlide(TRUE);
+        }
+
         return;
     }
 
