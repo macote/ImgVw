@@ -97,6 +97,7 @@ class ImgLoader
     ImgLoader(const ImgLoader&) = delete;
     ImgLoader& operator=(const ImgLoader&) = delete;
     void QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext = FALSE);
+    void PrioritizeTargetSize(INT targetwidth, INT targetheight);
     void SetNotificationWindow(HWND hwnd, UINT message);
     void StopLoading();
 
@@ -108,6 +109,9 @@ class ImgLoader
     HANDLE cancelevent_;
     HANDLE loopthread_{INVALID_HANDLE_VALUE};
     BOOL cancellationflag_{};
+    BOOL preferredtargetsizeset_{FALSE};
+    INT preferredtargetwidth_{};
+    INT preferredtargetheight_{};
     HWND notificationhwnd_{nullptr};
     UINT notificationmessage_{};
     CountingSemaphore loadersemaphore_;

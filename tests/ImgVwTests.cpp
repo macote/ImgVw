@@ -159,6 +159,20 @@ void TestOrderedNavigation()
     Check(files.CurrentPath() == L"a.jpg", "failed move preserves current path");
 }
 
+void TestPathsFromCurrent()
+{
+    ImgFileList files(1);
+    files.Add(L"b.jpg");
+    files.Add(L"a.jpg");
+    files.Add(L"d.jpg");
+    files.Add(L"c.jpg");
+
+    Check(files.MoveTo(L"c.jpg"), "move to queue seed start succeeds");
+    const auto paths = files.PathsFromCurrent();
+    const std::vector<std::wstring> expected = {L"c.jpg", L"d.jpg", L"a.jpg", L"b.jpg"};
+    Check(paths == expected, "paths from current start at current item and wrap in browse order");
+}
+
 void TestRemoval()
 {
     ImgFileList files(1);
@@ -621,6 +635,7 @@ int main()
 {
     TestEmptyList();
     TestOrderedNavigation();
+    TestPathsFromCurrent();
     TestRemoval();
     TestRandomNavigation();
     TestClear();

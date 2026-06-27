@@ -165,6 +165,11 @@ BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
 
     clientwidth_ = width;
     clientheight_ = height;
+    if (!displayslidepath_.empty())
+    {
+        browser_.MoveToItem(displayslidepath_);
+    }
+
     return browser_.UpdateTargetSize(width, height);
 }
 
@@ -419,6 +424,18 @@ void ImgVwWindow::EnableBrowseSubFolders()
 
 void ImgVwWindow::HandleMouseWheel(WORD distance)
 {
+    if (owner_ != nullptr)
+    {
+        owner_->HandleMultiMonitorMouseWheel(this);
+        return;
+    }
+
+    if (multimonitorslideshowrunning_)
+    {
+        HandleMultiMonitorMouseWheel(this);
+        return;
+    }
+
     if (distance & 0x8000)
     {
         BrowseNext();
@@ -426,6 +443,15 @@ void ImgVwWindow::HandleMouseWheel(WORD distance)
     else
     {
         BrowsePrevious();
+    }
+}
+
+void ImgVwWindow::HandleMultiMonitorMouseWheel(ImgVwWindow* target)
+{
+    if (multimonitorslideshowrunning_)
+    {
+        AdvanceSharedRandomSlide(target);
+        RestartMultiMonitorSlideShowTimer();
     }
 }
 

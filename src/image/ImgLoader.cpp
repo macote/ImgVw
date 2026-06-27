@@ -189,6 +189,14 @@ void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext
     {
         queue_.push_front(imgitem);
     }
+    else if (preferredtargetsizeset_ && imgitem->targetwidth() == preferredtargetwidth_ &&
+             imgitem->targetheight() == preferredtargetheight_)
+    {
+        const auto staleitem = std::find_if(queue_.begin(), queue_.end(), [this](const std::shared_ptr<ImgItem>& item) {
+            return item->targetwidth() != preferredtargetwidth_ || item->targetheight() != preferredtargetheight_;
+        });
+        queue_.insert(staleitem, imgitem);
+    }
     else
     {
         queue_.push_back(imgitem);
@@ -197,6 +205,36 @@ void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext
     LeaveCriticalSection(&queuecriticalsection_);
 
     SetEvent(workevent_);
+}
+
+void ImgLoader::PrioritizeTargetSize(INT targetwidth, INT targetheight)
+{
+    EnterCriticalSection(&queuecriticalsection_);
+
+    preferredtargetsizeset_ = TRUE;
+    preferredtargetwidth_ = targetwidth;
+    preferredtargetheight_ = targetheight;
+
+    std::list<std::shared_ptr<ImgItem>> prioritized;
+    auto item = queue_.begin();
+    while (item != queue_.end())
+    {
+        if ((*item)->targetwidth() == targetwidth && (*item)->targetheight() == targetheight)
+        {
+            prioritized.splice(prioritized.end(), queue_, item++);
+        }
+        else
+        {
+            ++item;
+        }
+    }
+
+    if (!prioritized.empty())
+    {
+        queue_.splice(queue_.begin(), prioritized);
+    }
+
+    LeaveCriticalSection(&queuecriticalsection_);
 }
 
 void ImgLoader::SetNotificationWindow(HWND hwnd, UINT message)

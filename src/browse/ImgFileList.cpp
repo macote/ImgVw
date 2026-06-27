@@ -139,3 +139,17 @@ bool ImgFileList::RemoveCurrent()
     random_index_ = kRandomIndexPark;
     return true;
 }
+
+std::vector<std::wstring> ImgFileList::PathsFromCurrent() const
+{
+    std::vector<std::wstring> paths;
+    if (files_.empty())
+    {
+        return paths;
+    }
+
+    const auto start = current_ == files_.end() ? files_.begin() : current_;
+    paths.insert(paths.end(), start, files_.end());
+    paths.insert(paths.end(), files_.begin(), start);
+    return paths;
+}
