@@ -75,6 +75,7 @@ class ImgVwWindow final : public Window
     BOOL BeginWindowDrag(LPARAM lParam);
     BOOL UpdateWindowDrag(WPARAM wParam, LPARAM lParam);
     void EndWindowDrag();
+    void FinishWindowDrag();
     void PerformAction();
     void BrowseNext();
     void BrowsePrevious();
