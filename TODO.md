@@ -9,8 +9,6 @@
 - Thumbnails
 - UI for load status
   - Hold Ctrl key to display image file count / loaded count
-- Right-Click context menu
-  - About, Exit, etc.
 - Load progress indicator for large files
 - Pan & Zoom
 - UI for error management
