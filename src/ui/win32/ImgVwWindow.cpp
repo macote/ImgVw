@@ -123,8 +123,10 @@ void ImgVwWindow::HandleWindowPosChanged()
     }
 
     currentmonitor_ = monitor;
-    ApplyMonitorBounds(monitor);
-    EndWindowDrag();
+    if (!draggingwindow_)
+    {
+        ApplyMonitorBounds(monitor);
+    }
 }
 
 BOOL ImgVwWindow::ApplyMonitorBounds(HMONITOR monitor)
@@ -185,7 +187,7 @@ BOOL ImgVwWindow::UpdateWindowDrag(WPARAM wParam, LPARAM lParam)
 
     if ((wParam & MK_LBUTTON) == 0)
     {
-        EndWindowDrag();
+        FinishWindowDrag();
         return FALSE;
     }
 
@@ -209,6 +211,22 @@ void ImgVwWindow::EndWindowDrag()
 
     draggingwindow_ = FALSE;
     ShowCursor(FALSE);
+}
+
+void ImgVwWindow::FinishWindowDrag()
+{
+    if (!draggingwindow_)
+    {
+        return;
+    }
+
+    const auto monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+    EndWindowDrag();
+    if (monitor != nullptr)
+    {
+        currentmonitor_ = monitor;
+        ApplyMonitorBounds(monitor);
+    }
 }
 
 bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
@@ -719,7 +737,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         break;
     case WM_LBUTTONUP:
-        EndWindowDrag();
+        FinishWindowDrag();
         return 0;
     case WM_MOUSEMOVE:
         if (UpdateWindowDrag(wParam, lParam))
