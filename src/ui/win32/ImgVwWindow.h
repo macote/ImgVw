@@ -58,8 +58,16 @@ class ImgVwWindow final : public Window
     POINTS mousemovelastpoints_{};
     LARGE_INTEGER mousemovelastcounter_{};
     BOOL mousehidetimerstarted_{FALSE};
+    INT clientwidth_{};
+    INT clientheight_{};
+    HMONITOR currentmonitor_{nullptr};
   private:
     void InitializeBrowser(const std::wstring& path);
+    BOOL UpdateClientSize(INT width, INT height);
+    void HandleSize(WPARAM wParam, LPARAM lParam);
+    void InitializeMonitorState();
+    void HandleWindowPosChanged();
+    BOOL ApplyMonitorBounds(HMONITOR monitor);
     void PerformAction();
     void BrowseNext();
     void BrowsePrevious();

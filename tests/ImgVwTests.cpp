@@ -4,6 +4,7 @@
 #include "ImageFormatDetector.h"
 #include "ImgResampler.h"
 #include "ImgFileList.h"
+#include "ImgCache.h"
 #include "ImgGDIItem.h"
 #include "ImgItemFactory.h"
 #include "ImgJpegDecoder.h"
@@ -209,6 +210,20 @@ void TestClear()
     Check(files.Empty(), "clear removes all items");
     Check(files.CurrentPath().empty(), "clear resets current path");
     Check(!files.MoveToRandom(), "clear resets random navigation");
+}
+
+void TestImgCacheKeyUsesViewport()
+{
+    const ImgCacheKey first{L"C:\\images\\photo.jpg", 800, 600};
+    const ImgCacheKey same{L"C:\\images\\photo.jpg", 800, 600};
+    const ImgCacheKey wider{L"C:\\images\\photo.jpg", 1024, 600};
+    const ImgCacheKey taller{L"C:\\images\\photo.jpg", 800, 768};
+    const ImgCacheKey other_path{L"C:\\images\\other.jpg", 800, 600};
+
+    Check(!(first < same) && !(same < first), "matching cache keys compare equivalent");
+    Check(first < wider || wider < first, "cache key includes target width");
+    Check(first < taller || taller < first, "cache key includes target height");
+    Check(first < other_path || other_path < first, "cache key includes filepath");
 }
 
 void TestLoaderShutdown()
@@ -609,6 +624,7 @@ int main()
     TestRemoval();
     TestRandomNavigation();
     TestClear();
+    TestImgCacheKeyUsesViewport();
     TestLoaderShutdown();
     TestImageFormatDetectorSignatures();
     TestImgItemFactoryResolvesSupportedExtensionsOnly();

@@ -40,6 +40,7 @@ LRESULT ImgVwWindow::OnCreate()
     SetCursor(arrowcursor_);
     SetCapture(hwnd_);
     ShowCursor(FALSE);
+    InitializeMonitorState();
     InitializeBrowser(path_);
 
     return FALSE;
@@ -72,7 +73,77 @@ void ImgVwWindow::InitializeBrowser(const std::wstring& path)
     }
 
     browser_.SetNotificationWindow(hwnd_, kBrowserChangedMessage);
+    UpdateClientSize(windowrectangle.right, windowrectangle.bottom);
     browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom);
+}
+
+BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
+{
+    if (width <= 0 || height <= 0)
+    {
+        return FALSE;
+    }
+
+    if (clientwidth_ == width && clientheight_ == height)
+    {
+        return FALSE;
+    }
+
+    clientwidth_ = width;
+    clientheight_ = height;
+    return browser_.UpdateTargetSize(width, height);
+}
+
+void ImgVwWindow::HandleSize(WPARAM wParam, LPARAM lParam)
+{
+    if (wParam == SIZE_MINIMIZED)
+    {
+        return;
+    }
+
+    const auto width = static_cast<INT>(LOWORD(lParam));
+    const auto height = static_cast<INT>(HIWORD(lParam));
+    if (UpdateClientSize(width, height))
+    {
+        InvalidateScreen();
+    }
+}
+
+void ImgVwWindow::InitializeMonitorState()
+{
+    currentmonitor_ = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+}
+
+void ImgVwWindow::HandleWindowPosChanged()
+{
+    const auto monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+    if (monitor == nullptr || monitor == currentmonitor_)
+    {
+        return;
+    }
+
+    currentmonitor_ = monitor;
+    ApplyMonitorBounds(monitor);
+}
+
+BOOL ImgVwWindow::ApplyMonitorBounds(HMONITOR monitor)
+{
+    MONITORINFO monitorinfo{};
+    monitorinfo.cbSize = sizeof(monitorinfo);
+    if (!GetMonitorInfo(monitor, &monitorinfo))
+    {
+        return FALSE;
+    }
+
+    const auto width = monitorinfo.rcMonitor.right - monitorinfo.rcMonitor.left;
+    const auto height = monitorinfo.rcMonitor.bottom - monitorinfo.rcMonitor.top;
+    if (width <= 0 || height <= 0)
+    {
+        return FALSE;
+    }
+
+    return SetWindowPos(hwnd_, nullptr, monitorinfo.rcMonitor.left, monitorinfo.rcMonitor.top, width, height,
+                        SWP_NOACTIVATE | SWP_NOZORDER);
 }
 
 bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
@@ -506,6 +577,11 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_ERASEBKGND:
         return TRUE;
     case WM_SIZE:
+        HandleSize(wParam, lParam);
+        return FALSE;
+    case WM_WINDOWPOSCHANGED:
+        HandleWindowPosChanged();
+        break;
     case WM_SETFOCUS:
         return FALSE;
     case WM_COMMAND:

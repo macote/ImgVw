@@ -32,6 +32,7 @@ class ImgBrowser final
     ImgBrowser(const ImgBrowser&) = delete;
     ImgBrowser& operator=(const ImgBrowser&) = delete;
     void BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight);
+    BOOL UpdateTargetSize(INT targetwidth, INT targetheight);
     void BrowseSubFoldersAsync();
     void StopBrowsing();
     void SetNotificationWindow(HWND hwnd, UINT message);
@@ -72,4 +73,5 @@ class ImgBrowser final
     static DWORD WINAPI StaticThreadCollectSubFolders(void* browserinstance);
     void Reset();
     ImgItem::Format ResolveFileFormat(const std::wstring& filepath);
+    std::shared_ptr<ImgItem> GetOrCreateCachedItem(const std::wstring& filepath);
 };
