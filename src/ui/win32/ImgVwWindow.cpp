@@ -131,7 +131,11 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
             return;
         }
 
-        if (!DisplayImage(pps->hdc, imgitem.get()))
+        if (DisplayImage(pps->hdc, imgitem.get()))
+        {
+            paintedslidepath_ = browser_.GetCurrentFilePath();
+        }
+        else
         {
             DisplayFileInformation(pps->hdc, browser_.GetCurrentFilePath());
         }
@@ -165,9 +169,10 @@ BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
 
     clientwidth_ = width;
     clientheight_ = height;
-    if (!displayslidepath_.empty())
+    const auto restorepath = paintedslidepath_.empty() ? displayslidepath_ : paintedslidepath_;
+    if (!restorepath.empty())
     {
-        browser_.MoveToItem(displayslidepath_);
+        browser_.MoveToItem(restorepath);
     }
 
     return browser_.UpdateTargetSize(width, height);
@@ -803,6 +808,7 @@ void ImgVwWindow::DisplayCurrentSlideWithoutTimer()
     if (imgitem == nullptr)
     {
         displayslidepath_.clear();
+        paintedslidepath_.clear();
         slideshowwaitingforimage_ = FALSE;
         slideshowneedsinitialadvance_ = slideshowrunning_ && slideshowrandom_;
         return;

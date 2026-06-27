@@ -55,6 +55,7 @@ class ImgVwWindow final : public Window
     ImgRenderer image_renderer_;
     std::wstring path_;
     std::wstring displayslidepath_;
+    std::wstring paintedslidepath_;
     WORD activeparam_{};
     HFONT captionfont_{nullptr};
     HCURSOR arrowcursor_{nullptr};
