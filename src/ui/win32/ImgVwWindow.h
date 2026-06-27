@@ -10,6 +10,7 @@
 #include <Windowsx.h>
 #include <commctrl.h>
 #include <objidl.h>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,10 @@ class ImgVwWindow final : public Window
             path_ = args[1];
         }
     }
+    ImgVwWindow(HINSTANCE hinst, const std::wstring& path, ImgVwWindow* owner, BOOL primary)
+        : Window(hinst), path_(path), owner_(owner), primarywindow_(primary)
+    {
+    }
     ImgVwWindow(const ImgVwWindow&) = delete;
     ImgVwWindow& operator=(const ImgVwWindow&) = delete;
     LPCWSTR ClassName() const
@@ -43,6 +48,8 @@ class ImgVwWindow final : public Window
     static ImgVwWindow* Create(HINSTANCE hInst, const std::vector<std::wstring>& args);
 
   private:
+    struct MonitorCreateContext;
+
     ImgBrowser browser_;
     FileOperations file_operations_;
     ImgRenderer image_renderer_;
@@ -54,17 +61,27 @@ class ImgVwWindow final : public Window
     BOOL slideshowrunning_{};
     BOOL slideshowrandom_{};
     BOOL slideshowwaitingforimage_{};
+    BOOL slideshowneedsinitialadvance_{};
     UINT slideshowinterval_{kInitialSlideShowIntervalInMilliseconds};
     POINTS mousemovelastpoints_{};
     LARGE_INTEGER mousemovelastcounter_{};
     BOOL mousehidetimerstarted_{FALSE};
     INT clientwidth_{};
     INT clientheight_{};
+    BOOL browsesubfolders_{FALSE};
     HMONITOR currentmonitor_{nullptr};
     BOOL draggingwindow_{FALSE};
     POINT dragstartpoint_{};
     RECT dragstartwindowrect_{};
+    ImgVwWindow* owner_{nullptr};
+    BOOL primarywindow_{TRUE};
+    BOOL multimonitorslideshowrunning_{FALSE};
+    std::size_t multimonitorslideshowindex_{};
+    std::vector<ImgVwWindow*> slideshowwindows_;
   private:
+    static ImgVwWindow* CreateOnMonitor(HINSTANCE hInst, const std::wstring& path, HMONITOR monitor,
+                                        ImgVwWindow* owner);
+    static BOOL CALLBACK CreateSlideShowWindowForMonitor(HMONITOR monitor, HDC dc, LPRECT rect, LPARAM param);
     void InitializeBrowser(const std::wstring& path);
     BOOL UpdateClientSize(INT width, INT height);
     void HandleSize(WPARAM wParam, LPARAM lParam);
@@ -82,15 +99,29 @@ class ImgVwWindow final : public Window
     void BrowseFirst();
     void BrowseLast();
     void BrowseSubFolders();
+    void EnableBrowseSubFolders();
     void HandleMouseWheel(WORD distance);
     void ToggleSlideShow(BOOL slideshowrandom);
     void StartSlideShow();
     void StopSlideShow();
+    void ToggleMultiMonitorRandomSlideShow();
+    void StartMultiMonitorRandomSlideShow();
+    void StopMultiMonitorRandomSlideShow();
+    void RestartMultiMonitorSlideShowTimer();
+    void HandleMultiMonitorSlideShow();
+    ImgVwWindow* MultiMonitorSlideShowWindowAt(std::size_t index);
+    std::size_t MultiMonitorSlideShowWindowCount() const;
+    void DestroySlideShowWindows();
+    void OnSlideShowWindowDestroyed(ImgVwWindow* window);
+    void CloseOwnedWindows();
+    ImgVwWindow* CommandTarget();
     void RestartSlideShowTimer();
     void IncreaseSlideShowSpeed();
     void DecreaseSlideShowSpeed();
     void HandleSlideShow();
+    BOOL AdvanceRandomSlide(BOOL restarttimer);
     void DisplayCurrentSlideWhenReady();
+    void DisplayCurrentSlideWithoutTimer();
     void HandleBrowserChanged();
     BOOL SelectDefaultICCProfile();
     void UseBuiltInICCProfile();
