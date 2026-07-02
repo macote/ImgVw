@@ -8,11 +8,17 @@
 #include <string>
 #include <vector>
 
+struct ImgBrowserStats
+{
+    std::size_t found_images{};
+    INT targetwidth{};
+    INT targetheight{};
+    ImgLoaderStats loader;
+    std::vector<ImgCacheSizeStats> sizes;
+};
+
 class ImgBrowser final
 {
-  public:
-    static constexpr std::size_t kTargetSizeSeedQueueLimit = 64;
-
   public:
     ImgBrowser()
     {
@@ -25,6 +31,7 @@ class ImgBrowser final
     ~ImgBrowser()
     {
         StopCollecting();
+        StopTargetQueueing();
         DeleteCriticalSection(&browsecriticalsection_);
         CloseHandle(readyevent_);
         if (collectorthread_ != NULL)
@@ -50,8 +57,23 @@ class ImgBrowser final
     BOOL MoveToRandom();
     void RemoveCurrentItem();
     void ReloadCurrentItem();
+    BOOL PreloadTargetSize(INT targetwidth, INT targetheight);
+    BOOL PreloadTargetSizes(const std::vector<SIZE>& target_sizes);
+    ImgBrowserStats GetStats();
 
   private:
+    struct TargetSize
+    {
+        INT width{};
+        INT height{};
+    };
+    struct TargetSizeQueueRequest
+    {
+        ImgBrowser* browser{};
+        std::vector<TargetSize> sizes;
+        BOOL loadnext{};
+    };
+
     ImgCache cache_;
     ImgLoader loader_;
     BOOL cancellationflag_{};
@@ -60,10 +82,12 @@ class ImgBrowser final
     ImgFileList files_;
     std::vector<std::wstring> folders_;
     HANDLE collectorthread_{NULL};
+    std::vector<HANDLE> targetqueuethreads_;
     HANDLE readyevent_;
     CRITICAL_SECTION browsecriticalsection_;
     INT targetwidth_{};
     INT targetheight_{};
+    std::vector<TargetSize> target_sizes_;
     HWND notificationhwnd_{nullptr};
     UINT notificationmessage_{};
 
@@ -72,11 +96,21 @@ class ImgBrowser final
     void CollectFolder(const std::wstring& folderpath);
     void CollectSubFolders();
     void StopCollecting();
+    void StopTargetQueueing();
     void NotifyChanged();
     static DWORD WINAPI StaticThreadCollect(void* browserinstance);
     static DWORD WINAPI StaticThreadCollectSubFolders(void* browserinstance);
+    static DWORD WINAPI StaticThreadQueueTargetSize(void* targetsizequeuerequest);
     void Reset();
-    void QueueTargetSizeFromCurrent();
+    BOOL AddTargetSize(INT targetwidth, INT targetheight);
+    BOOL AddTargetSizes(const std::vector<SIZE>& target_sizes, std::vector<TargetSize>* added_sizes);
+    void QueueTargetSizeAsync(INT targetwidth, INT targetheight, BOOL loadnext);
+    void QueueTargetSizesAsync(const std::vector<TargetSize>& target_sizes, BOOL loadnext);
+    void QueueTargetSizes(const std::vector<TargetSize>& target_sizes, BOOL loadnext);
+    void QueueFileForTargetSizes(const std::wstring& filepath, ImgItem::Format imgformat, BOOL loadnext);
+    void CleanupTargetQueueThreads();
     ImgItem::Format ResolveFileFormat(const std::wstring& filepath);
     std::shared_ptr<ImgItem> GetOrCreateCachedItem(const std::wstring& filepath);
+    std::shared_ptr<ImgItem> GetOrCreateCachedItem(const std::wstring& filepath, INT targetwidth, INT targetheight,
+                                                   ImgItem::Format imgformat);
 };

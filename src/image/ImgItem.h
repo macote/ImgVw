@@ -99,6 +99,10 @@ class ImgItem
     {
         return targetheight_;
     }
+    DWORD displaybuffersize() const
+    {
+        return displaybuffer_.buffersize();
+    }
     HANDLE loadedevent() const
     {
         return loadedevent_;

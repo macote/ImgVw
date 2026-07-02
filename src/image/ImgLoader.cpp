@@ -1,4 +1,4 @@
-﻿#include "ImgLoader.h"
+#include "ImgLoader.h"
 
 #include <algorithm>
 
@@ -241,6 +241,26 @@ void ImgLoader::SetNotificationWindow(HWND hwnd, UINT message)
 {
     notificationhwnd_ = hwnd;
     notificationmessage_ = message;
+}
+
+ImgLoaderStats ImgLoader::GetStats()
+{
+    ImgLoaderStats stats;
+    EnterCriticalSection(&queuecriticalsection_);
+    stats.queued = queue_.size();
+    for (const auto& loaderitem : loaderitems_)
+    {
+        const auto status = loaderitem->imgitem()->status();
+        if (status != ImgItem::Status::Ready && status != ImgItem::Status::Error)
+        {
+            ++stats.loading;
+        }
+    }
+    stats.maximum_slots = kMaximumLoaderCount;
+    stats.free_slots = stats.loading >= stats.maximum_slots ? 0 : stats.maximum_slots - stats.loading;
+    LeaveCriticalSection(&queuecriticalsection_);
+
+    return stats;
 }
 
 std::shared_ptr<ImgItem> ImgLoader::GetNextItem()

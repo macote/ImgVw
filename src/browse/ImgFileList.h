@@ -17,6 +17,7 @@ class ImgFileList final
     void Clear();
     bool Add(const std::wstring& filepath);
     bool Empty() const;
+    std::size_t Size() const;
     std::wstring CurrentPath() const;
     bool MoveToNext();
     bool MoveToPrevious();

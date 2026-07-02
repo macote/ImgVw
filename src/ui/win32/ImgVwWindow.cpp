@@ -2,6 +2,56 @@
 
 #include <algorithm>
 #include <climits>
+#include <iomanip>
+#include <sstream>
+
+#ifndef WM_DPICHANGED
+#define WM_DPICHANGED 0x02E0
+#endif
+
+namespace
+{
+typedef UINT(WINAPI* GetDpiForWindowProc)(HWND hwnd);
+
+constexpr UINT kDefaultDpi = 96;
+
+std::wstring FormatByteSize(unsigned long long bytes)
+{
+    static const wchar_t* kUnits[] = {L"B", L"KB", L"MB", L"GB", L"TB"};
+    auto value = static_cast<double>(bytes);
+    std::size_t unitindex{};
+    while (value >= 1024.0 && unitindex < _countof(kUnits) - 1)
+    {
+        value /= 1024.0;
+        ++unitindex;
+    }
+
+    std::wstringstream text;
+    if (unitindex == 0)
+    {
+        text << bytes << L" " << kUnits[unitindex];
+    }
+    else if (value >= 100.0)
+    {
+        text << static_cast<unsigned long long>(value + 0.5) << L" " << kUnits[unitindex];
+    }
+    else
+    {
+        text.setf(std::ios::fixed);
+        text.precision(1);
+        text << value << L" " << kUnits[unitindex];
+    }
+
+    return text.str();
+}
+
+std::wstring FormatPercent(std::size_t numerator, std::size_t denominator)
+{
+    std::wstringstream text;
+    text << (denominator > 0 ? numerator * 100 / denominator : 0) << L"%";
+    return text.str();
+}
+} // namespace
 
 struct ImgVwWindow::MonitorCreateContext
 {
@@ -140,6 +190,11 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
             DisplayFileInformation(pps->hdc, browser_.GetCurrentFilePath());
         }
     }
+
+    if (loaderstatsoverlayvisible_)
+    {
+        DrawLoaderStatsOverlay(pps->hdc, imgitem.get());
+    }
 }
 
 void ImgVwWindow::InitializeBrowser(const std::wstring& path)
@@ -193,6 +248,30 @@ void ImgVwWindow::HandleSize(WPARAM wParam, LPARAM lParam)
     }
 }
 
+void ImgVwWindow::HandleDpiChanged(LPARAM lParam)
+{
+    ResetLoaderStatsOverlayLayout();
+
+    const auto suggestedrect = reinterpret_cast<RECT*>(lParam);
+    if (suggestedrect != nullptr)
+    {
+        SetWindowPos(hwnd_, nullptr, suggestedrect->left, suggestedrect->top,
+                     suggestedrect->right - suggestedrect->left, suggestedrect->bottom - suggestedrect->top,
+                     SWP_NOACTIVATE | SWP_NOZORDER);
+    }
+
+    RECT clientrect{};
+    if (GetClientRect(hwnd_, &clientrect) && UpdateClientSize(clientrect.right, clientrect.bottom))
+    {
+        InvalidateScreen();
+    }
+
+    if (loaderstatsoverlayvisible_)
+    {
+        RefreshLoaderStatsOverlay();
+    }
+}
+
 void ImgVwWindow::InitializeMonitorState()
 {
     currentmonitor_ = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
@@ -206,6 +285,7 @@ void ImgVwWindow::HandleWindowPosChanged()
         return;
     }
 
+    ResetLoaderStatsOverlayLayout();
     currentmonitor_ = monitor;
     if (!draggingwindow_)
     {
@@ -334,7 +414,9 @@ bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
                                item->offsetx(),
                                item->offsety(),
                                item->displaywidth(),
-                               item->displayheight()};
+                               item->displayheight(),
+                               loaderstatsoverlayvisible_ && !IsRectEmpty(&loaderstatsoverlayrect_),
+                               loaderstatsoverlayrect_};
     return image_renderer_.Render(input).Succeeded();
 }
 
@@ -346,6 +428,320 @@ void ImgVwWindow::DisplayFileInformation(HDC dc, const std::wstring& filepath)
     const auto text_length =
         static_cast<int>(filepath.size() > static_cast<size_t>(INT_MAX) ? INT_MAX : filepath.size());
     TextOut(dc, 0, 0, filepath.c_str(), text_length);
+}
+
+BOOL ImgVwWindow::IsLoaderStatsOverlayKeyDown() const
+{
+    return owner_ == nullptr && (GetKeyState(VK_CONTROL) & 0x8000) != 0 && (GetKeyState(VK_MENU) & 0x8000) != 0;
+}
+
+void ImgVwWindow::UpdateLoaderStatsOverlayVisibility()
+{
+    const auto visible = IsLoaderStatsOverlayKeyDown();
+    if (loaderstatsoverlayvisible_ == visible)
+    {
+        return;
+    }
+
+    loaderstatsoverlayvisible_ = visible;
+    if (loaderstatsoverlayvisible_)
+    {
+        SetTimer(hwnd_, kLoaderStatsOverlayTimer, kLoaderStatsOverlayIntervalInMilliseconds, nullptr);
+        RefreshLoaderStatsOverlay();
+    }
+    else
+    {
+        KillTimer(hwnd_, kLoaderStatsOverlayTimer);
+        const auto previousrect = loaderstatsoverlayrect_;
+        loaderstatsoverlaytext_.clear();
+        SetRectEmpty(&loaderstatsoverlayrect_);
+        if (!IsRectEmpty(&previousrect))
+        {
+            InvalidateRect(hwnd_, &previousrect, FALSE);
+        }
+    }
+}
+
+std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
+{
+    const auto stats = browser_.GetStats();
+    std::size_t cached{};
+    for (const auto& size_stats : stats.sizes)
+    {
+        const auto size_total = size_stats.queued + size_stats.loading + size_stats.ready + size_stats.error;
+        cached += size_total;
+    }
+
+    std::wstringstream text;
+    text << stats.loader.queued << L" queued; " << stats.loader.free_slots << L"/" << stats.loader.maximum_slots
+         << L" slots free; " << cached << L" cached images";
+    const auto temppath = ImgSettings::GetInstance().temppath();
+    ULARGE_INTEGER freebytesavailable{};
+    if (!temppath.empty() && GetDiskFreeSpaceEx(temppath.c_str(), &freebytesavailable, nullptr, nullptr))
+    {
+        text << L"; " << FormatByteSize(freebytesavailable.QuadPart) << L" free";
+    }
+
+    text << L"\r\n";
+    text << L"--------------------------------------------------------------------------\r\n";
+    text << std::left << std::setw(12) << L"Size" << std::right << std::setw(8) << L"Ready" << std::setw(10)
+         << L"Loaded" << std::setw(10) << L"Loading" << std::setw(10) << L"Queued" << std::setw(8) << L"Errors"
+         << std::setw(13) << L"Used" << L"\r\n";
+    text << L"--------------------------------------------------------------------------\r\n";
+
+    for (const auto& size_stats : stats.sizes)
+    {
+        const auto size_total = size_stats.queued + size_stats.loading + size_stats.ready + size_stats.error;
+        std::wstringstream size;
+        size << size_stats.targetwidth << L"x" << size_stats.targetheight;
+        text << std::left << std::setw(12) << size.str() << std::right << std::setw(8)
+             << FormatPercent(size_stats.ready, size_total) << std::setw(10) << size_stats.ready << std::setw(10)
+             << size_stats.loading << std::setw(10) << size_stats.queued << std::setw(8) << size_stats.error
+             << std::setw(13) << FormatByteSize(size_stats.temp_file_bytes) << L"\r\n";
+    }
+
+    return text.str();
+}
+
+UINT ImgVwWindow::GetWindowDpi() const
+{
+    const auto user32 = GetModuleHandle(L"user32.dll");
+    if (user32 != nullptr)
+    {
+        const auto get_dpi_for_window =
+            reinterpret_cast<GetDpiForWindowProc>(GetProcAddress(user32, "GetDpiForWindow"));
+        if (get_dpi_for_window != nullptr)
+        {
+            const auto dpi = get_dpi_for_window(hwnd_);
+            if (dpi > 0)
+            {
+                return dpi;
+            }
+        }
+    }
+
+    HDC dc = GetDC(hwnd_);
+    if (dc != nullptr)
+    {
+        const auto dpi = GetDeviceCaps(dc, LOGPIXELSX);
+        ReleaseDC(hwnd_, dc);
+        if (dpi > 0)
+        {
+            return static_cast<UINT>(dpi);
+        }
+    }
+
+    return kDefaultDpi;
+}
+
+INT ImgVwWindow::ScaleForWindowDpi(INT value) const
+{
+    return MulDiv(value, static_cast<INT>(GetWindowDpi()), static_cast<INT>(kDefaultDpi));
+}
+
+HFONT ImgVwWindow::GetLoaderStatsOverlayFont()
+{
+    const auto dpi = GetWindowDpi();
+    if (loaderstatsoverlayfont_ != nullptr && loaderstatsoverlayfontdpi_ == dpi)
+    {
+        return loaderstatsoverlayfont_;
+    }
+
+    if (loaderstatsoverlayfont_ != nullptr)
+    {
+        DeleteObject(loaderstatsoverlayfont_);
+        loaderstatsoverlayfont_ = nullptr;
+    }
+
+    LOGFONT logfont{};
+    logfont.lfHeight = -MulDiv(9, static_cast<INT>(dpi), 72);
+    logfont.lfWeight = FW_NORMAL;
+    lstrcpy(logfont.lfFaceName, L"Lucida Console");
+
+    loaderstatsoverlayfont_ = CreateFontIndirect(&logfont);
+    loaderstatsoverlayfontdpi_ = dpi;
+    return loaderstatsoverlayfont_;
+}
+
+void ImgVwWindow::ResetLoaderStatsOverlayLayout()
+{
+    if (loaderstatsoverlayfont_ != nullptr)
+    {
+        DeleteObject(loaderstatsoverlayfont_);
+        loaderstatsoverlayfont_ = nullptr;
+    }
+    loaderstatsoverlayfontdpi_ = 0;
+    loaderstatsoverlaytext_.clear();
+    SetRectEmpty(&loaderstatsoverlayrect_);
+}
+
+RECT ImgVwWindow::CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& text) const
+{
+    const auto inset = ScaleForWindowDpi(16);
+    const auto horizontalpadding = ScaleForWindowDpi(8);
+    const auto verticalpadding = ScaleForWindowDpi(6);
+    RECT textrect{inset, inset, clientwidth_ > inset * 2 ? clientwidth_ - inset : ScaleForWindowDpi(784),
+                  clientheight_ > inset * 2 ? clientheight_ - inset : ScaleForWindowDpi(584)};
+    const auto font = const_cast<ImgVwWindow*>(this)->GetLoaderStatsOverlayFont();
+    const auto previousfont = font == nullptr ? nullptr : SelectObject(dc, font);
+    DrawText(dc, text.c_str(), -1, &textrect, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
+    if (previousfont != nullptr)
+    {
+        SelectObject(dc, previousfont);
+    }
+
+    RECT backgroundrect{textrect.left - horizontalpadding, textrect.top - verticalpadding,
+                        textrect.right + horizontalpadding, textrect.bottom + verticalpadding};
+    return backgroundrect;
+}
+
+void ImgVwWindow::RefreshLoaderStatsOverlay()
+{
+    const auto text = BuildLoaderStatsOverlayText();
+    HDC dc = GetDC(hwnd_);
+    if (dc == nullptr)
+    {
+        return;
+    }
+
+    const auto rect = CalculateLoaderStatsOverlayRect(dc, text);
+    ReleaseDC(hwnd_, dc);
+
+    RECT displayrect = rect;
+    if (!IsRectEmpty(&loaderstatsoverlayrect_))
+    {
+        UnionRect(&displayrect, &displayrect, &loaderstatsoverlayrect_);
+    }
+
+    if (loaderstatsoverlaytext_ == text && EqualRect(&loaderstatsoverlayrect_, &displayrect))
+    {
+        return;
+    }
+
+    loaderstatsoverlaytext_ = text;
+    loaderstatsoverlayrect_ = displayrect;
+    InvalidateRect(hwnd_, &loaderstatsoverlayrect_, FALSE);
+}
+
+void ImgVwWindow::DrawLoaderStatsOverlay(HDC dc, const ImgItem* item)
+{
+    if (loaderstatsoverlaytext_.empty() || IsRectEmpty(&loaderstatsoverlayrect_))
+    {
+        return;
+    }
+
+    const auto overlaywidth = loaderstatsoverlayrect_.right - loaderstatsoverlayrect_.left;
+    const auto overlayheight = loaderstatsoverlayrect_.bottom - loaderstatsoverlayrect_.top;
+    const auto memorydc = CreateCompatibleDC(dc);
+    const auto bitmap = memorydc == nullptr ? nullptr : CreateCompatibleBitmap(dc, overlaywidth, overlayheight);
+    if (memorydc == nullptr || bitmap == nullptr)
+    {
+        if (bitmap != nullptr)
+        {
+            DeleteObject(bitmap);
+        }
+        if (memorydc != nullptr)
+        {
+            DeleteDC(memorydc);
+        }
+        return;
+    }
+
+    const auto previousbitmap = SelectObject(memorydc, bitmap);
+    if (previousbitmap == nullptr || previousbitmap == HGDI_ERROR)
+    {
+        DeleteObject(bitmap);
+        DeleteDC(memorydc);
+        return;
+    }
+
+    RECT backgroundrect{0, 0, overlaywidth, overlayheight};
+    FillRect(memorydc, &backgroundrect, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+
+    if (item != nullptr && item->status() == ImgItem::Status::Ready)
+    {
+        RECT imagerect{item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(),
+                       item->offsety() + item->displayheight()};
+        RECT intersection{};
+        if (IntersectRect(&intersection, &loaderstatsoverlayrect_, &imagerect))
+        {
+            const auto imgbitmap = item->GetDisplayBitmap();
+            const auto sourcedc = CreateCompatibleDC(dc);
+            if (sourcedc != nullptr)
+            {
+                const auto previoussourcebitmap = SelectObject(sourcedc, imgbitmap.bitmap());
+                if (previoussourcebitmap != nullptr && previoussourcebitmap != HGDI_ERROR)
+                {
+                    BitBlt(memorydc, intersection.left - loaderstatsoverlayrect_.left,
+                           intersection.top - loaderstatsoverlayrect_.top, intersection.right - intersection.left,
+                           intersection.bottom - intersection.top, sourcedc, intersection.left - imagerect.left,
+                           intersection.top - imagerect.top, SRCCOPY);
+                    SelectObject(sourcedc, previoussourcebitmap);
+                }
+
+                DeleteDC(sourcedc);
+            }
+        }
+    }
+
+    const auto paneldc = CreateCompatibleDC(dc);
+    const auto panelbitmap = paneldc == nullptr ? nullptr : CreateCompatibleBitmap(dc, overlaywidth, overlayheight);
+    if (paneldc != nullptr && panelbitmap != nullptr)
+    {
+        const auto previouspanelbitmap = SelectObject(paneldc, panelbitmap);
+        FillRect(paneldc, &backgroundrect, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+
+        BLENDFUNCTION blend{};
+        blend.BlendOp = AC_SRC_OVER;
+        blend.SourceConstantAlpha = 128;
+        AlphaBlend(memorydc, 0, 0, overlaywidth, overlayheight, paneldc, 0, 0, overlaywidth, overlayheight, blend);
+
+        SelectObject(paneldc, previouspanelbitmap);
+    }
+
+    if (panelbitmap != nullptr)
+    {
+        DeleteObject(panelbitmap);
+    }
+    if (paneldc != nullptr)
+    {
+        DeleteDC(paneldc);
+    }
+
+    const auto borderpen = CreatePen(PS_SOLID, 1, RGB(90, 90, 90));
+    if (borderpen != nullptr)
+    {
+        const auto previouspen = SelectObject(memorydc, borderpen);
+        const auto previousbrush = SelectObject(memorydc, GetStockObject(NULL_BRUSH));
+        Rectangle(memorydc, 0, 0, overlaywidth, overlayheight);
+        SelectObject(memorydc, previousbrush);
+        SelectObject(memorydc, previouspen);
+        DeleteObject(borderpen);
+    }
+
+    SetBkMode(memorydc, TRANSPARENT);
+    SetTextColor(memorydc, RGB(180, 180, 180));
+    const auto horizontalpadding = ScaleForWindowDpi(8);
+    const auto verticalpadding = ScaleForWindowDpi(6);
+    RECT textrect{horizontalpadding, verticalpadding, overlaywidth - horizontalpadding,
+                  overlayheight - verticalpadding};
+    const auto overlayfont = GetLoaderStatsOverlayFont();
+    if (overlayfont != nullptr)
+    {
+        const auto previousfont = SelectObject(memorydc, overlayfont);
+        DrawText(memorydc, loaderstatsoverlaytext_.c_str(), -1, &textrect, DT_LEFT | DT_NOPREFIX);
+        SelectObject(memorydc, previousfont);
+    }
+    else
+    {
+        DrawText(memorydc, loaderstatsoverlaytext_.c_str(), -1, &textrect, DT_LEFT | DT_NOPREFIX);
+    }
+
+    BitBlt(dc, loaderstatsoverlayrect_.left, loaderstatsoverlayrect_.top, overlaywidth, overlayheight, memorydc, 0, 0,
+           SRCCOPY);
+    SelectObject(memorydc, previousbitmap);
+    DeleteObject(bitmap);
+    DeleteDC(memorydc);
 }
 
 void ImgVwWindow::InvalidateScreen()
@@ -520,6 +916,15 @@ void ImgVwWindow::StartMultiMonitorRandomSlideShow()
     currentmonitor_ = primarymonitor;
     MonitorCreateContext context{hinst_, path_, primarymonitor, this};
     EnumDisplayMonitors(nullptr, nullptr, CreateSlideShowWindowForMonitor, reinterpret_cast<LPARAM>(&context));
+    std::vector<SIZE> preloadtargetsizes;
+    for (const auto window : slideshowwindows_)
+    {
+        if (window != nullptr)
+        {
+            preloadtargetsizes.push_back({window->clientwidth_, window->clientheight_});
+        }
+    }
+    browser_.PreloadTargetSizes(preloadtargetsizes);
 
     for (std::size_t index = 0; index < MultiMonitorSlideShowWindowCount(); ++index)
     {
@@ -1051,9 +1456,11 @@ void ImgVwWindow::OnNCDestroy()
 {
     CloseOwnedWindows();
     StopSlideShow();
+    KillTimer(hwnd_, kLoaderStatsOverlayTimer);
     browser_.StopBrowsing();
     DeleteObject(backgroundbrush_);
     DeleteObject(captionfont_);
+    DeleteObject(loaderstatsoverlayfont_);
     if (owner_ != nullptr)
     {
         owner_->OnSlideShowWindowDestroyed(this);
@@ -1077,8 +1484,17 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_SIZE:
         HandleSize(wParam, lParam);
         return FALSE;
+    case WM_DPICHANGED:
+        HandleDpiChanged(lParam);
+        return 0;
     case WM_WINDOWPOSCHANGED:
         HandleWindowPosChanged();
+        break;
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP:
+        UpdateLoaderStatsOverlayVisibility();
         break;
     case WM_SETFOCUS:
         return FALSE;
@@ -1193,6 +1609,13 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return 0;
         case IDT_HIDEMOUSE:
             HandleHideMouseCursor();
+            return 0;
+        case kLoaderStatsOverlayTimer:
+            UpdateLoaderStatsOverlayVisibility();
+            if (loaderstatsoverlayvisible_)
+            {
+                RefreshLoaderStatsOverlay();
+            }
             return 0;
         }
 

@@ -25,10 +25,11 @@ class ImgVwWindow final : public Window
     static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 125;
     static const UINT kMouseHideIntervalInMilliseconds = 1000;
     static const UINT kBrowserChangedMessage = WM_APP + 1;
+    static const UINT kLoaderStatsOverlayTimer = 2;
+    static const UINT kLoaderStatsOverlayIntervalInMilliseconds = 250;
 
   public:
-    ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args)
-        : Window(hinst)
+    ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args) : Window(hinst)
     {
         if (args.size() > 1)
         {
@@ -80,6 +81,13 @@ class ImgVwWindow final : public Window
     BOOL multimonitorslideshowrunning_{FALSE};
     std::size_t multimonitorslideshowindex_{};
     std::vector<ImgVwWindow*> slideshowwindows_;
+
+    BOOL loaderstatsoverlayvisible_{FALSE};
+    std::wstring loaderstatsoverlaytext_;
+    RECT loaderstatsoverlayrect_{};
+    HFONT loaderstatsoverlayfont_{nullptr};
+    UINT loaderstatsoverlayfontdpi_{};
+
   private:
     static ImgVwWindow* CreateOnMonitor(HINSTANCE hInst, const std::wstring& path, HMONITOR monitor,
                                         ImgVwWindow* owner);
@@ -87,6 +95,7 @@ class ImgVwWindow final : public Window
     void InitializeBrowser(const std::wstring& path);
     BOOL UpdateClientSize(INT width, INT height);
     void HandleSize(WPARAM wParam, LPARAM lParam);
+    void HandleDpiChanged(LPARAM lParam);
     void InitializeMonitorState();
     void HandleWindowPosChanged();
     BOOL ApplyMonitorBounds(HMONITOR monitor);
@@ -136,6 +145,16 @@ class ImgVwWindow final : public Window
     void InvalidateScreen();
     bool DisplayImage(HDC dc, const ImgItem* item);
     void DisplayFileInformation(HDC dc, const std::wstring& filepath);
+    BOOL IsLoaderStatsOverlayKeyDown() const;
+    void UpdateLoaderStatsOverlayVisibility();
+    std::wstring BuildLoaderStatsOverlayText();
+    UINT GetWindowDpi() const;
+    INT ScaleForWindowDpi(INT value) const;
+    HFONT GetLoaderStatsOverlayFont();
+    void ResetLoaderStatsOverlayLayout();
+    RECT CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& text) const;
+    void RefreshLoaderStatsOverlay();
+    void DrawLoaderStatsOverlay(HDC dc, const ImgItem* item);
     void PaintContent(PAINTSTRUCT* pps);
     void DeleteCurrentItem(BOOL allowundo);
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);

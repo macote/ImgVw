@@ -11,6 +11,17 @@ void ClearLastError()
 {
     SetLastError(ERROR_SUCCESS);
 }
+
+bool ExcludeProtectedRectangle(HDC dc, const ImgRenderInput& input)
+{
+    if (!input.has_protected_rectangle || IsRectEmpty(&input.protected_rectangle))
+    {
+        return true;
+    }
+
+    return ExcludeClipRect(dc, input.protected_rectangle.left, input.protected_rectangle.top,
+                           input.protected_rectangle.right, input.protected_rectangle.bottom) != RGN_ERROR;
+}
 } // namespace
 
 ImgRenderResult ImgRenderer::Render(const ImgRenderInput& input) const
@@ -39,7 +50,9 @@ ImgRenderResult ImgRenderer::Render(const ImgRenderInput& input) const
 
     ImgRenderResult result{ImgRenderStatus::Succeeded, ERROR_SUCCESS};
     ClearLastError();
-    if (ExcludeClipRect(input.target_dc, input.x, input.y, input.x + input.width, input.y + input.height) == RGN_ERROR)
+    if (ExcludeClipRect(input.target_dc, input.x, input.y, input.x + input.width, input.y + input.height) ==
+            RGN_ERROR ||
+        !ExcludeProtectedRectangle(input.target_dc, input))
     {
         result = Failure(ImgRenderStatus::ExcludeClipFailed);
     }
@@ -59,10 +72,16 @@ ImgRenderResult ImgRenderer::Render(const ImgRenderInput& input) const
         else if (result.Succeeded())
         {
             ClearLastError();
-            if (!BitBlt(input.target_dc, input.x, input.y, input.width, input.height, memorydc, 0, 0, SRCCOPY))
+            if (!ExcludeProtectedRectangle(input.target_dc, input))
+            {
+                result = Failure(ImgRenderStatus::ExcludeClipFailed);
+            }
+            else if (!BitBlt(input.target_dc, input.x, input.y, input.width, input.height, memorydc, 0, 0, SRCCOPY))
             {
                 result = Failure(ImgRenderStatus::CopyBitmapFailed);
             }
+
+            SelectClipRgn(input.target_dc, nullptr);
         }
     }
 
