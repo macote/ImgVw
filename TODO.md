@@ -7,13 +7,8 @@
 
 - Folder navigation
 - Thumbnails
-- UI for load status
-  - Hold Ctrl key to display image file count / loaded count
 - Load progress indicator for large files
 - Pan & Zoom
-- UI for error management
-  - Load error
-  - Unsupported formats
 - UI for information
   - Image dimensions
   - File size
@@ -24,5 +19,8 @@
 
 ## Low Priority
 
+- UI for error management
+  - Load error
+  - Unsupported formats
 - UI for operations
   - Print

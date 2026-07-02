@@ -2,8 +2,22 @@
 
 #include "ImgItemFactory.h"
 #include <Windows.h>
-#include <string>
+#include <algorithm>
+#include <cstddef>
 #include <map>
+#include <string>
+#include <vector>
+
+struct ImgCacheSizeStats
+{
+    INT targetwidth{};
+    INT targetheight{};
+    std::size_t queued{};
+    std::size_t loading{};
+    std::size_t ready{};
+    std::size_t error{};
+    unsigned long long temp_file_bytes{};
+};
 
 struct ImgCacheKey
 {
@@ -52,6 +66,7 @@ class ImgCache
     std::shared_ptr<ImgItem> Add(std::wstring filepath, INT targetwidth, INT targetheight, ImgItem::Format imgformat);
     void Remove(std::wstring filepath);
     std::shared_ptr<ImgItem> Get(const std::wstring& filepath, INT targetwidth, INT targetheight) const;
+    std::vector<ImgCacheSizeStats> GetSizeStats() const;
 
   private:
     std::map<ImgCacheKey, std::shared_ptr<ImgItem>> map_;
@@ -104,4 +119,43 @@ inline std::shared_ptr<ImgItem> ImgCache::Get(const std::wstring& filepath, INT 
     }
 
     return imgitem;
+}
+
+inline std::vector<ImgCacheSizeStats> ImgCache::GetSizeStats() const
+{
+    std::vector<ImgCacheSizeStats> stats;
+    for (const auto& item : map_)
+    {
+        const auto& key = item.first;
+        auto match = std::find_if(stats.begin(), stats.end(), [&key](const ImgCacheSizeStats& candidate) {
+            return candidate.targetwidth == key.targetwidth && candidate.targetheight == key.targetheight;
+        });
+        if (match == stats.end())
+        {
+            ImgCacheSizeStats size_stats;
+            size_stats.targetwidth = key.targetwidth;
+            size_stats.targetheight = key.targetheight;
+            stats.push_back(size_stats);
+            match = stats.end() - 1;
+        }
+
+        switch (item.second->status())
+        {
+        case ImgItem::Status::Queued:
+            ++match->queued;
+            break;
+        case ImgItem::Status::Loading:
+            ++match->loading;
+            break;
+        case ImgItem::Status::Ready:
+            ++match->ready;
+            match->temp_file_bytes += item.second->displaybuffersize();
+            break;
+        case ImgItem::Status::Error:
+            ++match->error;
+            break;
+        }
+    }
+
+    return stats;
 }

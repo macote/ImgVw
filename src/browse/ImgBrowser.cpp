@@ -1,5 +1,6 @@
 ﻿#include "ImgBrowser.h"
 #include <Shlwapi.h>
+#include <algorithm>
 
 void ImgBrowser::CollectFile(const std::wstring& filepath, ImgItem::Format imgformat)
 {
@@ -7,8 +8,7 @@ void ImgBrowser::CollectFile(const std::wstring& filepath, ImgItem::Format imgfo
 
     if (files_.Add(filepath))
     {
-        const auto imgitem = cache_.Add(filepath, targetwidth_, targetheight_, imgformat);
-        loader_.QueueItem(imgitem);
+        QueueFileForTargetSizes(filepath, imgformat, FALSE);
     }
 
     SetEvent(readyevent_);
@@ -64,10 +64,12 @@ ImgItem::Format ImgBrowser::ResolveFileFormat(const std::wstring& filepath)
 
 void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight)
 {
+    StopTargetQueueing();
     Reset();
 
     targetwidth_ = targetwidth;
     targetheight_ = targetheight;
+    AddTargetSize(targetwidth_, targetheight_);
     loader_.PrioritizeTargetSize(targetwidth_, targetheight_);
 
     WIN32_FIND_DATA findfiledata{};
@@ -148,13 +150,14 @@ BOOL ImgBrowser::UpdateTargetSize(INT targetwidth, INT targetheight)
     {
         targetwidth_ = targetwidth;
         targetheight_ = targetheight;
+        AddTargetSize(targetwidth_, targetheight_);
     }
 
     LeaveCriticalSection(&browsecriticalsection_);
     if (changed)
     {
         loader_.PrioritizeTargetSize(targetwidth, targetheight);
-        QueueTargetSizeFromCurrent();
+        QueueTargetSizeAsync(targetwidth, targetheight, TRUE);
     }
 
     return changed ? TRUE : FALSE;
@@ -225,6 +228,7 @@ void ImgBrowser::StopCollecting()
 void ImgBrowser::StopBrowsing()
 {
     StopCollecting();
+    StopTargetQueueing();
     if (collectorthread_ != nullptr)
     {
         CloseHandle(collectorthread_);
@@ -232,6 +236,47 @@ void ImgBrowser::StopBrowsing()
     }
 
     loader_.StopLoading();
+}
+
+void ImgBrowser::StopTargetQueueing()
+{
+    if (targetqueuethreads_.empty())
+    {
+        return;
+    }
+
+    cancellationflag_ = TRUE;
+    for (const auto thread : targetqueuethreads_)
+    {
+        if (thread == nullptr || thread == INVALID_HANDLE_VALUE)
+        {
+            continue;
+        }
+
+        const DWORD timeoutMs = 3000;
+        const DWORD waitResult = WaitForSingleObject(thread, timeoutMs);
+        if (waitResult == WAIT_TIMEOUT)
+        {
+#if defined(IMGVW_DEBUG)
+            OutputDebugString(L"ImgBrowser::StopTargetQueueing: Warning: target queue thread did not terminate.\n");
+#endif
+        }
+        else if (waitResult == WAIT_FAILED)
+        {
+#if defined(IMGVW_DEBUG)
+            const DWORD error = GetLastError();
+            WCHAR buf[256];
+            swprintf_s(buf, L"ImgBrowser::StopTargetQueueing: WaitForSingleObject failed with error 0x%08lX\n",
+                       static_cast<unsigned long>(error));
+            OutputDebugString(buf);
+#endif
+        }
+
+        CloseHandle(thread);
+    }
+
+    targetqueuethreads_.clear();
+    cancellationflag_ = FALSE;
 }
 
 void ImgBrowser::SetNotificationWindow(HWND hwnd, UINT message)
@@ -244,32 +289,136 @@ void ImgBrowser::SetNotificationWindow(HWND hwnd, UINT message)
 void ImgBrowser::Reset()
 {
     files_.Clear();
+    target_sizes_.clear();
 }
 
-void ImgBrowser::QueueTargetSizeFromCurrent()
+BOOL ImgBrowser::AddTargetSize(INT targetwidth, INT targetheight)
 {
-    std::vector<std::wstring> paths;
+    const auto match = std::find_if(target_sizes_.begin(), target_sizes_.end(),
+                                    [targetwidth, targetheight](const TargetSize& target_size) {
+                                        return target_size.width == targetwidth && target_size.height == targetheight;
+                                    });
+    if (match != target_sizes_.end())
+    {
+        return FALSE;
+    }
+
+    target_sizes_.push_back({targetwidth, targetheight});
+    return TRUE;
+}
+
+BOOL ImgBrowser::AddTargetSizes(const std::vector<SIZE>& target_sizes, std::vector<TargetSize>* added_sizes)
+{
+    BOOL added = FALSE;
+    for (const auto& target_size : target_sizes)
+    {
+        if (target_size.cx <= 0 || target_size.cy <= 0)
+        {
+            continue;
+        }
+
+        if (AddTargetSize(target_size.cx, target_size.cy))
+        {
+            added = TRUE;
+            if (added_sizes != nullptr)
+            {
+                added_sizes->push_back({target_size.cx, target_size.cy});
+            }
+        }
+    }
+
+    return added;
+}
+
+void ImgBrowser::QueueTargetSizes(const std::vector<TargetSize>& target_sizes, BOOL loadnext)
+{
     EnterCriticalSection(&browsecriticalsection_);
-    paths = files_.PathsFromCurrent();
+    const auto paths = files_.PathsFromCurrent();
     LeaveCriticalSection(&browsecriticalsection_);
 
-    BOOL loadnext = TRUE;
-    std::size_t queued_count{};
+    BOOL next = loadnext;
     for (const auto& filepath : paths)
     {
-        if (queued_count >= kTargetSizeSeedQueueLimit)
+        if (cancellationflag_)
         {
             break;
         }
 
-        EnterCriticalSection(&browsecriticalsection_);
-        const auto imgitem = GetOrCreateCachedItem(filepath);
-        LeaveCriticalSection(&browsecriticalsection_);
+        const auto imgformat = ResolveFileFormat(filepath);
+        if (imgformat == ImgItem::Format::Unsupported)
+        {
+            continue;
+        }
+
+        for (const auto& target_size : target_sizes)
+        {
+            if (cancellationflag_)
+            {
+                break;
+            }
+
+            EnterCriticalSection(&browsecriticalsection_);
+            const auto imgitem = GetOrCreateCachedItem(filepath, target_size.width, target_size.height, imgformat);
+            LeaveCriticalSection(&browsecriticalsection_);
+            if (imgitem != nullptr)
+            {
+                loader_.QueueItem(imgitem, next);
+                next = FALSE;
+            }
+        }
+    }
+}
+
+void ImgBrowser::QueueTargetSizeAsync(INT targetwidth, INT targetheight, BOOL loadnext)
+{
+    QueueTargetSizesAsync(std::vector<TargetSize>{{targetwidth, targetheight}}, loadnext);
+}
+
+void ImgBrowser::QueueTargetSizesAsync(const std::vector<TargetSize>& target_sizes, BOOL loadnext)
+{
+    CleanupTargetQueueThreads();
+
+    const auto request = new TargetSizeQueueRequest{this, target_sizes, loadnext};
+    const auto thread = CreateThread(nullptr, 0, StaticThreadQueueTargetSize, request, 0, nullptr);
+    if (thread == nullptr)
+    {
+        delete request;
+        return;
+    }
+
+    targetqueuethreads_.push_back(thread);
+}
+
+void ImgBrowser::QueueFileForTargetSizes(const std::wstring& filepath, ImgItem::Format imgformat, BOOL loadnext)
+{
+    BOOL next = loadnext;
+    for (const auto& target_size : target_sizes_)
+    {
+        const auto imgitem = GetOrCreateCachedItem(filepath, target_size.width, target_size.height, imgformat);
         if (imgitem != nullptr)
         {
-            loader_.QueueItem(imgitem, loadnext);
-            loadnext = FALSE;
-            ++queued_count;
+            loader_.QueueItem(imgitem, next);
+            next = FALSE;
+        }
+    }
+}
+
+void ImgBrowser::CleanupTargetQueueThreads()
+{
+    auto thread = targetqueuethreads_.begin();
+    while (thread != targetqueuethreads_.end())
+    {
+        if (*thread == nullptr || *thread == INVALID_HANDLE_VALUE || WaitForSingleObject(*thread, 0) == WAIT_OBJECT_0)
+        {
+            if (*thread != nullptr && *thread != INVALID_HANDLE_VALUE)
+            {
+                CloseHandle(*thread);
+            }
+            thread = targetqueuethreads_.erase(thread);
+        }
+        else
+        {
+            ++thread;
         }
     }
 }
@@ -316,6 +465,52 @@ void ImgBrowser::ReloadCurrentItem()
 
         loader_.QueueItem(imgitem, TRUE);
     }
+}
+
+BOOL ImgBrowser::PreloadTargetSize(INT targetwidth, INT targetheight)
+{
+    if (targetwidth <= 0 || targetheight <= 0)
+    {
+        return FALSE;
+    }
+
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto added = AddTargetSize(targetwidth, targetheight);
+    LeaveCriticalSection(&browsecriticalsection_);
+    if (added)
+    {
+        QueueTargetSizeAsync(targetwidth, targetheight, FALSE);
+    }
+
+    return added;
+}
+
+BOOL ImgBrowser::PreloadTargetSizes(const std::vector<SIZE>& target_sizes)
+{
+    std::vector<TargetSize> added_sizes;
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto added = AddTargetSizes(target_sizes, &added_sizes);
+    LeaveCriticalSection(&browsecriticalsection_);
+    if (added)
+    {
+        QueueTargetSizesAsync(added_sizes, FALSE);
+    }
+
+    return added;
+}
+
+ImgBrowserStats ImgBrowser::GetStats()
+{
+    ImgBrowserStats stats;
+    EnterCriticalSection(&browsecriticalsection_);
+    stats.found_images = files_.Size();
+    stats.targetwidth = targetwidth_;
+    stats.targetheight = targetheight_;
+    stats.sizes = cache_.GetSizeStats();
+    LeaveCriticalSection(&browsecriticalsection_);
+    stats.loader = loader_.GetStats();
+
+    return stats;
 }
 
 BOOL ImgBrowser::MoveToNext()
@@ -369,8 +564,7 @@ BOOL ImgBrowser::MoveToOrAddItem(const std::wstring& filepath)
     EnterCriticalSection(&browsecriticalsection_);
     if (files_.Add(filepath))
     {
-        const auto imgitem = cache_.Add(filepath, targetwidth_, targetheight_, imgformat);
-        loader_.QueueItem(imgitem);
+        QueueFileForTargetSizes(filepath, imgformat, FALSE);
     }
 
     const auto moveSuccess = files_.MoveTo(filepath);
@@ -420,14 +614,22 @@ void ImgBrowser::CollectSubFolders()
 
 std::shared_ptr<ImgItem> ImgBrowser::GetOrCreateCachedItem(const std::wstring& filepath)
 {
-    auto imgitem = cache_.Get(filepath, targetwidth_, targetheight_);
+    const auto imgformat = ResolveFileFormat(filepath);
+    return GetOrCreateCachedItem(filepath, targetwidth_, targetheight_, imgformat);
+}
+
+std::shared_ptr<ImgItem> ImgBrowser::GetOrCreateCachedItem(const std::wstring& filepath, INT targetwidth,
+                                                           INT targetheight, ImgItem::Format imgformat)
+{
+    if (imgformat == ImgItem::Format::Unsupported)
+    {
+        return {};
+    }
+
+    auto imgitem = cache_.Get(filepath, targetwidth, targetheight);
     if (imgitem == nullptr)
     {
-        const auto imgformat = ResolveFileFormat(filepath);
-        if (imgformat != ImgItem::Format::Unsupported)
-        {
-            imgitem = cache_.Add(filepath, targetwidth_, targetheight_, imgformat);
-        }
+        imgitem = cache_.Add(filepath, targetwidth, targetheight, imgformat);
     }
 
     return imgitem;
@@ -466,5 +668,17 @@ DWORD WINAPI ImgBrowser::StaticThreadCollectSubFolders(void* browserinstance)
     SetEvent(browser->readyevent_);
     browser->NotifyChanged();
 
+    return 0;
+}
+
+DWORD WINAPI ImgBrowser::StaticThreadQueueTargetSize(void* targetsizequeuerequest)
+{
+    const auto request = reinterpret_cast<TargetSizeQueueRequest*>(targetsizequeuerequest);
+    if (request != nullptr && request->browser != nullptr)
+    {
+        request->browser->QueueTargetSizes(request->sizes, request->loadnext);
+    }
+
+    delete request;
     return 0;
 }

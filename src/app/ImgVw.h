@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ImgVwWindow.h"
+#include "ProcessDpiAwareness.h"
 #include "resource.h"
 #include <Windows.h>
 #include <shellapi.h>
@@ -16,6 +17,8 @@ class ImgVw
 
 inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 {
+    ProcessDpiAwareness::EnableNativeMonitorPixels();
+
     INT argscount;
     const auto args = CommandLineToArgvW(GetCommandLine(), &argscount);
     std::vector<std::wstring> argsvector;

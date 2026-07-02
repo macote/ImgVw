@@ -12,6 +12,8 @@ struct ImgRenderInput
     int y{};
     int width{};
     int height{};
+    BOOL has_protected_rectangle{FALSE};
+    RECT protected_rectangle{};
 };
 
 enum class ImgRenderStatus

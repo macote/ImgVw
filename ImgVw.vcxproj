@@ -198,6 +198,7 @@
     <ClInclude Include="src\platform\win32\FileMapView.h" />
     <ClInclude Include="src\platform\win32\ImageHeaderProbe.h" />
     <ClInclude Include="src\platform\win32\ImgSettings.h" />
+    <ClInclude Include="src\platform\win32\ProcessDpiAwareness.h" />
     <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
     <ClInclude Include="src\ui\win32\Window.h" />
@@ -221,6 +222,7 @@
     <ClCompile Include="src\image\ImgLoader.cpp" />
     <ClCompile Include="src\platform\win32\FileOperations.cpp" />
     <ClCompile Include="src\platform\win32\ImageHeaderProbe.cpp" />
+    <ClCompile Include="src\platform\win32\ProcessDpiAwareness.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
     <ClCompile Include="src\ui\win32\ImgVwWindow.cpp" />
     <ClCompile Include="src\ui\win32\Window.cpp" />

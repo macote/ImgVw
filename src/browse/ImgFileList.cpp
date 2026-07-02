@@ -37,6 +37,11 @@ bool ImgFileList::Empty() const
     return files_.empty();
 }
 
+std::size_t ImgFileList::Size() const
+{
+    return files_.size();
+}
+
 std::wstring ImgFileList::CurrentPath() const
 {
     return current_ == files_.end() ? std::wstring() : *current_;

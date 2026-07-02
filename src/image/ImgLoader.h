@@ -3,12 +3,21 @@
 #include "ImgItem.h"
 #include "CountingSemaphore.h"
 #include <Windows.h>
+#include <cstddef>
 #include <list>
 #include <functional>
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
+
+struct ImgLoaderStats
+{
+    std::size_t queued{};
+    std::size_t loading{};
+    std::size_t free_slots{};
+    std::size_t maximum_slots{};
+};
 
 class LoaderItem
 {
@@ -100,6 +109,7 @@ class ImgLoader
     void PrioritizeTargetSize(INT targetwidth, INT targetheight);
     void SetNotificationWindow(HWND hwnd, UINT message);
     void StopLoading();
+    ImgLoaderStats GetStats();
 
   private:
     std::list<std::shared_ptr<ImgItem>> queue_;
