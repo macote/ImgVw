@@ -29,6 +29,7 @@ Pass a file or folder as an argument.
 | F8 | Add images found in subfolders |
 | Ctrl + I | Select default CMYK ICC profile |
 | Ctrl + Shift + I | Use the built-in CMYK ICC profile |
+| Ctrl + Alt | Display loader statistics overlay |
 | Delete | Move to recycle bin if possible or delete |
 | Shift + Delete | Delete |
 | Enter | Display current file path |

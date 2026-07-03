@@ -1,3 +1,11 @@
+## 1.9.0 (2026-07-03)
+
+- Add multi-monitor random slideshow support with shared random ordering across displays
+- Improve image fitting and cache warmup when moving the viewer between monitors or DPI settings
+- Allow dragging the viewer between monitors and refine monitor-edge snapping
+- Restore the painted slide correctly after stopping multi-monitor slideshow mode
+- Add a native DPI-aware loader statistics overlay for cache and loading diagnostics
+
 ## 1.8.0 (2026-06-24)
 
 - Add HEIF/HEIC format display support
