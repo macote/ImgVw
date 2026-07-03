@@ -327,8 +327,8 @@ For performance, operations may be fused, but tests must demonstrate equivalent 
 
 - `src/image/ImgItem.h`
 - `src/image/ImgItem.cpp`
-- `src/image/ImgJpegDecoder.h`
-- `src/image/ImgJpegDecoder.cpp`
+- `src/image/ImgJPEGDecoder.h`
+- `src/image/ImgJPEGDecoder.cpp`
 - `src/image/ImgJPEGItem.cpp`
 - `src/image/ImgGDIItem.cpp` or its PNG replacement
 - `src/image/ImgItemFactory.h`

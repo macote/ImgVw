@@ -1,4 +1,4 @@
-#include "ImgJpegDecoder.h"
+#include "ImgJPEGDecoder.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -11,7 +11,7 @@ constexpr auto kIccMarker = JPEG_APP0 + 2;
 constexpr unsigned char kExifSignature[] = {'E', 'x', 'i', 'f', 0, 0};
 } // namespace
 
-ImgJpegDecoder::~ImgJpegDecoder()
+ImgJPEGDecoder::~ImgJPEGDecoder()
 {
     DeleteRowPointers();
     if (created_)
@@ -20,7 +20,7 @@ ImgJpegDecoder::~ImgJpegDecoder()
     }
 }
 
-bool ImgJpegDecoder::Initialize(const unsigned char* data, std::size_t size)
+bool ImgJPEGDecoder::Initialize(const unsigned char* data, std::size_t size)
 {
     if (created_ || data == nullptr || size == 0 || size > std::numeric_limits<unsigned long>::max())
     {
@@ -56,7 +56,7 @@ bool ImgJpegDecoder::Initialize(const unsigned char* data, std::size_t size)
     return true;
 }
 
-bool ImgJpegDecoder::ConfigureOutput(unsigned int scale_numerator, unsigned int scale_denominator, bool cmyk)
+bool ImgJPEGDecoder::ConfigureOutput(unsigned int scale_numerator, unsigned int scale_denominator, bool cmyk)
 {
     if (!created_ || scale_numerator == 0 || scale_denominator == 0)
     {
@@ -80,7 +80,7 @@ bool ImgJpegDecoder::ConfigureOutput(unsigned int scale_numerator, unsigned int 
     return output_width_ > 0 && output_height_ > 0;
 }
 
-bool ImgJpegDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up)
+bool ImgJPEGDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up)
 {
     if (!created_ || buffer == nullptr || stride <= 0 || output_width_ <= 0 || output_height_ <= 0)
     {
@@ -130,12 +130,12 @@ bool ImgJpegDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up)
     return true;
 }
 
-void ImgJpegDecoder::CaptureError()
+void ImgJPEGDecoder::CaptureError()
 {
     error_ = error_manager_.message[0] == '\0' ? "JPEG operation failed." : error_manager_.message;
 }
 
-void ImgJpegDecoder::FindExifMarker()
+void ImgJPEGDecoder::FindExifMarker()
 {
     for (auto marker = decompressor_.marker_list; marker != nullptr; marker = marker->next)
     {
@@ -149,7 +149,7 @@ void ImgJpegDecoder::FindExifMarker()
     }
 }
 
-void ImgJpegDecoder::ReadIccProfile()
+void ImgJPEGDecoder::ReadIccProfile()
 {
     JOCTET* profile{};
     unsigned int profile_size{};
@@ -160,20 +160,20 @@ void ImgJpegDecoder::ReadIccProfile()
     }
 }
 
-void ImgJpegDecoder::DeleteRowPointers()
+void ImgJPEGDecoder::DeleteRowPointers()
 {
     std::free(row_pointers_);
     row_pointers_ = nullptr;
 }
 
-void ImgJpegDecoder::ErrorExit(j_common_ptr common)
+void ImgJPEGDecoder::ErrorExit(j_common_ptr common)
 {
     auto error = reinterpret_cast<ErrorManager*>(common->err);
     (*common->err->format_message)(common, error->message);
     longjmp(error->jump_buffer, 1);
 }
 
-void ImgJpegDecoder::EmitMessage(j_common_ptr common, int message_level)
+void ImgJPEGDecoder::EmitMessage(j_common_ptr common, int message_level)
 {
     if (message_level < 0)
     {

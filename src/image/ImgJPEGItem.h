@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ImgJpegDecoder.h"
+#include "ImgJPEGDecoder.h"
 #include "ImgItem.h"
 #include <Windows.h>
 #include <Gdiplus.h>

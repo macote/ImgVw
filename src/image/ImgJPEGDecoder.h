@@ -8,13 +8,13 @@
 
 #include <jpeglib.h>
 
-class ImgJpegDecoder final
+class ImgJPEGDecoder final
 {
   public:
-    ImgJpegDecoder() = default;
-    ~ImgJpegDecoder();
-    ImgJpegDecoder(const ImgJpegDecoder&) = delete;
-    ImgJpegDecoder& operator=(const ImgJpegDecoder&) = delete;
+    ImgJPEGDecoder() = default;
+    ~ImgJPEGDecoder();
+    ImgJPEGDecoder(const ImgJPEGDecoder&) = delete;
+    ImgJPEGDecoder& operator=(const ImgJPEGDecoder&) = delete;
 
     bool Initialize(const unsigned char* data, std::size_t size);
     bool ConfigureOutput(unsigned int scale_numerator, unsigned int scale_denominator, bool cmyk);

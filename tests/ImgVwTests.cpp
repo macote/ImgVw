@@ -7,7 +7,7 @@
 #include "ImgCache.h"
 #include "ImgGDIItem.h"
 #include "ImgItemFactory.h"
-#include "ImgJpegDecoder.h"
+#include "ImgJPEGDecoder.h"
 #include "ImgRenderer.h"
 #include "ImgLoader.h"
 
@@ -468,7 +468,7 @@ void TestRendererDrawsImageAndBackground()
 void TestJpegDecoderMetadataAndScaling()
 {
     const auto jpeg = CreateJpeg(false, true);
-    ImgJpegDecoder decoder;
+    ImgJPEGDecoder decoder;
 
     Check(decoder.Initialize(jpeg.data(), jpeg.size()), "JPEG decoder reads generated image");
     Check(decoder.width() == 4 && decoder.height() == 2, "JPEG decoder reports source dimensions");
@@ -487,7 +487,7 @@ void TestJpegDecoderMetadataAndScaling()
 void TestJpegDecoderCmyk()
 {
     const auto jpeg = CreateJpeg(true, false);
-    ImgJpegDecoder decoder;
+    ImgJPEGDecoder decoder;
 
     Check(decoder.Initialize(jpeg.data(), jpeg.size()), "JPEG decoder reads generated CMYK image");
     Check(decoder.is_cmyk(), "CMYK JPEG is detected");
@@ -501,7 +501,7 @@ void TestJpegDecoderCmyk()
 void TestJpegDecoderRejectsInvalidData()
 {
     const unsigned char invalid[] = {1, 2, 3, 4};
-    ImgJpegDecoder decoder;
+    ImgJPEGDecoder decoder;
 
     Check(!decoder.Initialize(invalid, sizeof(invalid)), "JPEG decoder rejects invalid input");
     Check(!decoder.error().empty(), "JPEG decoder reports invalid-input error");

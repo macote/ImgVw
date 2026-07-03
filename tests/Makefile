@@ -8,7 +8,7 @@ SOURCES = ImgVwTests.cpp ../src/browse/ImgFileList.cpp ../src/image/ColorProfile
 	../src/image/ColorTransform.cpp ../src/image/ExifOrientation.cpp ../src/image/ImgResampler.cpp \
 	../src/image/ImgLoader.cpp ../src/image/ImageFormatDetector.cpp ../src/image/ImgBuffer.cpp \
 	../src/image/ImgGDIItem.cpp ../src/image/ImgItem.cpp ../src/image/ImgItemHelper.cpp \
-	../src/image/ImgJpegDecoder.cpp ../src/platform/win32/FileOperations.cpp ../src/platform/win32/ImageHeaderProbe.cpp \
+	../src/image/ImgJPEGDecoder.cpp ../src/platform/win32/FileOperations.cpp ../src/platform/win32/ImageHeaderProbe.cpp \
 	../src/ui/win32/ImgRenderer.cpp
 
 ifeq ($(DUMPMACHINE),x86_64-w64-mingw32)

@@ -444,7 +444,7 @@ The Linux port depends on removing GDI+ from all shared decode paths.
 
 Refactor `ImgJPEGItem` to:
 
-- use `ImgJpegDecoder`;
+- use `ImgJPEGDecoder`;
 - represent EXIF orientation with a portable `ImageOrientation` enum;
 - use first-party rotation/flip code;
 - use `ImgResampler` for final scaling;

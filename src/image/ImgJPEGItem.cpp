@@ -61,7 +61,7 @@ void ImgJPEGItem::Load()
             goto done;
         }
 
-        ImgJpegDecoder decoder;
+        ImgJPEGDecoder decoder;
         if (!decoder.Initialize(jpegfilemap.data(), jpegfilemap.filesize().LowPart))
         {
             errorstring_ = decoder.error();
