@@ -15,29 +15,30 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 
 Pass a file or folder as an argument.
 
-| Shortcut | Description |
-|:-:|:-|
-| Left Arrow \| Mouse Wheel Up | Browse backward |
-| Right Arrow \| Mouse Wheel Down | Browse forward |
-| Home | Go to first |
-| End | Go to last |
-| F5 | Toggle slideshow |
-| Shift + F5 | Toggle slideshow (random mode) |
-| Ctrl + Shift + F5 | Toggle slideshow on all monitors (random mode) |
-| F6 | Increase slideshow speed |
-| F7 | Decrease slideshow speed |
-| F8 | Add images found in subfolders |
-| Ctrl + I | Select default CMYK ICC profile |
-| Ctrl + Shift + I | Use the built-in CMYK ICC profile |
-| Ctrl + Alt | Display loader statistics overlay |
-| Delete | Move to recycle bin if possible or delete |
-| Shift + Delete | Delete |
-| Enter | Display current file path |
-| Escape | Exit |
+|            Shortcut             | Description                                    |
+| :-----------------------------: | :--------------------------------------------- |
+|  Left Arrow \| Mouse Wheel Up   | Browse backward                                |
+| Right Arrow \| Mouse Wheel Down | Browse forward                                 |
+|              Home               | Go to first                                    |
+|               End               | Go to last                                     |
+|               F5                | Toggle slideshow                               |
+|           Shift + F5            | Toggle slideshow (random mode)                 |
+|        Ctrl + Shift + F5        | Toggle slideshow on all monitors (random mode) |
+|               F6                | Increase slideshow speed                       |
+|               F7                | Decrease slideshow speed                       |
+|               F8                | Add images found in subfolders                 |
+|            Ctrl + I             | Select default CMYK ICC profile                |
+|        Ctrl + Shift + I         | Use the built-in CMYK ICC profile              |
+|           Ctrl + Alt            | Display loader statistics overlay              |
+|             Delete              | Move to recycle bin if possible or delete      |
+|         Shift + Delete          | Delete                                         |
+|              Enter              | Display current file path                      |
+|             Escape              | Exit                                           |
 
 ## 3rd-party libraries
 
 ImgVw uses the following libraries:
+
 - [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
 - [Little-CMS](https://github.com/mm2/Little-CMS)
 - [libheif](https://github.com/strukturag/libheif)
@@ -61,6 +62,44 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libheif.ps1 -Mode all -Arch all -Clean
 ```
 
+## Relinking LGPL Libraries
+
+Release binaries statically link libheif and libde265. To relink ImgVw with modified versions of those libraries, use
+the source archive for the exact ImgVw release, rebuild the static library artifacts from the modified dependency
+sources, and then rebuild ImgVw.
+
+The bundled HEIF dependency script currently uses these exact source archives:
+
+- libheif 1.23.0:
+  `https://github.com/strukturag/libheif/releases/download/v1.23.0/libheif-1.23.0.tar.gz`
+  SHA-256: `4c9182b18897617182eed12ab5eb9f9d855b3aa3a736d6bdb31abc034ec7d393`
+- libde265 1.1.1:
+  `https://github.com/strukturag/libde265/releases/download/v1.1.1/libde265-1.1.1.tar.gz`
+  SHA-256: `fd48a927e94ed74fc7ce8829d222b9d8599fcbfe8b6448ba66705babc56ab219`
+
+Rebuild the standard, unmodified artifacts with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libheif.ps1 -Mode all -Arch all -Clean
+```
+
+To rebuild from modified libheif and libde265 source trees, pass those trees explicitly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libheif.ps1 -Mode all -Arch all -Clean `
+    -LibheifSourceDir C:\src\libheif-1.23.0 -Libde265SourceDir C:\src\libde265-1.1.1
+```
+
+Then rebuild ImgVw with Visual Studio or with the MSYS build script:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x86 -Clean
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x64 -Clean
+```
+
+The generated dependency archives are written under `3rd-party\libheif` and `3rd-party\libde265`, where the Visual
+Studio project and Makefile pick them up for the final application link.
+
 ## License
 
-ImgVw is BSD-licensed.
+ImgVw’s own source code is MIT-licensed. Bundled third-party components are distributed under their respective licenses; see LICENSE.md.
