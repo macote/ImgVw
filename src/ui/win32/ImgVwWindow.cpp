@@ -859,16 +859,16 @@ void ImgVwWindow::HandleMultiMonitorMouseWheel(ImgVwWindow* target)
 
 void ImgVwWindow::ToggleSlideShow(BOOL slideshowrandom)
 {
-    StopMultiMonitorSlideShow();
-    slideshowrandom_ = slideshowrandom;
-    if (!slideshowrunning_)
-    {
-        StartSlideShow();
-    }
-    else
+    if (slideshowrunning_ && !multimonitorslideshowrunning_ && slideshowrandom_ == slideshowrandom)
     {
         StopSlideShow();
+        return;
     }
+
+    StopMultiMonitorSlideShow();
+    StopSlideShow();
+    slideshowrandom_ = slideshowrandom;
+    StartSlideShow();
 }
 
 void ImgVwWindow::StartSlideShow()
