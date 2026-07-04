@@ -1,1 +1,10 @@
-* text=auto
+# Normalize text files in the repository and check them out with LF,
+# regardless of each developer's core.autocrlf setting.
+* text=auto eol=lf
+
+# Markdown files are project-authored text and should always use LF.
+*.md text eol=lf
+
+# Windows resource compiler tooling is happier with CRLF.
+*.rc text eol=crlf
+*.rc2 text eol=crlf

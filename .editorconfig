@@ -1,9 +1,15 @@
 root = true
 
 [*]
-end_of_line = crlf
+end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
+
+[*.{rc,rc2}]
+end_of_line = crlf
+
+[*.md]
+end_of_line = lf
 
 [*.{h,cpp,rc}]
 indent_style = space

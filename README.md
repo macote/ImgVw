@@ -60,8 +60,8 @@ Rebuild the bundled dependencies with:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libjpeg-turbo.ps1 -Mode all -Arch all -Clean
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode all -Arch all -Clean
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libheif.ps1 -Mode all -Arch all -Clean
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-little-cms.ps1 -Mode all -Arch all -Clean
 ```
 
 ## Relinking LGPL Libraries

@@ -42,7 +42,7 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 
 - Follow `docs/CODING_STYLE.md`.
 - Use the root `.clang-format` configuration for first-party C++ files.
-- Use 4 spaces, no tabs, CRLF line endings, and a final newline.
+- Use 4 spaces, no tabs, LF line endings except for `.rc`/`.rc2` files, and a final newline.
 - Keep lines at or below 120 columns where practical.
 - Classes, structs, enums, and public functions use `CamelCase`.
 - Private data members use `lower_case_` with a trailing underscore.
