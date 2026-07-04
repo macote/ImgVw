@@ -911,6 +911,7 @@ void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
     slideshowrunning_ = TRUE;
     multimonitorslideshowrunning_ = TRUE;
     multimonitorslideshowindex_ = 0;
+    multimonitorslideshowcursorpath_.clear();
     slideshowneedsinitialadvance_ = FALSE;
 
     const auto primarymonitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
@@ -936,6 +937,7 @@ void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
         else if (index == 0)
         {
             DisplayCurrentSlideWithoutTimer();
+            multimonitorslideshowcursorpath_ = browser_.GetCurrentFilePath();
         }
         else
         {
@@ -955,6 +957,7 @@ void ImgVwWindow::StopMultiMonitorSlideShow()
 
     multimonitorslideshowrunning_ = FALSE;
     multimonitorslideshowindex_ = 0;
+    multimonitorslideshowcursorpath_.clear();
     StopSlideShow();
     DestroySlideShowWindows();
 }
@@ -1137,10 +1140,18 @@ BOOL ImgVwWindow::AdvanceSharedSequentialSlide(ImgVwWindow* target)
         return FALSE;
     }
 
+    if (!multimonitorslideshowcursorpath_.empty())
+    {
+        browser_.MoveToItem(multimonitorslideshowcursorpath_);
+    }
+
     if (!browser_.MoveToNext() && !browser_.MoveToFirst())
     {
         return FALSE;
     }
+
+    const auto filepath = browser_.GetCurrentFilePath();
+    multimonitorslideshowcursorpath_ = filepath;
 
     if (target == this)
     {
@@ -1149,8 +1160,9 @@ BOOL ImgVwWindow::AdvanceSharedSequentialSlide(ImgVwWindow* target)
         return TRUE;
     }
 
-    const auto filepath = browser_.GetCurrentFilePath();
-    return target->DisplaySlidePath(filepath);
+    const auto displayed = target->DisplaySlidePath(filepath);
+    RestoreSharedOwnerDisplayCursor();
+    return displayed;
 }
 
 BOOL ImgVwWindow::AdvanceSharedRandomSlide(ImgVwWindow* target)
@@ -1167,7 +1179,7 @@ BOOL ImgVwWindow::AdvanceSharedRandomSlide(ImgVwWindow* target)
     {
         if (!browser_.MoveToRandom())
         {
-            RestoreSharedRandomOwnerDisplayCursor();
+            RestoreSharedOwnerDisplayCursor();
             return FALSE;
         }
 
@@ -1181,7 +1193,7 @@ BOOL ImgVwWindow::AdvanceSharedRandomSlide(ImgVwWindow* target)
 
     if (!foundpath)
     {
-        RestoreSharedRandomOwnerDisplayCursor();
+        RestoreSharedOwnerDisplayCursor();
         return FALSE;
     }
 
@@ -1193,11 +1205,11 @@ BOOL ImgVwWindow::AdvanceSharedRandomSlide(ImgVwWindow* target)
     }
 
     const auto displayed = target->DisplaySlidePath(filepath);
-    RestoreSharedRandomOwnerDisplayCursor();
+    RestoreSharedOwnerDisplayCursor();
     return displayed;
 }
 
-void ImgVwWindow::RestoreSharedRandomOwnerDisplayCursor()
+void ImgVwWindow::RestoreSharedOwnerDisplayCursor()
 {
     if (!displayslidepath_.empty())
     {

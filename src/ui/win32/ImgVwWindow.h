@@ -80,6 +80,7 @@ class ImgVwWindow final : public Window
     BOOL primarywindow_{TRUE};
     BOOL multimonitorslideshowrunning_{FALSE};
     std::size_t multimonitorslideshowindex_{};
+    std::wstring multimonitorslideshowcursorpath_;
     std::vector<ImgVwWindow*> slideshowwindows_;
 
     BOOL loaderstatsoverlayvisible_{FALSE};
@@ -135,7 +136,7 @@ class ImgVwWindow final : public Window
     BOOL AdvanceSharedSlide(ImgVwWindow* target);
     BOOL AdvanceSharedSequentialSlide(ImgVwWindow* target);
     BOOL AdvanceSharedRandomSlide(ImgVwWindow* target);
-    void RestoreSharedRandomOwnerDisplayCursor();
+    void RestoreSharedOwnerDisplayCursor();
     BOOL IsSlidePathVisible(const std::wstring& filepath);
     BOOL DisplaySlidePath(const std::wstring& filepath);
     void DisplayCurrentSlideWhenReady();
