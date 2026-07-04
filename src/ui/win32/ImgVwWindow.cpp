@@ -59,6 +59,7 @@ struct ImgVwWindow::MonitorCreateContext
     std::wstring path;
     HMONITOR primarymonitor{};
     ImgVwWindow* owner{};
+    BOOL slideshowrandom{};
 };
 
 ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring>& args)
@@ -130,7 +131,7 @@ BOOL CALLBACK ImgVwWindow::CreateSlideShowWindowForMonitor(HMONITOR monitor, HDC
     if (window != nullptr)
     {
         context->owner->slideshowwindows_.push_back(window);
-        window->slideshowrandom_ = TRUE;
+        window->slideshowrandom_ = context->slideshowrandom;
         window->slideshowrunning_ = TRUE;
         ShowWindow(window->hwnd(), SW_SHOWNOACTIVATE);
         if (context->owner->browsesubfolders_)
@@ -851,14 +852,14 @@ void ImgVwWindow::HandleMultiMonitorMouseWheel(ImgVwWindow* target)
 {
     if (multimonitorslideshowrunning_)
     {
-        AdvanceSharedRandomSlide(target);
+        AdvanceSharedSlide(target);
         RestartMultiMonitorSlideShowTimer();
     }
 }
 
 void ImgVwWindow::ToggleSlideShow(BOOL slideshowrandom)
 {
-    StopMultiMonitorRandomSlideShow();
+    StopMultiMonitorSlideShow();
     slideshowrandom_ = slideshowrandom;
     if (!slideshowrunning_)
     {
@@ -890,23 +891,23 @@ void ImgVwWindow::StopSlideShow()
     }
 }
 
-void ImgVwWindow::ToggleMultiMonitorRandomSlideShow()
+void ImgVwWindow::ToggleMultiMonitorSlideShow(BOOL slideshowrandom)
 {
-    if (multimonitorslideshowrunning_)
+    if (multimonitorslideshowrunning_ && slideshowrandom_ == slideshowrandom)
     {
-        StopMultiMonitorRandomSlideShow();
+        StopMultiMonitorSlideShow();
         return;
     }
 
-    StartMultiMonitorRandomSlideShow();
+    StartMultiMonitorSlideShow(slideshowrandom);
 }
 
-void ImgVwWindow::StartMultiMonitorRandomSlideShow()
+void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
 {
     StopSlideShow();
     DestroySlideShowWindows();
 
-    slideshowrandom_ = TRUE;
+    slideshowrandom_ = slideshowrandom;
     slideshowrunning_ = TRUE;
     multimonitorslideshowrunning_ = TRUE;
     multimonitorslideshowindex_ = 0;
@@ -914,7 +915,7 @@ void ImgVwWindow::StartMultiMonitorRandomSlideShow()
 
     const auto primarymonitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
     currentmonitor_ = primarymonitor;
-    MonitorCreateContext context{hinst_, path_, primarymonitor, this};
+    MonitorCreateContext context{hinst_, path_, primarymonitor, this, slideshowrandom_};
     EnumDisplayMonitors(nullptr, nullptr, CreateSlideShowWindowForMonitor, reinterpret_cast<LPARAM>(&context));
     std::vector<SIZE> preloadtargetsizes;
     for (const auto window : slideshowwindows_)
@@ -928,13 +929,24 @@ void ImgVwWindow::StartMultiMonitorRandomSlideShow()
 
     for (std::size_t index = 0; index < MultiMonitorSlideShowWindowCount(); ++index)
     {
-        AdvanceSharedRandomSlide(MultiMonitorSlideShowWindowAt(index));
+        if (slideshowrandom_)
+        {
+            AdvanceSharedRandomSlide(MultiMonitorSlideShowWindowAt(index));
+        }
+        else if (index == 0)
+        {
+            DisplayCurrentSlideWithoutTimer();
+        }
+        else
+        {
+            AdvanceSharedSequentialSlide(MultiMonitorSlideShowWindowAt(index));
+        }
     }
 
     RestartMultiMonitorSlideShowTimer();
 }
 
-void ImgVwWindow::StopMultiMonitorRandomSlideShow()
+void ImgVwWindow::StopMultiMonitorSlideShow()
 {
     if (!multimonitorslideshowrunning_ && slideshowwindows_.empty())
     {
@@ -968,7 +980,7 @@ void ImgVwWindow::HandleMultiMonitorSlideShow()
     multimonitorslideshowindex_ = (multimonitorslideshowindex_ + 1) % count;
     if (window != nullptr)
     {
-        AdvanceSharedRandomSlide(window);
+        AdvanceSharedSlide(window);
     }
 
     RestartMultiMonitorSlideShowTimer();
@@ -1111,6 +1123,34 @@ BOOL ImgVwWindow::AdvanceRandomSlide(BOOL restarttimer)
 
     slideshowneedsinitialadvance_ = FALSE;
     return TRUE;
+}
+
+BOOL ImgVwWindow::AdvanceSharedSlide(ImgVwWindow* target)
+{
+    return slideshowrandom_ ? AdvanceSharedRandomSlide(target) : AdvanceSharedSequentialSlide(target);
+}
+
+BOOL ImgVwWindow::AdvanceSharedSequentialSlide(ImgVwWindow* target)
+{
+    if (target == nullptr || target->slideshowwaitingforimage_)
+    {
+        return FALSE;
+    }
+
+    if (!browser_.MoveToNext() && !browser_.MoveToFirst())
+    {
+        return FALSE;
+    }
+
+    if (target == this)
+    {
+        target->DisplayCurrentSlideWithoutTimer();
+        target->slideshowneedsinitialadvance_ = FALSE;
+        return TRUE;
+    }
+
+    const auto filepath = browser_.GetCurrentFilePath();
+    return target->DisplaySlidePath(filepath);
 }
 
 BOOL ImgVwWindow::AdvanceSharedRandomSlide(ImgVwWindow* target)
@@ -1259,11 +1299,11 @@ void ImgVwWindow::HandleBrowserChanged()
     {
         if (owner_ != nullptr)
         {
-            owner_->AdvanceSharedRandomSlide(this);
+            owner_->AdvanceSharedSlide(this);
         }
         else if (multimonitorslideshowrunning_)
         {
-            AdvanceSharedRandomSlide(this);
+            AdvanceSharedSlide(this);
         }
         else
         {
@@ -1536,7 +1576,10 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             ToggleSlideShow(TRUE);
             break;
         case IDR_TOGGLESS_MULTI:
-            ToggleMultiMonitorRandomSlideShow();
+            ToggleMultiMonitorSlideShow(FALSE);
+            break;
+        case IDR_TOGGLESS_MULTI_RANDOM:
+            ToggleMultiMonitorSlideShow(TRUE);
             break;
         case IDR_INCSSS:
             IncreaseSlideShowSpeed();

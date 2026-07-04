@@ -116,9 +116,9 @@ class ImgVwWindow final : public Window
     void ToggleSlideShow(BOOL slideshowrandom);
     void StartSlideShow();
     void StopSlideShow();
-    void ToggleMultiMonitorRandomSlideShow();
-    void StartMultiMonitorRandomSlideShow();
-    void StopMultiMonitorRandomSlideShow();
+    void ToggleMultiMonitorSlideShow(BOOL slideshowrandom);
+    void StartMultiMonitorSlideShow(BOOL slideshowrandom);
+    void StopMultiMonitorSlideShow();
     void RestartMultiMonitorSlideShowTimer();
     void HandleMultiMonitorSlideShow();
     ImgVwWindow* MultiMonitorSlideShowWindowAt(std::size_t index);
@@ -132,6 +132,8 @@ class ImgVwWindow final : public Window
     void DecreaseSlideShowSpeed();
     void HandleSlideShow();
     BOOL AdvanceRandomSlide(BOOL restarttimer);
+    BOOL AdvanceSharedSlide(ImgVwWindow* target);
+    BOOL AdvanceSharedSequentialSlide(ImgVwWindow* target);
     BOOL AdvanceSharedRandomSlide(ImgVwWindow* target);
     void RestoreSharedRandomOwnerDisplayCursor();
     BOOL IsSlidePathVisible(const std::wstring& filepath);

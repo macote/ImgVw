@@ -24,12 +24,13 @@ Pass a file or folder as an argument.
 |               F1                | About                                          |
 |               F3                | Toggle slideshow                               |
 |               F4                | Toggle slideshow (random mode)                 |
+|               F5                | Toggle slideshow on all monitors               |
 |               F6                | Toggle slideshow on all monitors (random mode) |
 |               F7                | Increase slideshow speed                       |
 |               F8                | Decrease slideshow speed                       |
 |               F9                | Add images found in subfolders                 |
-|              F11                | Select default CMYK ICC profile                |
-|              F12                | Use the built-in CMYK ICC profile              |
+|               F11               | Select default CMYK ICC profile                |
+|               F12               | Use the built-in CMYK ICC profile              |
 |           Ctrl + Alt            | Display loader statistics overlay              |
 |             Delete              | Move to recycle bin if possible or delete      |
 |         Shift + Delete          | Delete                                         |
@@ -41,9 +42,9 @@ Pass a file or folder as an argument.
 ImgVw uses the following libraries:
 
 - [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)
-- [Little-CMS](https://github.com/mm2/Little-CMS)
 - [libheif](https://github.com/strukturag/libheif)
 - [libde265](https://github.com/strukturag/libde265)
+- [Little-CMS](https://github.com/mm2/Little-CMS)
 
 ImgVw includes the unchanged
 [CGATS21 CRPC5](https://registry.color.org/profile-registry/CGATS21_CRPC5) profile as a generic fallback for untagged
@@ -53,7 +54,7 @@ CMYK JPEG files. It is an approximate viewing default, not an exact representati
 
 Visual Studio and MSYS builds support Win32 and x64 configurations. Win32 remains available for legacy Windows
 compatibility. x64 is recommended for large images or large folders, but requires architecture-matched static libraries
-for libjpeg-turbo, Little CMS, libheif, and libde265.
+for libjpeg-turbo, libheif, libde265 and Little CMS.
 
 Rebuild the bundled dependencies with:
 
