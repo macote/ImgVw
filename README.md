@@ -21,14 +21,15 @@ Pass a file or folder as an argument.
 | Right Arrow \| Mouse Wheel Down | Browse forward                                 |
 |              Home               | Go to first                                    |
 |               End               | Go to last                                     |
-|               F5                | Toggle slideshow                               |
-|           Shift + F5            | Toggle slideshow (random mode)                 |
-|        Ctrl + Shift + F5        | Toggle slideshow on all monitors (random mode) |
-|               F6                | Increase slideshow speed                       |
-|               F7                | Decrease slideshow speed                       |
-|               F8                | Add images found in subfolders                 |
-|            Ctrl + I             | Select default CMYK ICC profile                |
-|        Ctrl + Shift + I         | Use the built-in CMYK ICC profile              |
+|               F1                | About                                          |
+|               F3                | Toggle slideshow                               |
+|               F4                | Toggle slideshow (random mode)                 |
+|               F6                | Toggle slideshow on all monitors (random mode) |
+|               F7                | Increase slideshow speed                       |
+|               F8                | Decrease slideshow speed                       |
+|               F9                | Add images found in subfolders                 |
+|              F11                | Select default CMYK ICC profile                |
+|              F12                | Use the built-in CMYK ICC profile              |
 |           Ctrl + Alt            | Display loader statistics overlay              |
 |             Delete              | Move to recycle bin if possible or delete      |
 |         Shift + Delete          | Delete                                         |
