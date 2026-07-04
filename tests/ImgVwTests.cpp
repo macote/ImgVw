@@ -144,9 +144,9 @@ void TestOrderedNavigation()
     Check(files.Add(L"a.jpg"), "second path is added");
     Check(files.Add(L"c.jpg"), "third path is added");
     Check(!files.Add(L"b.jpg"), "duplicate path is rejected");
-    Check(files.CurrentPath() == L"b.jpg", "first collected path remains current");
+    Check(files.CurrentPath() == L"a.jpg", "unmoved list uses sorted first path as current");
 
-    Check(files.MoveToFirst(), "move to first succeeds");
+    Check(!files.MoveToFirst(), "cannot move to first while already on first");
     Check(files.CurrentPath() == L"a.jpg", "first path uses sorted order");
     Check(!files.MoveToPrevious(), "cannot move before first");
     Check(files.MoveToNext(), "move next succeeds");
@@ -157,6 +157,37 @@ void TestOrderedNavigation()
     Check(files.MoveTo(L"a.jpg"), "move to known path succeeds");
     Check(!files.MoveTo(L"missing.jpg"), "move to unknown path fails");
     Check(files.CurrentPath() == L"a.jpg", "failed move preserves current path");
+}
+
+void TestFolderGroupedNavigation()
+{
+    ImgFileList files(1);
+
+    files.Add(L"C:\\images\\example.jpg");
+    files.Add(L"C:\\images\\W900\\b.jpg");
+    files.Add(L"C:\\images\\IMG1.jpg");
+    files.Add(L"C:\\images\\W900\\a.jpg");
+
+    Check(files.CurrentPath() == L"C:\\images\\example.jpg", "root folder sorted first path is current");
+    Check(files.MoveToNext(), "move to second root file succeeds");
+    Check(files.CurrentPath() == L"C:\\images\\IMG1.jpg", "root files stay together before subfolder files");
+    Check(files.MoveToNext(), "move to first subfolder file succeeds");
+    Check(files.CurrentPath() == L"C:\\images\\W900\\a.jpg", "subfolder files sort after root files");
+    Check(files.MoveToNext(), "move to second subfolder file succeeds");
+    Check(files.CurrentPath() == L"C:\\images\\W900\\b.jpg", "subfolder files sort by filename");
+}
+
+void TestExplicitNavigationPinsCurrentPath()
+{
+    ImgFileList files(1);
+
+    files.Add(L"b.jpg");
+    files.Add(L"c.jpg");
+    Check(files.MoveToLast(), "move to selected item succeeds");
+    Check(files.CurrentPath() == L"c.jpg", "selected item is current before later insert");
+
+    files.Add(L"a.jpg");
+    Check(files.CurrentPath() == L"c.jpg", "later sorted insert does not replace selected current item");
 }
 
 void TestPathsFromCurrent()
@@ -635,6 +666,8 @@ int main()
 {
     TestEmptyList();
     TestOrderedNavigation();
+    TestFolderGroupedNavigation();
+    TestExplicitNavigationPinsCurrentPath();
     TestPathsFromCurrent();
     TestRemoval();
     TestRandomNavigation();

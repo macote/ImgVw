@@ -6,6 +6,11 @@
 #include <string>
 #include <vector>
 
+struct ImgFileListPathLess
+{
+    bool operator()(const std::wstring& left, const std::wstring& right) const;
+};
+
 class ImgFileList final
 {
   public:
@@ -29,9 +34,10 @@ class ImgFileList final
     std::vector<std::wstring> PathsFromCurrent() const;
 
   private:
-    std::set<std::wstring> files_;
-    std::set<std::wstring>::iterator current_{files_.end()};
+    std::set<std::wstring, ImgFileListPathLess> files_;
+    std::set<std::wstring, ImgFileListPathLess>::iterator current_{files_.end()};
     std::vector<std::wstring> random_order_;
     std::size_t random_index_{kRandomIndexPark};
     std::mt19937 random_engine_;
+    bool current_pinned_{};
 };

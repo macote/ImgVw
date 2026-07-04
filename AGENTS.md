@@ -27,6 +27,11 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
   For example:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x86 -Clean`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x64 -Clean`
+- Test entrypoint: `scripts/test-msys.ps1`. Prefer this for unit tests; it uses the same MSYS2 discovery pattern as the
+  build script, selects the requested architecture shell/toolchain, and runs `make -C tests test`.
+  For example:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-msys.ps1 -Arch x86 -Clean`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-msys.ps1 -Arch x64 -Clean`
 - Dependency build scripts are `scripts/build-libjpeg-turbo.ps1` and `scripts/build-little-cms.ps1`. Use them when
   rebuilding vendored library artifacts instead of invoking dependency build systems manually.
 - Useful Makefile variants:
