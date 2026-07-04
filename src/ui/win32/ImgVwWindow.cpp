@@ -206,6 +206,9 @@ void ImgVwWindow::InitializeBrowser(const std::wstring& path)
         return;
     }
 
+    const auto attributes = path.empty() ? INVALID_FILE_ATTRIBUTES : GetFileAttributes(path.c_str());
+    startupfileargument_ = attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+
     browser_.SetNotificationWindow(hwnd_, kBrowserChangedMessage);
     UpdateClientSize(windowrectangle.right, windowrectangle.bottom);
     browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom);
@@ -474,13 +477,13 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
     }
 
     std::wstringstream text;
-    text << stats.loader.queued << L" queued; " << stats.loader.free_slots << L"/" << stats.loader.maximum_slots
-         << L" slots free; " << cached << L" cached images";
+    text << L"found: " << stats.found_images << L"; cached: " << cached << L"; queued: " << stats.loader.queued
+         << L"; slots: " << stats.loader.free_slots << L"/" << stats.loader.maximum_slots;
     const auto temppath = ImgSettings::GetInstance().temppath();
     ULARGE_INTEGER freebytesavailable{};
     if (!temppath.empty() && GetDiskFreeSpaceEx(temppath.c_str(), &freebytesavailable, nullptr, nullptr))
     {
-        text << L"; " << FormatByteSize(freebytesavailable.QuadPart) << L" free";
+        text << L"; free: " << FormatByteSize(freebytesavailable.QuadPart);
     }
 
     text << L"\r\n";
@@ -1281,8 +1284,43 @@ void ImgVwWindow::DisplayCurrentSlideWithoutTimer()
     }
 }
 
+void ImgVwWindow::HandleStartupExitConditions()
+{
+    if (owner_ != nullptr || exitmessagedisplayed_ || !browser_.IsCollectingComplete())
+    {
+        return;
+    }
+
+    const auto stats = browser_.GetStats();
+    if (stats.found_images == 0)
+    {
+        if (!browsesubfolders_ && browser_.BrowseSubFoldersAsync())
+        {
+            browsesubfolders_ = TRUE;
+            return;
+        }
+
+        ShowMessageAndExit(L"No images were found.");
+    }
+    else if (startupfileargument_ && stats.found_images == 1)
+    {
+        ShowMessageAndExit(L"Only one image was found for the selected file.");
+    }
+}
+
+void ImgVwWindow::ShowMessageAndExit(LPCWSTR message)
+{
+    exitmessagedisplayed_ = TRUE;
+    ShowCursor(TRUE);
+    MessageBox(hwnd_, message, L"ImgVw", MB_OK | MB_ICONINFORMATION);
+    ShowCursor(FALSE);
+    CloseWindow();
+}
+
 void ImgVwWindow::HandleBrowserChanged()
 {
+    HandleStartupExitConditions();
+
     if (slideshowwaitingforimage_)
     {
         const auto imgitem = browser_.GetCurrentItem();

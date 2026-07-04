@@ -72,6 +72,8 @@ class ImgVwWindow final : public Window
     INT clientwidth_{};
     INT clientheight_{};
     BOOL browsesubfolders_{FALSE};
+    BOOL startupfileargument_{FALSE};
+    BOOL exitmessagedisplayed_{FALSE};
     HMONITOR currentmonitor_{nullptr};
     BOOL draggingwindow_{FALSE};
     POINT dragstartpoint_{};
@@ -141,6 +143,8 @@ class ImgVwWindow final : public Window
     BOOL DisplaySlidePath(const std::wstring& filepath);
     void DisplayCurrentSlideWhenReady();
     void DisplayCurrentSlideWithoutTimer();
+    void HandleStartupExitConditions();
+    void ShowMessageAndExit(LPCWSTR message);
     void HandleBrowserChanged();
     BOOL SelectDefaultICCProfile();
     void UseBuiltInICCProfile();

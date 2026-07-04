@@ -43,7 +43,8 @@ class ImgBrowser final
     ImgBrowser& operator=(const ImgBrowser&) = delete;
     void BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight);
     BOOL UpdateTargetSize(INT targetwidth, INT targetheight);
-    void BrowseSubFoldersAsync();
+    BOOL BrowseSubFoldersAsync();
+    BOOL IsCollectingComplete() const;
     void StopBrowsing();
     void SetNotificationWindow(HWND hwnd, UINT message);
     std::wstring GetCurrentFilePath();

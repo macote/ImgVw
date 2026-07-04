@@ -190,6 +190,17 @@ void TestExplicitNavigationPinsCurrentPath()
     Check(files.CurrentPath() == L"c.jpg", "later sorted insert does not replace selected current item");
 }
 
+void TestDirectFileSelectionPinsCurrentPath()
+{
+    ImgFileList files(1);
+
+    files.Add(L"b.jpg");
+    Check(files.MoveTo(L"b.jpg"), "directly selected file is selected");
+    files.Add(L"a.jpg");
+
+    Check(files.CurrentPath() == L"b.jpg", "later sorted insert does not replace directly selected file");
+}
+
 void TestPathsFromCurrent()
 {
     ImgFileList files(1);
@@ -668,6 +679,7 @@ int main()
     TestOrderedNavigation();
     TestFolderGroupedNavigation();
     TestExplicitNavigationPinsCurrentPath();
+    TestDirectFileSelectionPinsCurrentPath();
     TestPathsFromCurrent();
     TestRemoval();
     TestRandomNavigation();

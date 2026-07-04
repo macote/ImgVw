@@ -112,6 +112,7 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
             if (imgformat != ImgItem::Format::Unsupported)
             {
                 CollectFile(workpath, imgformat);
+                MoveToItem(workpath);
             }
         }
         else
@@ -163,11 +164,11 @@ BOOL ImgBrowser::UpdateTargetSize(INT targetwidth, INT targetheight)
     return changed ? TRUE : FALSE;
 }
 
-void ImgBrowser::BrowseSubFoldersAsync()
+BOOL ImgBrowser::BrowseSubFoldersAsync()
 {
     if (recursive_)
     {
-        return;
+        return FALSE;
     }
 
     recursive_ = TRUE;
@@ -175,13 +176,13 @@ void ImgBrowser::BrowseSubFoldersAsync()
     const auto collectorstatus = WaitForSingleObject(collectorthread_, 0);
     if (collectorstatus == WAIT_TIMEOUT)
     {
-        return;
+        return TRUE;
     }
 
     if (collectorstatus != WAIT_OBJECT_0)
     {
         // TODO: handle error
-        return;
+        return FALSE;
     }
 
     if (!cancellationflag_ && !folders_.empty())
@@ -191,7 +192,20 @@ void ImgBrowser::BrowseSubFoldersAsync()
         CloseHandle(collectorthread_);
         collectorthread_ =
             CreateThread(nullptr, 0, StaticThreadCollectSubFolders, reinterpret_cast<void*>(this), 0, nullptr);
+        return collectorthread_ != nullptr ? TRUE : FALSE;
     }
+
+    return FALSE;
+}
+
+BOOL ImgBrowser::IsCollectingComplete() const
+{
+    if (collectorthread_ == nullptr || collectorthread_ == INVALID_HANDLE_VALUE)
+    {
+        return TRUE;
+    }
+
+    return WaitForSingleObject(collectorthread_, 0) == WAIT_OBJECT_0 ? TRUE : FALSE;
 }
 
 void ImgBrowser::StopCollecting()
