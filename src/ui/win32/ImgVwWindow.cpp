@@ -1452,6 +1452,17 @@ BOOL ImgVwWindow::SelectDefaultICCProfile()
     return profile_selected;
 }
 
+void ImgVwWindow::UpdateContextMenuForMonitorCount(HMENU menu) const
+{
+    if (menu == nullptr || HasMultipleMonitors())
+    {
+        return;
+    }
+
+    DeleteMenu(menu, IDR_TOGGLESS_MULTI, MF_BYCOMMAND);
+    DeleteMenu(menu, IDR_TOGGLESS_MULTI_RANDOM, MF_BYCOMMAND);
+}
+
 void ImgVwWindow::HandleContextMenu(LPARAM lParam)
 {
     RECT rc;
@@ -1466,6 +1477,7 @@ void ImgVwWindow::HandleContextMenu(LPARAM lParam)
 
         const auto root = LoadMenu(hinst_, L"IMGPOPUP");
         const auto popup = GetSubMenu(root, 0);
+        UpdateContextMenuForMonitorCount(popup);
 
         ShowCursor(TRUE);
         TrackPopupMenu(popup, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd_, nullptr);

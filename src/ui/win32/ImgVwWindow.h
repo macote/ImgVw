@@ -144,6 +144,7 @@ class ImgVwWindow final : public Window
     void HandleBrowserChanged();
     BOOL SelectDefaultICCProfile();
     void UseBuiltInICCProfile();
+    void UpdateContextMenuForMonitorCount(HMENU menu) const;
     void HandleContextMenu(LPARAM lParam);
     void InvalidateScreen();
     bool DisplayImage(HDC dc, const ImgItem* item);
