@@ -25,8 +25,8 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - Repository build scripts are under `scripts/`. Prefer `scripts/build-msys.ps1` for MSYS application builds; it locates
   MSYS2, selects the architecture-specific shell/toolchain, invokes the Makefile, and verifies the output executable.
   For example:
-  - `powershell -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x86 -Clean`
-  - `powershell -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x64 -Clean`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x86 -Clean`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msys.ps1 -Config release -Arch x64 -Clean`
 - Dependency build scripts are `scripts/build-libjpeg-turbo.ps1` and `scripts/build-little-cms.ps1`. Use them when
   rebuilding vendored library artifacts instead of invoking dependency build systems manually.
 - Useful Makefile variants:
@@ -37,6 +37,8 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - The Makefile defines `WINVER=0x0501` and `_WIN32_WINNT=0x0501`; do not introduce newer Win32 APIs without guards or
   compatible fallbacks.
 - When possible, verify changes with at least one local build path. If a toolchain is unavailable, state that clearly.
+- Do not assume MSYS2 is installed at `C:\msys64`; use the repository scripts' discovery logic or call the scripts
+  directly.
 
 ## Coding Style
 
@@ -48,6 +50,24 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - Private data members use `lower_case_` with a trailing underscore.
 - Constants use the existing `kName` style.
 - Avoid Hungarian notation in new first-party code except where Win32 API conventions make it clearer.
+- Preserve existing file encodings and BOMs. Do not strip a BOM or rewrite an ANSI file as UTF-8 as a side effect of
+  formatting or mechanical edits.
+- `resources/*.rc` and `resources/*.rc2` are Windows resource files. Treat them as CRLF and Windows-1252/ANSI unless
+  their encoding is intentionally changed. Do not run broad formatters over them.
+- When editing `.rc` files, use byte/encoding-preserving replacements and verify with a build path that runs `windres`
+  or the Visual Studio resource compiler.
+
+## PowerShell and Windows Shell Practices
+
+- Always invoke PowerShell with `-NoProfile`.
+- Avoid nested `powershell -Command` calls for non-trivial scripts or string replacements. Prefer running PowerShell
+  directly in the current shell, using `-File`, or using a short temporary script when quoting would be fragile.
+- Quote Git refs and paths that contain special PowerShell characters. In particular, quote stash refs such as
+  `'stash@{0}'`.
+- Be careful with PowerShell strings containing `&`, tabs, quotes, backticks, or resource-script text. Prefer
+  single-quoted literals or here-strings, and verify the file content after replacement.
+- For multi-line PowerShell examples, prefer splatting or one command per line over fragile trailing-backtick command
+  chains when editing scripts or docs.
 
 ## Architecture Guidelines
 
@@ -66,4 +86,17 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - Keep Visual Studio project files, filters, and the Makefile in sync when adding, moving, or removing source files.
 - Treat `artifacts/imgvw_architecture_refactor_plan.md` as useful direction for larger refactors, especially around
   ownership, async loading, navigation safety, and tests.
+- Before staging or committing, inspect staged and unstaged changes separately. Preserve user-made staged changes unless
+  the user explicitly asks to replace them.
+- For history rewrites, tag moves, force pushes, or replacing GitHub releases, create a backup ref first when practical,
+  then verify the final tree/refs before pushing.
+- When cleaning local branches, only delete branches that are merged or explicitly identified as disposable backup
+  branches.
 - When executing PowerShell commands, always use the `-NoProfile` flag (e.g., `powershell -NoProfile -ExecutionPolicy Bypass ...`) to prevent profile script loading and potential hangs.
+
+## Release and Dependency Notes
+
+- Release binaries currently statically link LGPL dependencies `libheif` and `libde265`; keep README/LICENSE/release
+  notes consistent with the documented relinking path.
+- Dependency rebuild scripts should be used instead of direct dependency build-system calls. When a script has both VS
+  and MSYS legs, keep those environments isolated so MSYS CMake does not pick up MSVC tools.
