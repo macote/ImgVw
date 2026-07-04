@@ -1,4 +1,4 @@
-﻿<#
+<#
 Builds the static libjpeg-turbo artifacts consumed by ImgVw.
 
 MSYS artifacts are the deployment path:
@@ -393,7 +393,15 @@ if ($Mode -eq "all" -or $Mode -eq "vs") {
     }
 }
 
-if ($Mode -eq "all" -or $Mode -eq "msys") {
+if ($Mode -eq "all" -and -not (Get-Item "env:$MsysShellMarker" -ErrorAction SilentlyContinue)) {
+    foreach ($targetArch in Get-Architectures) {
+        Invoke-InMsysShell -TargetArch $targetArch
+    }
+    Copy-HeadersAndDocs -SourceDir $sourceDir -VendorDir $vendorDir
+    exit 0
+}
+
+if ($Mode -eq "msys") {
     foreach ($targetArch in Get-Architectures) {
         Build-Msys -TargetArch $targetArch -SourceDir $sourceDir -VendorDir $vendorDir
     }

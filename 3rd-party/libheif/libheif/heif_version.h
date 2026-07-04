@@ -33,6 +33,6 @@
 /* Version string */
 #define LIBHEIF_VERSION "1.23.0"
 
-#define LIBHEIF_PLUGIN_DIRECTORY "C:/Users/mac/AppData/Local/Temp/imgvw-libheif/install-libheif-vs-x64/lib/libheif"
+#define LIBHEIF_PLUGIN_DIRECTORY "libheif"
 
 #endif  // LIBHEIF_HEIF_VERSION_H

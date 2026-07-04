@@ -7,11 +7,17 @@ MSYS artifacts are the deployment path:
 
 Visual C++ artifacts are for Visual Studio local development:
   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libheif.ps1 -Mode vs -Arch all
+
+To build from modified dependency sources:
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-libheif.ps1 -Mode all -Arch all -Clean `
+      -LibheifSourceDir C:\src\libheif -Libde265SourceDir C:\src\libde265
 #>
 
 param(
     [string]$LibheifVersion = "1.23.0",
     [string]$Libde265Version = "1.1.1",
+    [string]$LibheifSourceDir = "",
+    [string]$Libde265SourceDir = "",
     [ValidateSet("all", "vs", "msys", "source")]
     [string]$Mode = "all",
     [ValidateSet("all", "x86", "x64")]
@@ -160,11 +166,18 @@ function Invoke-InMsysShell {
     $shellType = if ($TargetArch -eq "x86") { "-mingw32" } else { "-ucrt64" }
     $repoMsysPath = ConvertTo-MsysPath $RepoRoot
     $cleanArg = if ($Clean) { " -Clean" } else { "" }
+    $sourceArgs = ""
+    if ($LibheifSourceDir) {
+        $sourceArgs += " -LibheifSourceDir $(Quote-BashArgument $LibheifSourceDir)"
+    }
+    if ($Libde265SourceDir) {
+        $sourceArgs += " -Libde265SourceDir $(Quote-BashArgument $Libde265SourceDir)"
+    }
     $scriptInvocation =
         "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-libheif.ps1" +
         " -LibheifVersion $LibheifVersion -Libde265Version $Libde265Version -Mode msys -Arch $TargetArch" +
         " -RepoRoot $(Quote-BashArgument $RepoRoot) -WorkRoot $(Quote-BashArgument $WorkRoot)" +
-        " -MsysRoot $(Quote-BashArgument $resolvedMsysRoot)$cleanArg"
+        " -MsysRoot $(Quote-BashArgument $resolvedMsysRoot)$sourceArgs$cleanArg"
     $command = @(
         "set -e",
         "export $MsysShellMarker=1",
@@ -219,24 +232,41 @@ function Expand-SourceArchive {
 }
 
 function Initialize-Sources {
-    if (-not $LibheifHashes.ContainsKey($LibheifVersion)) {
-        throw "No pinned SHA256 is available for libheif $LibheifVersion."
+    if ($LibheifSourceDir) {
+        if (-not (Test-Path -LiteralPath $LibheifSourceDir -PathType Container)) {
+            throw "libheif source directory was not found: $LibheifSourceDir"
+        }
+        $libheifSource = Resolve-Path -LiteralPath $LibheifSourceDir -ErrorAction Stop
+        $libheifSource = $libheifSource.Path
     }
-    if (-not $Libde265Hashes.ContainsKey($Libde265Version)) {
-        throw "No pinned SHA256 is available for libde265 $Libde265Version."
+    else {
+        if (-not $LibheifHashes.ContainsKey($LibheifVersion)) {
+            throw "No pinned SHA256 is available for libheif $LibheifVersion."
+        }
+        $libheifArchive = Get-VerifiedArchive -Name "libheif-$LibheifVersion.tar.gz" `
+            -Url "https://github.com/strukturag/libheif/releases/download/v$LibheifVersion/libheif-$LibheifVersion.tar.gz" `
+            -ExpectedHash $LibheifHashes[$LibheifVersion]
+        $libheifSource = Join-Path $WorkRoot "libheif-$LibheifVersion"
+        Expand-SourceArchive -Archive $libheifArchive -SourceDir $libheifSource
     }
 
-    $libheifArchive = Get-VerifiedArchive -Name "libheif-$LibheifVersion.tar.gz" `
-        -Url "https://github.com/strukturag/libheif/releases/download/v$LibheifVersion/libheif-$LibheifVersion.tar.gz" `
-        -ExpectedHash $LibheifHashes[$LibheifVersion]
-    $libde265Archive = Get-VerifiedArchive -Name "libde265-$Libde265Version.tar.gz" `
-        -Url "https://github.com/strukturag/libde265/releases/download/v$Libde265Version/libde265-$Libde265Version.tar.gz" `
-        -ExpectedHash $Libde265Hashes[$Libde265Version]
-
-    $libheifSource = Join-Path $WorkRoot "libheif-$LibheifVersion"
-    $libde265Source = Join-Path $WorkRoot "libde265-$Libde265Version"
-    Expand-SourceArchive -Archive $libheifArchive -SourceDir $libheifSource
-    Expand-SourceArchive -Archive $libde265Archive -SourceDir $libde265Source
+    if ($Libde265SourceDir) {
+        if (-not (Test-Path -LiteralPath $Libde265SourceDir -PathType Container)) {
+            throw "libde265 source directory was not found: $Libde265SourceDir"
+        }
+        $libde265Source = Resolve-Path -LiteralPath $Libde265SourceDir -ErrorAction Stop
+        $libde265Source = $libde265Source.Path
+    }
+    else {
+        if (-not $Libde265Hashes.ContainsKey($Libde265Version)) {
+            throw "No pinned SHA256 is available for libde265 $Libde265Version."
+        }
+        $libde265Archive = Get-VerifiedArchive -Name "libde265-$Libde265Version.tar.gz" `
+            -Url "https://github.com/strukturag/libde265/releases/download/v$Libde265Version/libde265-$Libde265Version.tar.gz" `
+            -ExpectedHash $Libde265Hashes[$Libde265Version]
+        $libde265Source = Join-Path $WorkRoot "libde265-$Libde265Version"
+        Expand-SourceArchive -Archive $libde265Archive -SourceDir $libde265Source
+    }
 
     return @{
         Libheif = $libheifSource
@@ -329,6 +359,7 @@ function Get-LibheifArguments {
         "-DCMAKE_INSTALL_PREFIX=$InstallDir",
         "-DCMAKE_PREFIX_PATH=$Libde265InstallDir",
         "-DCMAKE_CXX_FLAGS=$staticDecoderDefinition",
+        "-DPLUGIN_DIRECTORY=libheif",
         "-DBUILD_SHARED_LIBS=OFF",
         "-DBUILD_TESTING=OFF",
         "-DBUILD_DOCUMENTATION=OFF",
@@ -403,6 +434,7 @@ function Assert-BuildConfiguration {
     $required = @(
         "BUILD_SHARED_LIBS:BOOL=OFF",
         "ENABLE_PLUGIN_LOADING:BOOL=OFF",
+        "PLUGIN_DIRECTORY:STRING=libheif",
         "WITH_LIBDE265:BOOL=ON",
         "WITH_LIBDE265_PLUGIN:BOOL=OFF",
         "WITH_X265:BOOL=OFF",
