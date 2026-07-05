@@ -1,10 +1,12 @@
 ## High Priority
 
-- Storage management
-  - Check remaining temp space, use page file, use memory, etc.
+- Create install script that copies bin, add bin to path, add open with ...
 
 ## Medium Priority
 
+- i18n
+- Storage management
+  - Check remaining temp space, use page file, use memory, etc.
 - Folder navigation
 - Thumbnails
 - Load progress indicator for large files
