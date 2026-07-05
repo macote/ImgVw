@@ -7,6 +7,7 @@ Make ImgVw available through a repository-provided PowerShell installer that can
 - install or update the application executable and required redistributable files;
 - register ImgVw as an Open With candidate for supported image extensions;
 - register ImgVw for folders so Explorer can open a folder in ImgVw;
+- register ImgVw in Windows Settings > Apps so the user can uninstall it from standard Windows UI;
 - optionally set legacy default file associations where Windows allows it;
 - uninstall the files and registry entries created by the script;
 - preserve the current Windows XP compatibility target.
@@ -94,7 +95,7 @@ The README should show a direct per-user install command that downloads the inst
 `powershell -NoProfile`. The script itself must check the latest release and download the correct application asset:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing https://github.com/macote/ImgVw/releases/latest/download/install-imgvw.ps1 -OutFile $env:TEMP\install-imgvw.ps1; & $env:TEMP\install-imgvw.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/macote/ImgVw/releases/latest/download/install-imgvw.ps1 | iex"
 ```
 
 That one-liner should be the primary install path. If release archives remain available, document this archive-local
@@ -109,11 +110,17 @@ Also document:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install-imgvw.ps1 -Version latest -Arch x64
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install-imgvw.ps1 -Action Uninstall
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install-imgvw.ps1 -Scope AllUsers
 ```
 
 The README should state that the default install is per-user, adds ImgVw to the user's `PATH`, and registers Explorer
 Open With entries without taking over default image apps.
+
+Keep all-users install support available as an advanced option in the script help or release notes, but do not make it
+part of the primary README install flow. If documented, state that it requires an elevated PowerShell session:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-imgvw.ps1 -Scope AllUsers
+```
 
 ## Files To Install
 
@@ -136,9 +143,10 @@ The installer should:
 3. Select the correct executable architecture.
 4. Copy the executable to the target path as `ImgVw.exe`.
 5. Stop before overwriting a running executable unless `-Force` is used and the replacement can be performed safely.
-6. Copy the expected documentation files.
-7. Register shell integration.
-8. Write a small install marker under the install directory with version, architecture, source path, installed files, and registry
+6. Copy the installer script to the target path as `install-imgvw.ps1` so Windows Settings can uninstall offline.
+7. Copy the expected documentation files.
+8. Register shell integration and the Windows uninstall entry.
+9. Write a small install marker under the install directory with version, architecture, source path, installed files, and registry
    roots used.
 
 ## Architecture Selection
@@ -146,7 +154,7 @@ The installer should:
 Release packaging should make bitness explicit. Prefer publishing separate assets:
 
 ```text
-ImgVw-win32.zip
+ImgVw-x86.zip
 ImgVw-x64.zip
 install-imgvw.ps1
 ```
@@ -212,7 +220,7 @@ explicitly provided.
 The release asset naming convention should be stable enough for deterministic selection, for example:
 
 ```text
-ImgVw-win32.zip
+ImgVw-x86.zip
 ImgVw-x64.zip
 install-imgvw.ps1
 ```
@@ -233,6 +241,41 @@ The script should:
 - leave the running PowerShell session unchanged except for printing the installed command path.
 
 After installation, `ImgVw.exe` should be invokable from a new terminal.
+
+## Windows Apps Uninstall Registration
+
+Register ImgVw in the standard Windows uninstall registry location so Windows Settings > Apps can remove installs made
+by the script.
+
+For `CurrentUser`:
+
+```text
+HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\ImgVw
+```
+
+For `AllUsers`:
+
+```text
+HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\ImgVw
+```
+
+The entry should include:
+
+```text
+DisplayName = ImgVw
+DisplayVersion = <release tag>
+Publisher = Marc-Andre Cote
+InstallLocation = <install directory>
+DisplayIcon = <install directory>\ImgVw.exe,0
+UninstallString = powershell -NoProfile -ExecutionPolicy Bypass -File "<install directory>\install-imgvw.ps1" -Action Uninstall -Scope <scope> -InstallDir "<install directory>"
+QuietUninstallString = <same command until a dedicated -Quiet switch exists>
+NoModify = 1
+NoRepair = 1
+EstimatedSize = <installed size in KB>
+```
+
+The installer must copy `install-imgvw.ps1` into the install directory before writing this key. Uninstall should remove
+the uninstall key and the local script copy.
 
 ## Registry Model
 
@@ -331,9 +374,10 @@ of trying to force ImgVw into Windows' file-oriented Open With picker for folder
 2. Remove ImgVw from each supported extension's `OpenWithProgids` and `OpenWithList`.
 3. Remove the folder shell verb keys.
 4. Remove `RegisteredApplications` and capabilities entries that point to ImgVw.
-5. Remove the install directory only if it matches the default path or contains an install marker created by the script.
-6. Remove the user `PATH` entry if the script added it.
-7. Refresh shell associations.
+5. Remove the Windows Apps uninstall registry entry.
+6. Remove the install directory only if it matches the default path or contains an install marker created by the script.
+7. Remove the user `PATH` entry if the script added it.
+8. Refresh shell associations.
 
 Never delete a user-supplied `-InstallDir` unless the install marker proves it was created by this installer and contains
 only files the installer owns.
@@ -380,6 +424,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-imgvw.ps1 -A
 Also verify:
 
 - Explorer shows ImgVw in Open With for each supported image extension.
+- Windows Settings > Apps lists ImgVw and invokes the local uninstall script.
 - A selected image opens with the correct quoted path when launched through Open With.
 - A selected folder shows `Open with ImgVw` and opens that folder in ImgVw.
 - A drive root shows `Open with ImgVw` and opens that root in ImgVw.
@@ -388,6 +433,7 @@ Also verify:
 - Windows 8 or later does not receive invalid `UserChoice` registry writes.
 - `-Scope AllUsers` fails clearly without elevation and succeeds when elevated.
 - Uninstall removes ImgVw entries without removing unrelated Open With apps.
+- Uninstall removes the Windows Apps uninstall entry.
 
 ## Acceptance Criteria
 

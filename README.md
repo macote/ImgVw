@@ -36,6 +36,34 @@ Pass a file or folder as an argument.
 |              Enter              | Display current file path                      |
 |             Escape              | Exit                                           |
 
+## Installation
+
+ImgVw can still be copied and run directly. To install the latest release for the current user, run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://github.com/macote/ImgVw/releases/latest/download/install-imgvw.ps1 | iex"
+```
+
+The installer checks the latest GitHub release, selects the x64 build on 64-bit Windows or the x86 build otherwise,
+installs it as `ImgVw.exe` under `%LOCALAPPDATA%\Programs\ImgVw`, adds that directory to the user `PATH`, and registers
+ImgVw in Explorer's Open With menu for supported image files and folders. It does not take over default image
+associations. Run the install command again to upgrade an older install to the latest release. The install also appears
+in Windows Settings > Apps.
+
+Uninstall from Windows Settings > Apps > Installed apps (or Apps & features) > ImgVw > Uninstall.
+
+If Settings is unavailable, uninstall with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm https://github.com/macote/ImgVw/releases/latest/download/install-imgvw.ps1))) -Action Uninstall"
+```
+
+From an extracted release archive, run the local script instead:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-imgvw.ps1
+```
+
 ## 3rd-party libraries
 
 ImgVw uses the following libraries:

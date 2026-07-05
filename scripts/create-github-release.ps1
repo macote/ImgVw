@@ -92,6 +92,14 @@ $licensePath = Resolve-RepoPath "LICENSE.md"
 if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf)) {
     throw "LICENSE.md was not found: $licensePath"
 }
+$readmePath = Resolve-RepoPath "README.md"
+if (-not (Test-Path -LiteralPath $readmePath -PathType Leaf)) {
+    throw "README.md was not found: $readmePath"
+}
+$installerPath = Resolve-RepoPath "scripts\install-imgvw.ps1"
+if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
+    throw "Installer script was not found: $installerPath"
+}
 
 Push-Location $RepoRoot
 $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) `
@@ -102,11 +110,15 @@ try {
 
     New-Item -ItemType Directory -Path $stagingDir | Out-Null
     $assets = [System.Collections.Generic.List[string]]::new()
-    Add-StagedAsset -Assets $assets -Path $X86Binary -ReleaseName "ImgVw-$Tag-x86.exe" `
+    Add-StagedAsset -Assets $assets -Path $X86Binary -ReleaseName "ImgVw-x86.exe" `
         -StagingDir $stagingDir
-    Add-StagedAsset -Assets $assets -Path $X64Binary -ReleaseName "ImgVw-$Tag-x64.exe" `
+    Add-StagedAsset -Assets $assets -Path $X64Binary -ReleaseName "ImgVw-x64.exe" `
         -StagingDir $stagingDir
     Add-StagedAsset -Assets $assets -Path $licensePath -ReleaseName "LICENSE.md" `
+        -StagingDir $stagingDir
+    Add-StagedAsset -Assets $assets -Path $readmePath -ReleaseName "README.md" `
+        -StagingDir $stagingDir
+    Add-StagedAsset -Assets $assets -Path $installerPath -ReleaseName "install-imgvw.ps1" `
         -StagingDir $stagingDir
 
     $releaseExists = $true

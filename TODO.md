@@ -1,7 +1,5 @@
 ## High Priority
 
-- Create install script that copies bin, add bin to path, add open with ...
-
 ## Medium Priority
 
 - i18n

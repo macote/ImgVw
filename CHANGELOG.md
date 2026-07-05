@@ -2,6 +2,8 @@
 
 - Add multi-monitor random and sequential slideshow support with shared random ordering across displays
 - Improve image fitting, cache warmup, and monitor/DPI transitions when moving the viewer between displays
+- Add a PowerShell installer that downloads the latest release, installs per-user by default, adds ImgVw to PATH,
+  registers Explorer Open With integration for supported images and folders, and supports Windows Settings uninstall
 - Allow dragging the viewer between monitors and refine monitor-edge snapping
 - Add native DPI-aware loading progress and loader statistics overlays for cache/loading diagnostics
 - Improve startup handling for missing or empty folders
