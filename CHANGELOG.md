@@ -1,10 +1,12 @@
-## 1.9.0 (2026-07-03)
+## 1.9.0 (2026-07-05)
 
-- Add multi-monitor random slideshow support with shared random ordering across displays
-- Improve image fitting and cache warmup when moving the viewer between monitors or DPI settings
+- Add multi-monitor random and sequential slideshow support with shared random ordering across displays
+- Improve image fitting, cache warmup, and monitor/DPI transitions when moving the viewer between displays
 - Allow dragging the viewer between monitors and refine monitor-edge snapping
-- Restore the painted slide correctly after stopping multi-monitor slideshow mode
-- Add a native DPI-aware loader statistics overlay for cache and loading diagnostics
+- Add native DPI-aware loading progress and loader statistics overlays for cache/loading diagnostics
+- Improve startup handling for missing or empty folders
+- Fix slideshow toggle/cursor behavior and restore the painted slide after stopping multi-monitor slideshow mode
+- Hide multi-monitor menu items on single-monitor systems and remove the Ctrl+Q exit accelerator
 
 ## 1.8.0 (2026-06-24)
 
