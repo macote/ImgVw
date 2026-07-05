@@ -51,6 +51,12 @@ std::wstring FormatPercent(std::size_t numerator, std::size_t denominator)
     text << (denominator > 0 ? numerator * 100 / denominator : 0) << L"%";
     return text.str();
 }
+
+bool ContainsRect(const RECT& outer, const RECT& inner)
+{
+    return inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right &&
+           inner.bottom <= outer.bottom;
+}
 } // namespace
 
 struct ImgVwWindow::MonitorCreateContext
@@ -180,6 +186,13 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
         if (slideshowwaitingforimage_ && imgitem->status() != ImgItem::Status::Ready &&
             imgitem->status() != ImgItem::Status::Error)
         {
+            return;
+        }
+
+        if (loaderstatsoverlayvisible_ && imgitem->status() == ImgItem::Status::Ready &&
+            !IsRectEmpty(&loaderstatsoverlayrect_) && ContainsRect(loaderstatsoverlayrect_, pps->rcPaint))
+        {
+            DrawLoaderStatsOverlay(pps->hdc, imgitem.get());
             return;
         }
 
@@ -432,16 +445,21 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const st
         return false;
     }
 
+    const auto statsdrawn = loaderstatsoverlayvisible_;
+    std::wstring text = filepath;
+    RECT overlayrect{};
     if (loaderstatsoverlayvisible_)
     {
-        FillRect(dc, &paintrect, backgroundbrush_);
         loaderstatsoverlaytext_ = BuildLoaderStatsOverlayText();
         loaderstatsoverlayrect_ = CalculateLoaderStatsOverlayRect(dc, loaderstatsoverlaytext_);
-        DrawTextOverlay(dc, loaderstatsoverlayrect_, loaderstatsoverlaytext_, nullptr);
-        return true;
+        text = loaderstatsoverlaytext_;
+        overlayrect = loaderstatsoverlayrect_;
+    }
+    else
+    {
+        overlayrect = CalculateLoaderStatsOverlayRect(dc, text);
     }
 
-    const auto overlayrect = CalculateLoaderStatsOverlayRect(dc, filepath);
     const auto paintwidth = paintrect.right - paintrect.left;
     const auto paintheight = paintrect.bottom - paintrect.top;
     const auto memorydc = CreateCompatibleDC(dc);
@@ -457,8 +475,8 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const st
             DeleteDC(memorydc);
         }
         FillRect(dc, &paintrect, backgroundbrush_);
-        DrawTextOverlay(dc, overlayrect, filepath, nullptr);
-        return false;
+        DrawTextOverlay(dc, overlayrect, text, nullptr);
+        return statsdrawn;
     }
 
     const auto previousbitmap = SelectObject(memorydc, bitmap);
@@ -467,21 +485,21 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const st
         DeleteObject(bitmap);
         DeleteDC(memorydc);
         FillRect(dc, &paintrect, backgroundbrush_);
-        DrawTextOverlay(dc, overlayrect, filepath, nullptr);
-        return false;
+        DrawTextOverlay(dc, overlayrect, text, nullptr);
+        return statsdrawn;
     }
 
     POINT previousorigin{};
     SetViewportOrgEx(memorydc, -paintrect.left, -paintrect.top, &previousorigin);
     FillRect(memorydc, &paintrect, backgroundbrush_);
-    DrawTextOverlay(memorydc, overlayrect, filepath, nullptr);
+    DrawTextOverlay(memorydc, overlayrect, text, nullptr);
     SetViewportOrgEx(memorydc, previousorigin.x, previousorigin.y, nullptr);
 
     BitBlt(dc, paintrect.left, paintrect.top, paintwidth, paintheight, memorydc, 0, 0, SRCCOPY);
     SelectObject(memorydc, previousbitmap);
     DeleteObject(bitmap);
     DeleteDC(memorydc);
-    return false;
+    return statsdrawn;
 }
 
 BOOL ImgVwWindow::IsLoaderStatsOverlayKeyDown() const
