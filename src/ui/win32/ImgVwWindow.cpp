@@ -174,6 +174,7 @@ LRESULT ImgVwWindow::OnCreate()
 void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
 {
     const auto imgitem = browser_.GetCurrentItem();
+    bool loaderstatsdrawn = false;
     if (imgitem != nullptr)
     {
         if (slideshowwaitingforimage_ && imgitem->status() != ImgItem::Status::Ready &&
@@ -188,11 +189,11 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
         }
         else
         {
-            DisplayFileInformation(pps->hdc, browser_.GetCurrentFilePath());
+            loaderstatsdrawn = DisplayFileInformation(pps->hdc, pps->rcPaint, browser_.GetCurrentFilePath());
         }
     }
 
-    if (loaderstatsoverlayvisible_)
+    if (loaderstatsoverlayvisible_ && !loaderstatsdrawn)
     {
         DrawLoaderStatsOverlay(pps->hdc, imgitem.get());
     }
@@ -424,14 +425,63 @@ bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
     return image_renderer_.Render(input).Succeeded();
 }
 
-void ImgVwWindow::DisplayFileInformation(HDC dc, const std::wstring& filepath)
+bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const std::wstring& filepath)
 {
-    RECT windowrectangle;
-    GetWindowRect(hwnd_, &windowrectangle);
-    FillRect(dc, &windowrectangle, backgroundbrush_);
-    const auto text_length =
-        static_cast<int>(filepath.size() > static_cast<size_t>(INT_MAX) ? INT_MAX : filepath.size());
-    TextOut(dc, 0, 0, filepath.c_str(), text_length);
+    if (IsRectEmpty(&paintrect))
+    {
+        return false;
+    }
+
+    if (loaderstatsoverlayvisible_)
+    {
+        FillRect(dc, &paintrect, backgroundbrush_);
+        loaderstatsoverlaytext_ = BuildLoaderStatsOverlayText();
+        loaderstatsoverlayrect_ = CalculateLoaderStatsOverlayRect(dc, loaderstatsoverlaytext_);
+        DrawTextOverlay(dc, loaderstatsoverlayrect_, loaderstatsoverlaytext_, nullptr);
+        return true;
+    }
+
+    const auto overlayrect = CalculateLoaderStatsOverlayRect(dc, filepath);
+    const auto paintwidth = paintrect.right - paintrect.left;
+    const auto paintheight = paintrect.bottom - paintrect.top;
+    const auto memorydc = CreateCompatibleDC(dc);
+    const auto bitmap = memorydc == nullptr ? nullptr : CreateCompatibleBitmap(dc, paintwidth, paintheight);
+    if (memorydc == nullptr || bitmap == nullptr)
+    {
+        if (bitmap != nullptr)
+        {
+            DeleteObject(bitmap);
+        }
+        if (memorydc != nullptr)
+        {
+            DeleteDC(memorydc);
+        }
+        FillRect(dc, &paintrect, backgroundbrush_);
+        DrawTextOverlay(dc, overlayrect, filepath, nullptr);
+        return false;
+    }
+
+    const auto previousbitmap = SelectObject(memorydc, bitmap);
+    if (previousbitmap == nullptr || previousbitmap == HGDI_ERROR)
+    {
+        DeleteObject(bitmap);
+        DeleteDC(memorydc);
+        FillRect(dc, &paintrect, backgroundbrush_);
+        DrawTextOverlay(dc, overlayrect, filepath, nullptr);
+        return false;
+    }
+
+    POINT previousorigin{};
+    SetViewportOrgEx(memorydc, -paintrect.left, -paintrect.top, &previousorigin);
+    FillRect(memorydc, &paintrect, backgroundbrush_);
+    DrawTextOverlay(memorydc, overlayrect, filepath, nullptr);
+    SetViewportOrgEx(memorydc, previousorigin.x, previousorigin.y, nullptr);
+
+    BitBlt(dc, paintrect.left, paintrect.top, paintwidth, paintheight, memorydc, 0, 0, SRCCOPY);
+    SelectObject(memorydc, previousbitmap);
+    DeleteObject(bitmap);
+    DeleteDC(memorydc);
+    return false;
 }
 
 BOOL ImgVwWindow::IsLoaderStatsOverlayKeyDown() const
@@ -502,6 +552,14 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
              << FormatPercent(size_stats.ready, size_total) << std::setw(10) << size_stats.ready << std::setw(10)
              << size_stats.loading << std::setw(10) << size_stats.queued << std::setw(8) << size_stats.error
              << std::setw(13) << FormatByteSize(size_stats.temp_file_bytes) << L"\r\n";
+    }
+
+    const auto currentitem = browser_.GetCurrentItem();
+    const auto currentpath = browser_.GetCurrentFilePath();
+    if (!currentpath.empty() && (currentitem == nullptr || currentitem->status() != ImgItem::Status::Ready))
+    {
+        text << L"--------------------------------------------------------------------------\r\n";
+        text << L"loading " << currentpath << L"\r\n";
     }
 
     return text.str();
@@ -611,31 +669,31 @@ void ImgVwWindow::RefreshLoaderStatsOverlay()
     const auto rect = CalculateLoaderStatsOverlayRect(dc, text);
     ReleaseDC(hwnd_, dc);
 
-    RECT displayrect = rect;
+    RECT invalidaterect = rect;
     if (!IsRectEmpty(&loaderstatsoverlayrect_))
     {
-        UnionRect(&displayrect, &displayrect, &loaderstatsoverlayrect_);
+        UnionRect(&invalidaterect, &invalidaterect, &loaderstatsoverlayrect_);
     }
 
-    if (loaderstatsoverlaytext_ == text && EqualRect(&loaderstatsoverlayrect_, &displayrect))
+    if (loaderstatsoverlaytext_ == text && EqualRect(&loaderstatsoverlayrect_, &rect))
     {
         return;
     }
 
     loaderstatsoverlaytext_ = text;
-    loaderstatsoverlayrect_ = displayrect;
-    InvalidateRect(hwnd_, &loaderstatsoverlayrect_, FALSE);
+    loaderstatsoverlayrect_ = rect;
+    InvalidateRect(hwnd_, &invalidaterect, FALSE);
 }
 
-void ImgVwWindow::DrawLoaderStatsOverlay(HDC dc, const ImgItem* item)
+void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item)
 {
-    if (loaderstatsoverlaytext_.empty() || IsRectEmpty(&loaderstatsoverlayrect_))
+    if (text.empty() || IsRectEmpty(&overlayrect))
     {
         return;
     }
 
-    const auto overlaywidth = loaderstatsoverlayrect_.right - loaderstatsoverlayrect_.left;
-    const auto overlayheight = loaderstatsoverlayrect_.bottom - loaderstatsoverlayrect_.top;
+    const auto overlaywidth = overlayrect.right - overlayrect.left;
+    const auto overlayheight = overlayrect.bottom - overlayrect.top;
     const auto memorydc = CreateCompatibleDC(dc);
     const auto bitmap = memorydc == nullptr ? nullptr : CreateCompatibleBitmap(dc, overlaywidth, overlayheight);
     if (memorydc == nullptr || bitmap == nullptr)
@@ -667,7 +725,7 @@ void ImgVwWindow::DrawLoaderStatsOverlay(HDC dc, const ImgItem* item)
         RECT imagerect{item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(),
                        item->offsety() + item->displayheight()};
         RECT intersection{};
-        if (IntersectRect(&intersection, &loaderstatsoverlayrect_, &imagerect))
+        if (IntersectRect(&intersection, &overlayrect, &imagerect))
         {
             const auto imgbitmap = item->GetDisplayBitmap();
             const auto sourcedc = CreateCompatibleDC(dc);
@@ -676,8 +734,8 @@ void ImgVwWindow::DrawLoaderStatsOverlay(HDC dc, const ImgItem* item)
                 const auto previoussourcebitmap = SelectObject(sourcedc, imgbitmap.bitmap());
                 if (previoussourcebitmap != nullptr && previoussourcebitmap != HGDI_ERROR)
                 {
-                    BitBlt(memorydc, intersection.left - loaderstatsoverlayrect_.left,
-                           intersection.top - loaderstatsoverlayrect_.top, intersection.right - intersection.left,
+                    BitBlt(memorydc, intersection.left - overlayrect.left, intersection.top - overlayrect.top,
+                           intersection.right - intersection.left,
                            intersection.bottom - intersection.top, sourcedc, intersection.left - imagerect.left,
                            intersection.top - imagerect.top, SRCCOPY);
                     SelectObject(sourcedc, previoussourcebitmap);
@@ -733,19 +791,23 @@ void ImgVwWindow::DrawLoaderStatsOverlay(HDC dc, const ImgItem* item)
     if (overlayfont != nullptr)
     {
         const auto previousfont = SelectObject(memorydc, overlayfont);
-        DrawText(memorydc, loaderstatsoverlaytext_.c_str(), -1, &textrect, DT_LEFT | DT_NOPREFIX);
+        DrawText(memorydc, text.c_str(), -1, &textrect, DT_LEFT | DT_NOPREFIX);
         SelectObject(memorydc, previousfont);
     }
     else
     {
-        DrawText(memorydc, loaderstatsoverlaytext_.c_str(), -1, &textrect, DT_LEFT | DT_NOPREFIX);
+        DrawText(memorydc, text.c_str(), -1, &textrect, DT_LEFT | DT_NOPREFIX);
     }
 
-    BitBlt(dc, loaderstatsoverlayrect_.left, loaderstatsoverlayrect_.top, overlaywidth, overlayheight, memorydc, 0, 0,
-           SRCCOPY);
+    BitBlt(dc, overlayrect.left, overlayrect.top, overlaywidth, overlayheight, memorydc, 0, 0, SRCCOPY);
     SelectObject(memorydc, previousbitmap);
     DeleteObject(bitmap);
     DeleteDC(memorydc);
+}
+
+void ImgVwWindow::DrawLoaderStatsOverlay(HDC dc, const ImgItem* item)
+{
+    DrawTextOverlay(dc, loaderstatsoverlayrect_, loaderstatsoverlaytext_, item);
 }
 
 void ImgVwWindow::InvalidateScreen()

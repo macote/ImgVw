@@ -152,7 +152,7 @@ class ImgVwWindow final : public Window
     void HandleContextMenu(LPARAM lParam);
     void InvalidateScreen();
     bool DisplayImage(HDC dc, const ImgItem* item);
-    void DisplayFileInformation(HDC dc, const std::wstring& filepath);
+    bool DisplayFileInformation(HDC dc, const RECT& paintrect, const std::wstring& filepath);
     BOOL IsLoaderStatsOverlayKeyDown() const;
     void UpdateLoaderStatsOverlayVisibility();
     std::wstring BuildLoaderStatsOverlayText();
@@ -162,6 +162,7 @@ class ImgVwWindow final : public Window
     void ResetLoaderStatsOverlayLayout();
     RECT CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& text) const;
     void RefreshLoaderStatsOverlay();
+    void DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item);
     void DrawLoaderStatsOverlay(HDC dc, const ImgItem* item);
     void PaintContent(PAINTSTRUCT* pps);
     void DeleteCurrentItem(BOOL allowundo);
