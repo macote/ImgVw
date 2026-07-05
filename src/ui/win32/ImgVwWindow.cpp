@@ -215,7 +215,7 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
         {
             if (loaderstatsoverlayvisible_)
             {
-                DisplayFileInformation(pps->hdc, pps->rcPaint, browser_.GetCurrentFilePath());
+                DisplayFileInformation(pps->hdc, pps->rcPaint, imgitem.get(), browser_.GetCurrentFilePath());
             }
             else
             {
@@ -244,7 +244,8 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
                                                       browser_.GetCurrentFilePath());
             if (!loaderstatsdrawn)
             {
-                loaderstatsdrawn = DisplayFileInformation(pps->hdc, pps->rcPaint, browser_.GetCurrentFilePath());
+                loaderstatsdrawn =
+                    DisplayFileInformation(pps->hdc, pps->rcPaint, imgitem.get(), browser_.GetCurrentFilePath());
             }
         }
     }
@@ -487,7 +488,8 @@ bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
     return image_renderer_.Render(input).Succeeded();
 }
 
-bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const std::wstring& filepath)
+bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const ImgItem* item,
+                                         const std::wstring& filepath)
 {
     if (IsRectEmpty(&paintrect))
     {
@@ -495,7 +497,7 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const st
     }
 
     const auto statsdrawn = loaderstatsoverlayvisible_;
-    std::wstring text = filepath;
+    auto text = BuildItemInfoOverlayText(item, filepath);
     RECT overlayrect{};
     if (loaderstatsoverlayvisible_)
     {
@@ -559,32 +561,70 @@ bool ImgVwWindow::DisplayLoadingProgress(HDC dc, const RECT& paintrect, const Im
         return false;
     }
 
-    const auto text = BuildLoadingProgressOverlayText(item, filepath);
+    const auto text = BuildItemInfoOverlayText(item, filepath);
     const auto overlayrect = CalculateLoaderStatsOverlayRect(dc, text);
     FillRect(dc, &paintrect, backgroundbrush_);
     DrawTextOverlay(dc, overlayrect, text, nullptr);
     return true;
 }
 
-std::wstring ImgVwWindow::BuildLoadingProgressOverlayText(const ImgItem* item, const std::wstring& filepath) const
+std::wstring ImgVwWindow::BuildItemInfoOverlayText(const ImgItem* item, const std::wstring& filepath) const
 {
-    const auto percent = item == nullptr ? -1 : item->loadingprogresspercent();
     std::wstringstream text;
-    if (percent >= 0)
+    text << filepath;
+    const auto status = BuildItemStatusText(item);
+    if (!status.empty())
     {
-        text << L"[" << percent << L"%]";
-    }
-
-    if (!filepath.empty())
-    {
-        if (percent >= 0)
-        {
-            text << L" ";
-        }
-        text << filepath;
+        text << L"\r\n" << status;
     }
 
     return text.str();
+}
+
+std::wstring ImgVwWindow::BuildItemStatusText(const ImgItem* item) const
+{
+    if (item == nullptr)
+    {
+        return L"Status: Unknown";
+    }
+
+    std::wstringstream text;
+    text << L"Status: ";
+    switch (item->status())
+    {
+    case ImgItem::Status::Queued:
+        text << L"Queued";
+        break;
+    case ImgItem::Status::Loading:
+        text << L"Loading";
+        break;
+    case ImgItem::Status::Ready:
+        text << L"Ready";
+        break;
+    case ImgItem::Status::Error:
+        text << L"Error";
+        break;
+    }
+
+    const auto percent = GetDisplayProgressPercent(item);
+    if (percent >= 0 && (item->status() == ImgItem::Status::Queued || item->status() == ImgItem::Status::Loading))
+    {
+        text << L" (" << percent << L"%)";
+    }
+
+    return text.str();
+}
+
+INT ImgVwWindow::GetDisplayProgressPercent(const ImgItem* item) const
+{
+    auto percent = item == nullptr ? -1 : item->loadingprogresspercent();
+    if (percent < 0 && item != nullptr && item->status() != ImgItem::Status::Ready &&
+        item->status() != ImgItem::Status::Error && item->supportsloadingprogress())
+    {
+        percent = 0;
+    }
+
+    return percent;
 }
 
 BOOL ImgVwWindow::IsLoadingProgressOverlayVisible(const ImgItem* item) const
@@ -595,8 +635,7 @@ BOOL ImgVwWindow::IsLoadingProgressOverlayVisible(const ImgItem* item) const
     }
 
     const auto status = item->status();
-    if (status == ImgItem::Status::Ready || status == ImgItem::Status::Error || item->loadingprogresspercent() < 0 ||
-        loadingprogresswaitstarttick_ == 0)
+    if (status == ImgItem::Status::Ready || status == ImgItem::Status::Error || loadingprogresswaitstarttick_ == 0)
     {
         return FALSE;
     }
@@ -734,10 +773,10 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
 
     const auto currentitem = browser_.GetCurrentItem();
     const auto currentpath = browser_.GetCurrentFilePath();
-    if (!currentpath.empty() && (currentitem == nullptr || currentitem->status() != ImgItem::Status::Ready))
+    if (!currentpath.empty())
     {
         text << L"--------------------------------------------------------------------------\r\n";
-        text << BuildLoadingProgressOverlayText(currentitem.get(), currentpath) << L"\r\n";
+        text << BuildItemInfoOverlayText(currentitem.get(), currentpath);
     }
 
     return text.str();

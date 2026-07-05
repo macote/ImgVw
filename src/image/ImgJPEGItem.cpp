@@ -49,6 +49,12 @@ int PaddedStride(int width, int component_count)
 }
 } // namespace
 
+ImgJPEGItem::ImgJPEGItem(std::wstring filepath, INT targetwidth, INT targetheight)
+    : ImgItem(filepath, targetwidth, targetheight)
+{
+    SetSupportsLoadingProgress(TRUE);
+}
+
 void ImgJPEGItem::UpdateDecodeProgress(int percent, void* context)
 {
     auto item = reinterpret_cast<ImgJPEGItem*>(context);

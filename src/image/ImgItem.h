@@ -107,6 +107,10 @@ class ImgItem
     {
         return static_cast<INT>(InterlockedCompareExchange(const_cast<volatile LONG*>(&loadingprogresspercent_), 0, 0));
     }
+    BOOL supportsloadingprogress() const
+    {
+        return supportsloadingprogress_;
+    }
     void ResetLoadingProgress()
     {
         InterlockedExchange(&loadingprogresspercent_, -1);
@@ -166,6 +170,10 @@ class ImgItem
     }
     BOOL TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer);
     void CloseICCProfile();
+    void SetSupportsLoadingProgress(BOOL supportsloadingprogress)
+    {
+        supportsloadingprogress_ = supportsloadingprogress;
+    }
 
   private:
     static ColorProfile DefaultICCProfile;
@@ -187,4 +195,5 @@ class ImgItem
     ColorProfile iccprofile_;
     BOOL iccprofileloadfailed_{};
     CmykProfileSource cmykprofilesource_{CmykProfileSource::None};
+    BOOL supportsloadingprogress_{FALSE};
 };

@@ -9,7 +9,6 @@
   - Check remaining temp space, use page file, use memory, etc.
 - Folder navigation
 - Thumbnails
-- Load progress indicator for large files
 - Pan & Zoom
 - UI for information
   - Image dimensions

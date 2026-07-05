@@ -162,9 +162,11 @@ class ImgVwWindow final : public Window
     void HandleContextMenu(LPARAM lParam);
     void InvalidateScreen();
     bool DisplayImage(HDC dc, const ImgItem* item);
-    bool DisplayFileInformation(HDC dc, const RECT& paintrect, const std::wstring& filepath);
+    bool DisplayFileInformation(HDC dc, const RECT& paintrect, const ImgItem* item, const std::wstring& filepath);
     bool DisplayLoadingProgress(HDC dc, const RECT& paintrect, const ImgItem* item, const std::wstring& filepath);
-    std::wstring BuildLoadingProgressOverlayText(const ImgItem* item, const std::wstring& filepath) const;
+    std::wstring BuildItemInfoOverlayText(const ImgItem* item, const std::wstring& filepath) const;
+    std::wstring BuildItemStatusText(const ImgItem* item) const;
+    INT GetDisplayProgressPercent(const ImgItem* item) const;
     BOOL IsLoadingProgressOverlayVisible(const ImgItem* item) const;
     void UpdateLoadingProgressOverlayTimer();
     BOOL IsLoaderStatsOverlayKeyDown() const;

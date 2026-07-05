@@ -9,9 +9,7 @@
 class ImgJPEGItem final : public ImgItem
 {
   public:
-    ImgJPEGItem(std::wstring filepath, INT targetwidth, INT targetheight) : ImgItem(filepath, targetwidth, targetheight)
-    {
-    }
+    ImgJPEGItem(std::wstring filepath, INT targetwidth, INT targetheight);
     ImgJPEGItem(const ImgJPEGItem&) = delete;
     ImgJPEGItem& operator=(const ImgJPEGItem&) = delete;
     void Load();

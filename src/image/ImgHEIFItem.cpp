@@ -381,6 +381,12 @@ void EndDecodeProgress(heif_progress_step step, void* context)
 }
 } // namespace
 
+ImgHEIFItem::ImgHEIFItem(std::wstring filepath, INT targetwidth, INT targetheight)
+    : ImgItem(filepath, targetwidth, targetheight)
+{
+    SetSupportsLoadingProgress(TRUE);
+}
+
 void ImgHEIFItem::Load()
 {
     status_ = Status::Loading;
