@@ -55,8 +55,10 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - Private data members use `lower_case_` with a trailing underscore.
 - Constants use the existing `kName` style.
 - Avoid Hungarian notation in new first-party code except where Win32 API conventions make it clearer.
-- Preserve existing file encodings and BOMs. Do not strip a BOM or rewrite an ANSI file as UTF-8 as a side effect of
-  formatting or mechanical edits.
+- First-party UTF-8 source files must not have a BOM. Do not add a BOM when editing `.h`, `.cpp`, or other UTF-8 source
+  files, and remove an existing BOM only when that encoding cleanup is intentional for the change.
+- Preserve existing non-UTF-8 encodings. Do not rewrite an ANSI file as UTF-8 as a side effect of formatting or
+  mechanical edits.
 - `resources/*.rc` and `resources/*.rc2` are Windows resource files. Treat them as CRLF and Windows-1252/ANSI unless
   their encoding is intentionally changed. Do not run broad formatters over them.
 - When editing `.rc` files, use byte/encoding-preserving replacements and verify with a build path that runs `windres`

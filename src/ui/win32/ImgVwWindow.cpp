@@ -1,4 +1,4 @@
-﻿#include "ImgVwWindow.h"
+#include "ImgVwWindow.h"
 
 #include <algorithm>
 #include <climits>
@@ -208,11 +208,15 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
     bool loaderstatsdrawn = false;
     if (imgitem != nullptr)
     {
-        if (slideshowwaitingforimage_ && imgitem->status() != ImgItem::Status::Ready &&
-            imgitem->status() != ImgItem::Status::Error)
+        const auto status = imgitem->status();
+        if ((slideshowwaitingforimage_ || firstimagepaint_) &&
+            status != ImgItem::Status::Ready &&
+            status != ImgItem::Status::Error)
         {
             return;
         }
+
+        firstimagepaint_ = FALSE;
 
         if (loaderstatsoverlayvisible_ && imgitem->status() == ImgItem::Status::Ready &&
             !IsRectEmpty(&loaderstatsoverlayrect_) && ContainsRect(loaderstatsoverlayrect_, pps->rcPaint))

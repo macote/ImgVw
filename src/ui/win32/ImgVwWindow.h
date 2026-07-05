@@ -86,6 +86,7 @@ class ImgVwWindow final : public Window
     std::size_t multimonitorslideshowindex_{};
     std::wstring multimonitorslideshowcursorpath_;
     std::vector<ImgVwWindow*> slideshowwindows_;
+    BOOL firstimagepaint_{TRUE};
 
     BOOL loaderstatsoverlayvisible_{FALSE};
     std::wstring loaderstatsoverlaytext_;
