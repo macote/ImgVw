@@ -31,6 +31,7 @@ class ImgVwWindow final : public Window
   public:
     ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args) : Window(hinst)
     {
+        launchedwithoutarguments_ = args.size() <= 1;
         if (args.size() > 1)
         {
             path_ = args[1];
@@ -73,6 +74,7 @@ class ImgVwWindow final : public Window
     INT clientheight_{};
     BOOL browsesubfolders_{FALSE};
     BOOL startupfileargument_{FALSE};
+    BOOL launchedwithoutarguments_{FALSE};
     BOOL exitmessagedisplayed_{FALSE};
     HMONITOR currentmonitor_{nullptr};
     BOOL draggingwindow_{FALSE};
@@ -95,7 +97,7 @@ class ImgVwWindow final : public Window
     static ImgVwWindow* CreateOnMonitor(HINSTANCE hInst, const std::wstring& path, HMONITOR monitor,
                                         ImgVwWindow* owner);
     static BOOL CALLBACK CreateSlideShowWindowForMonitor(HMONITOR monitor, HDC dc, LPRECT rect, LPARAM param);
-    void InitializeBrowser(const std::wstring& path);
+    BOOL InitializeBrowser(const std::wstring& path);
     BOOL UpdateClientSize(INT width, INT height);
     void HandleSize(WPARAM wParam, LPARAM lParam);
     void HandleDpiChanged(LPARAM lParam);

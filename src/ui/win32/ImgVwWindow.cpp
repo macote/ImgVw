@@ -70,6 +70,28 @@ struct ImgVwWindow::MonitorCreateContext
 
 ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring>& args)
 {
+    if (args.size() > 1)
+    {
+        const auto& path = args[1];
+        if (!path.empty())
+        {
+            std::wstring workpath = path;
+            if (workpath.back() == L'\\')
+            {
+                workpath = workpath.substr(0, workpath.size() - 1);
+            }
+            WIN32_FIND_DATA findfiledata{};
+            HANDLE findfilehandle = FindFirstFile(workpath.c_str(), &findfiledata);
+            if (findfilehandle == INVALID_HANDLE_VALUE)
+            {
+                std::wstring error_msg = L"The system cannot find the path specified:\n" + path;
+                MessageBox(nullptr, error_msg.c_str(), L"ImgVw Error", MB_OK | MB_ICONERROR);
+                return nullptr;
+            }
+            FindClose(findfilehandle);
+        }
+    }
+
     auto self = new ImgVwWindow(hInst, args);
     if (self != nullptr)
     {
@@ -172,7 +194,10 @@ LRESULT ImgVwWindow::OnCreate()
     }
 
     InitializeMonitorState();
-    InitializeBrowser(path_);
+    if (!InitializeBrowser(path_))
+    {
+        PostMessage(hwnd_, WM_CLOSE, 0, 0);
+    }
 
     return FALSE;
 }
@@ -212,12 +237,12 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
     }
 }
 
-void ImgVwWindow::InitializeBrowser(const std::wstring& path)
+BOOL ImgVwWindow::InitializeBrowser(const std::wstring& path)
 {
     RECT windowrectangle{};
     if (!GetClientRect(hwnd_, &windowrectangle))
     {
-        return;
+        return FALSE;
     }
 
     const auto attributes = path.empty() ? INVALID_FILE_ATTRIBUTES : GetFileAttributes(path.c_str());
@@ -225,7 +250,13 @@ void ImgVwWindow::InitializeBrowser(const std::wstring& path)
 
     browser_.SetNotificationWindow(hwnd_, kBrowserChangedMessage);
     UpdateClientSize(windowrectangle.right, windowrectangle.bottom);
-    browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom);
+    if (!browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom))
+    {
+        std::wstring error_msg = L"The system cannot find the path specified:\n" + path_;
+        MessageBox(hwnd_, error_msg.c_str(), L"ImgVw Error", MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
+    return TRUE;
 }
 
 BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
@@ -1380,7 +1411,8 @@ void ImgVwWindow::HandleStartupExitConditions()
             return;
         }
 
-        ShowMessageAndExit(L"No images were found.");
+        ShowMessageAndExit(launchedwithoutarguments_ ? L"No images were found.\n\nUsage: ImgVw [file-or-folder]"
+                                                     : L"No images were found.");
     }
     else if (startupfileargument_ && stats.found_images == 1)
     {

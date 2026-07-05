@@ -62,7 +62,7 @@ ImgItem::Format ImgBrowser::ResolveFileFormat(const std::wstring& filepath)
     return ImgItemFactory::ResolveFormat(filepath);
 }
 
-void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight)
+BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight)
 {
     StopTargetQueueing();
     Reset();
@@ -122,20 +122,13 @@ void ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
     }
     else
     {
-        TCHAR mypicturespath[MAX_PATH];
-        if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_MYPICTURES, nullptr, SHGFP_TYPE_CURRENT, mypicturespath)))
-        {
-            folderpath_ = std::wstring(mypicturespath) + L"\\";
-        }
-        else
-        {
-            // TODO: handle error
-        }
+        return FALSE;
     }
 
     ResetEvent(readyevent_);
 
     collectorthread_ = CreateThread(nullptr, 0, StaticThreadCollect, reinterpret_cast<void*>(this), 0, nullptr);
+    return TRUE;
 }
 
 BOOL ImgBrowser::UpdateTargetSize(INT targetwidth, INT targetheight)
