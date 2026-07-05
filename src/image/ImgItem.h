@@ -103,6 +103,27 @@ class ImgItem
     {
         return displaybuffer_.buffersize();
     }
+    INT loadingprogresspercent() const
+    {
+        return static_cast<INT>(InterlockedCompareExchange(const_cast<volatile LONG*>(&loadingprogresspercent_), 0, 0));
+    }
+    void ResetLoadingProgress()
+    {
+        InterlockedExchange(&loadingprogresspercent_, -1);
+    }
+    void SetLoadingProgressPercent(INT percent)
+    {
+        if (percent < 0)
+        {
+            percent = 0;
+        }
+        else if (percent > 100)
+        {
+            percent = 100;
+        }
+
+        InterlockedExchange(&loadingprogresspercent_, percent);
+    }
     HANDLE loadedevent() const
     {
         return loadedevent_;
@@ -127,6 +148,7 @@ class ImgItem
     INT offsety_{};
     ImgBuffer displaybuffer_;
     Status status_{Status::Queued};
+    volatile LONG loadingprogresspercent_{-1};
     std::wstring errormessage_;
     HANDLE loadedevent_{NULL};
     HANDLE heap_{INVALID_HANDLE_VALUE};

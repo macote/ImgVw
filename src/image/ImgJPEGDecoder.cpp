@@ -80,7 +80,8 @@ bool ImgJPEGDecoder::ConfigureOutput(unsigned int scale_numerator, unsigned int 
     return output_width_ > 0 && output_height_ > 0;
 }
 
-bool ImgJPEGDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up)
+bool ImgJPEGDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up, ProgressCallback progress_callback,
+                            void* progress_context)
 {
     if (!created_ || buffer == nullptr || stride <= 0 || output_width_ <= 0 || output_height_ <= 0)
     {
@@ -119,10 +120,24 @@ bool ImgJPEGDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up)
         return false;
     }
 
+    if (progress_callback != nullptr)
+    {
+        progress_callback(0, progress_context);
+    }
+
     while (decompressor_.output_scanline < decompressor_.output_height)
     {
+        const auto start_scanline = decompressor_.output_scanline;
+        const auto remaining_scanlines = decompressor_.output_height - decompressor_.output_scanline;
+        const auto scanline_count = remaining_scanlines > 16 ? 16 : remaining_scanlines;
         jpeg_read_scanlines(&decompressor_, &row_pointers_[decompressor_.output_scanline],
-                            decompressor_.output_height - decompressor_.output_scanline);
+                            scanline_count);
+        if (progress_callback != nullptr && decompressor_.output_scanline != start_scanline)
+        {
+            const auto percent =
+                static_cast<int>((decompressor_.output_scanline * 100) / decompressor_.output_height);
+            progress_callback(percent, progress_context);
+        }
     }
 
     jpeg_finish_decompress(&decompressor_);

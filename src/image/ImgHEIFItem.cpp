@@ -100,6 +100,12 @@ class LoadCompletion final
     HANDLE event_;
 };
 
+struct HeifProgressContext
+{
+    ImgItem* item{};
+    volatile LONG maximum{100};
+};
+
 std::wstring Utf8ToWide(const char* text)
 {
     if (text == nullptr || text[0] == '\0')
@@ -329,11 +335,56 @@ bool ConvertRgbaToBottomUpBgr(const std::vector<std::uint8_t>& embedded_profile,
     *output_stride = destination_stride;
     return true;
 }
+
+void StartDecodeProgress(heif_progress_step step, int max_progress, void* context)
+{
+    if (step != heif_progress_step_total)
+    {
+        return;
+    }
+
+    auto progress_context = reinterpret_cast<HeifProgressContext*>(context);
+    if (progress_context != nullptr && progress_context->item != nullptr)
+    {
+        InterlockedExchange(&progress_context->maximum, max_progress > 0 ? max_progress : 100);
+        progress_context->item->SetLoadingProgressPercent(0);
+    }
+}
+
+void UpdateDecodeProgress(heif_progress_step step, int progress, void* context)
+{
+    if (step != heif_progress_step_total)
+    {
+        return;
+    }
+
+    auto progress_context = reinterpret_cast<HeifProgressContext*>(context);
+    if (progress_context != nullptr && progress_context->item != nullptr)
+    {
+        const auto maximum = InterlockedCompareExchange(&progress_context->maximum, 0, 0);
+        progress_context->item->SetLoadingProgressPercent(maximum > 0 ? (progress * 100) / maximum : progress);
+    }
+}
+
+void EndDecodeProgress(heif_progress_step step, void* context)
+{
+    if (step != heif_progress_step_total)
+    {
+        return;
+    }
+
+    auto progress_context = reinterpret_cast<HeifProgressContext*>(context);
+    if (progress_context != nullptr && progress_context->item != nullptr)
+    {
+        progress_context->item->SetLoadingProgressPercent(100);
+    }
+}
 } // namespace
 
 void ImgHEIFItem::Load()
 {
     status_ = Status::Loading;
+    ResetLoadingProgress();
     const LoadCompletion completion(loadedevent_);
 
     try
@@ -404,6 +455,11 @@ void ImgHEIFItem::Load()
         decoding_options->color_conversion_options.preferred_chroma_upsampling_algorithm =
             heif_chroma_upsampling_bilinear;
         decoding_options->color_conversion_options.only_use_preferred_chroma_algorithm = 1;
+        HeifProgressContext progress_context{this, 100};
+        decoding_options->start_progress = StartDecodeProgress;
+        decoding_options->on_progress = UpdateDecodeProgress;
+        decoding_options->end_progress = EndDecodeProgress;
+        decoding_options->progress_user_data = &progress_context;
 
         heif_image* raw_image{};
         error = heif_decode_image(handle.get(), &raw_image, heif_colorspace_RGB, heif_chroma_interleaved_RGBA,

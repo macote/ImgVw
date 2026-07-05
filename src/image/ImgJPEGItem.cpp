@@ -18,6 +18,8 @@ constexpr std::array<ScalingFactor, 16> kScalingFactors = {
     ScalingFactor{1, 1}, ScalingFactor{7, 8},  ScalingFactor{3, 4}, ScalingFactor{5, 8},
     ScalingFactor{1, 2}, ScalingFactor{3, 8},  ScalingFactor{1, 4}, ScalingFactor{1, 8}};
 
+constexpr DWORD kProgressFileSizeThresholdBytes = 100ul * 1024ul * 1024ul;
+
 int ScaleDimension(int dimension, const ScalingFactor& factor)
 {
     return ((dimension * static_cast<int>(factor.numerator)) + static_cast<int>(factor.denominator) - 1) /
@@ -47,9 +49,19 @@ int PaddedStride(int width, int component_count)
 }
 } // namespace
 
+void ImgJPEGItem::UpdateDecodeProgress(int percent, void* context)
+{
+    auto item = reinterpret_cast<ImgJPEGItem*>(context);
+    if (item != nullptr)
+    {
+        item->SetLoadingProgressPercent(percent);
+    }
+}
+
 void ImgJPEGItem::Load()
 {
     status_ = Status::Loading;
+    ResetLoadingProgress();
     PBYTE buffer{nullptr};
 
     try
@@ -59,6 +71,12 @@ void ImgJPEGItem::Load()
         {
             status_ = Status::Error;
             goto done;
+        }
+
+        const auto showprogress = jpegfilemap.filesize().LowPart >= kProgressFileSizeThresholdBytes;
+        if (showprogress)
+        {
+            SetLoadingProgressPercent(0);
         }
 
         ImgJPEGDecoder decoder;
@@ -145,7 +163,7 @@ void ImgJPEGItem::Load()
             goto done;
         }
 
-        if (!decoder.Decode(buffer, stride, true))
+        if (!decoder.Decode(buffer, stride, true, showprogress ? UpdateDecodeProgress : nullptr, this))
         {
             errorstring_ = decoder.error();
             status_ = Status::Error;

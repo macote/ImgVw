@@ -213,6 +213,14 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
             status != ImgItem::Status::Ready &&
             status != ImgItem::Status::Error)
         {
+            if (loaderstatsoverlayvisible_)
+            {
+                DisplayFileInformation(pps->hdc, pps->rcPaint, browser_.GetCurrentFilePath());
+            }
+            else
+            {
+                DisplayLoadingProgress(pps->hdc, pps->rcPaint, imgitem.get(), browser_.GetCurrentFilePath());
+            }
             return;
         }
 
@@ -231,7 +239,13 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
         }
         else
         {
-            loaderstatsdrawn = DisplayFileInformation(pps->hdc, pps->rcPaint, browser_.GetCurrentFilePath());
+            loaderstatsdrawn = !loaderstatsoverlayvisible_ &&
+                               DisplayLoadingProgress(pps->hdc, pps->rcPaint, imgitem.get(),
+                                                      browser_.GetCurrentFilePath());
+            if (!loaderstatsdrawn)
+            {
+                loaderstatsdrawn = DisplayFileInformation(pps->hdc, pps->rcPaint, browser_.GetCurrentFilePath());
+            }
         }
     }
 
@@ -537,6 +551,116 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const st
     return statsdrawn;
 }
 
+bool ImgVwWindow::DisplayLoadingProgress(HDC dc, const RECT& paintrect, const ImgItem* item,
+                                         const std::wstring& filepath)
+{
+    if (IsRectEmpty(&paintrect) || !IsLoadingProgressOverlayVisible(item))
+    {
+        return false;
+    }
+
+    const auto text = BuildLoadingProgressOverlayText(item, filepath);
+    const auto overlayrect = CalculateLoaderStatsOverlayRect(dc, text);
+    FillRect(dc, &paintrect, backgroundbrush_);
+    DrawTextOverlay(dc, overlayrect, text, nullptr);
+    return true;
+}
+
+std::wstring ImgVwWindow::BuildLoadingProgressOverlayText(const ImgItem* item, const std::wstring& filepath) const
+{
+    const auto percent = item == nullptr ? -1 : item->loadingprogresspercent();
+    std::wstringstream text;
+    if (percent >= 0)
+    {
+        text << L"[" << percent << L"%]";
+    }
+
+    if (!filepath.empty())
+    {
+        if (percent >= 0)
+        {
+            text << L" ";
+        }
+        text << filepath;
+    }
+
+    return text.str();
+}
+
+BOOL ImgVwWindow::IsLoadingProgressOverlayVisible(const ImgItem* item) const
+{
+    if (item == nullptr)
+    {
+        return FALSE;
+    }
+
+    const auto status = item->status();
+    if (status == ImgItem::Status::Ready || status == ImgItem::Status::Error || item->loadingprogresspercent() < 0 ||
+        loadingprogresswaitstarttick_ == 0)
+    {
+        return FALSE;
+    }
+
+    return GetTickCount() - loadingprogresswaitstarttick_ >= kLoadingProgressOverlayDebounceInMilliseconds;
+}
+
+void ImgVwWindow::UpdateLoadingProgressOverlayTimer()
+{
+    const auto item = browser_.GetCurrentItem();
+    const auto waiting = item != nullptr && item->status() != ImgItem::Status::Ready &&
+                         item->status() != ImgItem::Status::Error;
+    if (!waiting)
+    {
+        if (loadingprogressoverlayvisible_)
+        {
+            InvalidateRect(hwnd_, nullptr, FALSE);
+        }
+        if (loaderstatsoverlayvisible_)
+        {
+            RefreshLoaderStatsOverlay();
+        }
+
+        KillTimer(hwnd_, kLoadingProgressOverlayTimer);
+        lastloadingprogresspercent_ = -2;
+        loadingprogresswaitstarttick_ = 0;
+        loadingprogressoverlayvisible_ = FALSE;
+        loadingprogresspath_.clear();
+        return;
+    }
+
+    const auto currentpath = browser_.GetCurrentFilePath();
+    if (loadingprogresspath_ != currentpath)
+    {
+        loadingprogresspath_ = currentpath;
+        lastloadingprogresspercent_ = -2;
+        loadingprogresswaitstarttick_ = 0;
+        loadingprogressoverlayvisible_ = FALSE;
+    }
+
+    if (loadingprogresswaitstarttick_ == 0)
+    {
+        loadingprogresswaitstarttick_ = GetTickCount();
+    }
+
+    SetTimer(hwnd_, kLoadingProgressOverlayTimer, kLoadingProgressOverlayIntervalInMilliseconds, nullptr);
+
+    const auto percent = item->loadingprogresspercent();
+    const auto visible = IsLoadingProgressOverlayVisible(item.get());
+    if (percent != lastloadingprogresspercent_ || visible != loadingprogressoverlayvisible_)
+    {
+        lastloadingprogresspercent_ = percent;
+        loadingprogressoverlayvisible_ = visible;
+        if (loaderstatsoverlayvisible_)
+        {
+            RefreshLoaderStatsOverlay();
+        }
+        else if (visible)
+        {
+            InvalidateRect(hwnd_, nullptr, FALSE);
+        }
+    }
+}
+
 BOOL ImgVwWindow::IsLoaderStatsOverlayKeyDown() const
 {
     return owner_ == nullptr && (GetKeyState(VK_CONTROL) & 0x8000) != 0 && (GetKeyState(VK_MENU) & 0x8000) != 0;
@@ -554,6 +678,7 @@ void ImgVwWindow::UpdateLoaderStatsOverlayVisibility()
     if (loaderstatsoverlayvisible_)
     {
         SetTimer(hwnd_, kLoaderStatsOverlayTimer, kLoaderStatsOverlayIntervalInMilliseconds, nullptr);
+        UpdateLoadingProgressOverlayTimer();
         RefreshLoaderStatsOverlay();
     }
     else
@@ -612,7 +737,7 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
     if (!currentpath.empty() && (currentitem == nullptr || currentitem->status() != ImgItem::Status::Ready))
     {
         text << L"--------------------------------------------------------------------------\r\n";
-        text << L"loading " << currentpath << L"\r\n";
+        text << BuildLoadingProgressOverlayText(currentitem.get(), currentpath) << L"\r\n";
     }
 
     return text.str();
@@ -1393,6 +1518,7 @@ void ImgVwWindow::DisplayCurrentSlideWithoutTimer()
     displayslidepath_ = browser_.GetCurrentFilePath();
     const auto status = imgitem->status();
     slideshowwaitingforimage_ = status != ImgItem::Status::Ready && status != ImgItem::Status::Error;
+    UpdateLoadingProgressOverlayTimer();
     if (!slideshowwaitingforimage_)
     {
         InvalidateRect(hwnd_, nullptr, FALSE);
@@ -1436,6 +1562,7 @@ void ImgVwWindow::ShowMessageAndExit(LPCWSTR message)
 void ImgVwWindow::HandleBrowserChanged()
 {
     HandleStartupExitConditions();
+    UpdateLoadingProgressOverlayTimer();
 
     if (slideshowwaitingforimage_)
     {
@@ -1675,6 +1802,7 @@ void ImgVwWindow::OnNCDestroy()
     CloseOwnedWindows();
     StopSlideShow();
     KillTimer(hwnd_, kLoaderStatsOverlayTimer);
+    KillTimer(hwnd_, kLoadingProgressOverlayTimer);
     browser_.StopBrowsing();
     DeleteObject(backgroundbrush_);
     DeleteObject(captionfont_);
@@ -1837,6 +1965,9 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 RefreshLoaderStatsOverlay();
             }
+            return 0;
+        case kLoadingProgressOverlayTimer:
+            UpdateLoadingProgressOverlayTimer();
             return 0;
         }
 

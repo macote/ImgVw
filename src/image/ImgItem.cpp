@@ -14,6 +14,7 @@ ImgItem::DefaultICCProfileCriticalSectionInitializer ImgItem::defaultICCProfileC
 void ImgItem::Unload()
 {
     status_ = Status::Queued;
+    ResetLoadingProgress();
     iccprofileloadfailed_ = FALSE;
     cmykprofilesource_ = CmykProfileSource::None;
     CloseICCProfile();

@@ -27,6 +27,9 @@ class ImgVwWindow final : public Window
     static const UINT kBrowserChangedMessage = WM_APP + 1;
     static const UINT kLoaderStatsOverlayTimer = 2;
     static const UINT kLoaderStatsOverlayIntervalInMilliseconds = 250;
+    static const UINT kLoadingProgressOverlayTimer = 3;
+    static const UINT kLoadingProgressOverlayIntervalInMilliseconds = 100;
+    static const DWORD kLoadingProgressOverlayDebounceInMilliseconds = 666;
 
   public:
     ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args) : Window(hinst)
@@ -93,6 +96,10 @@ class ImgVwWindow final : public Window
     RECT loaderstatsoverlayrect_{};
     HFONT loaderstatsoverlayfont_{nullptr};
     UINT loaderstatsoverlayfontdpi_{};
+    INT lastloadingprogresspercent_{-2};
+    DWORD loadingprogresswaitstarttick_{};
+    BOOL loadingprogressoverlayvisible_{FALSE};
+    std::wstring loadingprogresspath_;
 
   private:
     static ImgVwWindow* CreateOnMonitor(HINSTANCE hInst, const std::wstring& path, HMONITOR monitor,
@@ -156,6 +163,10 @@ class ImgVwWindow final : public Window
     void InvalidateScreen();
     bool DisplayImage(HDC dc, const ImgItem* item);
     bool DisplayFileInformation(HDC dc, const RECT& paintrect, const std::wstring& filepath);
+    bool DisplayLoadingProgress(HDC dc, const RECT& paintrect, const ImgItem* item, const std::wstring& filepath);
+    std::wstring BuildLoadingProgressOverlayText(const ImgItem* item, const std::wstring& filepath) const;
+    BOOL IsLoadingProgressOverlayVisible(const ImgItem* item) const;
+    void UpdateLoadingProgressOverlayTimer();
     BOOL IsLoaderStatsOverlayKeyDown() const;
     void UpdateLoaderStatsOverlayVisibility();
     std::wstring BuildLoaderStatsOverlayText();

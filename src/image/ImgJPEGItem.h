@@ -17,5 +17,7 @@ class ImgJPEGItem final : public ImgItem
     void Load();
 
   private:
+    static void UpdateDecodeProgress(int percent, void* context);
+
     std::string errorstring_;
 };

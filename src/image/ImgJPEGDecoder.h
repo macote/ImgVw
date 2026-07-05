@@ -11,6 +11,8 @@
 class ImgJPEGDecoder final
 {
   public:
+    typedef void (*ProgressCallback)(int percent, void* context);
+
     ImgJPEGDecoder() = default;
     ~ImgJPEGDecoder();
     ImgJPEGDecoder(const ImgJPEGDecoder&) = delete;
@@ -18,7 +20,8 @@ class ImgJPEGDecoder final
 
     bool Initialize(const unsigned char* data, std::size_t size);
     bool ConfigureOutput(unsigned int scale_numerator, unsigned int scale_denominator, bool cmyk);
-    bool Decode(unsigned char* buffer, int stride, bool bottom_up);
+    bool Decode(unsigned char* buffer, int stride, bool bottom_up, ProgressCallback progress_callback = nullptr,
+                void* progress_context = nullptr);
 
     int width() const
     {
