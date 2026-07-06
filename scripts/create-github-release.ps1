@@ -106,7 +106,11 @@ $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) `
     ("imgvw-release-" + [System.Guid]::NewGuid().ToString("N"))
 try {
     Invoke-Checked "git" @("rev-parse", "--is-inside-work-tree")
-    Invoke-Checked "git" @("rev-parse", "--verify", $Target)
+    $targetSha = & git rev-parse --verify $Target
+    if ($LASTEXITCODE -ne 0) {
+        throw "git rev-parse --verify $Target failed"
+    }
+    $targetSha = $targetSha.Trim()
 
     New-Item -ItemType Directory -Path $stagingDir | Out-Null
     $assets = [System.Collections.Generic.List[string]]::new()
@@ -132,12 +136,35 @@ try {
             throw "Release '$Tag' already exists. Pass -ReplaceExistingAssets to replace its uploaded assets."
         }
 
+        $editArgs = @("release", "edit", $Tag)
+        if ($Title) {
+            $editArgs += @("--title", $Title)
+        }
+        if ($NotesFile) {
+            $editArgs += @("--notes-file", (Resolve-RepoPath $NotesFile))
+        }
+        elseif ($Notes) {
+            $editArgs += @("--notes", $Notes)
+        }
+        if ($Draft) {
+            $editArgs += "--draft"
+        }
+        if ($Prerelease) {
+            $editArgs += "--prerelease"
+        }
+        if ($targetSha) {
+            $editArgs += @("--target", $targetSha)
+        }
+
+        Invoke-Checked "gh" $editArgs
+        Write-Host "Updated release '$Tag' metadata."
+
         Invoke-Checked "gh" (@("release", "upload", $Tag, "--clobber") + $assets.ToArray())
         Write-Host "Updated release '$Tag' assets."
         return
     }
 
-    $createArgs = @("release", "create", $Tag, "--target", $Target)
+    $createArgs = @("release", "create", $Tag, "--target", $targetSha)
     if ($Title) {
         $createArgs += @("--title", $Title)
     }

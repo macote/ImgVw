@@ -2,9 +2,9 @@
 
 ## Medium Priority
 
-- i18n
 - Storage management
   - Check remaining temp space, use page file, use memory, etc.
+- i18n
 - Folder navigation
 - Thumbnails
 - Pan & Zoom
