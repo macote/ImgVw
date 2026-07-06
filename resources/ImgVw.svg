@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="19.5 16.75 217 217" role="img" aria-labelledby="title desc">
+  <title id="title">ImgVw app icon</title>
+  <desc id="desc">Minimal IMG over VW lettermark with supporting frame lines.</desc>
+
+  <text x="128" y="120"
+        fill="#7b68ee"
+        font-family="Segoe UI, Arial, sans-serif"
+        font-size="94"
+        font-weight="800"
+        stroke="#6253be"
+        stroke-width="2"
+        paint-order="stroke"
+        text-anchor="middle"
+        letter-spacing="0">IMG</text>
+  <text x="128" y="207"
+        fill="#ff8c00"
+        font-family="Segoe UI, Arial, sans-serif"
+        font-size="100"
+        font-weight="800"
+        stroke="#cc7000"
+        stroke-width="3"
+        paint-order="stroke"
+        text-anchor="middle"
+        letter-spacing="0">VW</text>
+</svg>
