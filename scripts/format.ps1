@@ -45,7 +45,7 @@ $clangFormat = Find-ClangTool "clang-format.exe"
 $files = Get-ChildItem -Path `
     (Join-Path $repoRoot "src"), `
     (Join-Path $repoRoot "resources") `
-    -Recurse -File -Include *.cpp,*.h,*.rc |
+    -Recurse -File -Include *.cpp,*.h |
     Sort-Object FullName
 
 if ($Check) {

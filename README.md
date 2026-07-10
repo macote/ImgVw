@@ -5,7 +5,7 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 ## Features
 
 - Fast display caching
-- Copy and run, no installation required
+- Copy and run directly, or use the optional PowerShell installer
 - Auto-rotate images based on EXIF information
 - Embedded and fallback ICC color management for CMYK JPEG images
 - Works on Windows XP and later

@@ -10,17 +10,20 @@ ImgVw follows the C++ Core Guidelines as its engineering baseline, with Microsof
 - Keep lines at or below 120 columns where practical.
 - Do not reformat files under `3rd-party/`.
 
-Run formatting before committing first-party C++ or resource changes:
+Run formatting before committing first-party C++ changes:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\format.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\format.ps1
 ```
 
 To check formatting without modifying files:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\format.ps1 -Check
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\format.ps1 -Check
 ```
+
+Do not run `clang-format` over Windows resource files. Preserve the existing Windows-1252/ANSI encoding and CRLF line
+endings when editing `.rc` and `.rc2` files, then verify the result with a build that runs the resource compiler.
 
 ## Naming
 

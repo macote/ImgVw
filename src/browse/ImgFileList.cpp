@@ -46,22 +46,21 @@ int ComparePathPart(const std::wstring& left, std::wstring::size_type left_offse
 
     return 0;
 }
-}
+} // namespace
 
 bool ImgFileListPathLess::operator()(const std::wstring& left, const std::wstring& right) const
 {
     const auto left_filename_offset = FileNameOffset(left);
     const auto right_filename_offset = FileNameOffset(right);
 
-    const auto folder_compare =
-        ComparePathPart(left, 0, left_filename_offset, right, 0, right_filename_offset);
+    const auto folder_compare = ComparePathPart(left, 0, left_filename_offset, right, 0, right_filename_offset);
     if (folder_compare != 0)
     {
         return folder_compare < 0;
     }
 
-    return ComparePathPart(left, left_filename_offset, left.size() - left_filename_offset, right,
-                           right_filename_offset, right.size() - right_filename_offset) < 0;
+    return ComparePathPart(left, left_filename_offset, left.size() - left_filename_offset, right, right_filename_offset,
+                           right.size() - right_filename_offset) < 0;
 }
 
 ImgFileList::ImgFileList() : random_engine_(std::random_device{}()) {}

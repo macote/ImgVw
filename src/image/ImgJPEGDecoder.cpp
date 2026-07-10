@@ -130,12 +130,10 @@ bool ImgJPEGDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up, P
         const auto start_scanline = decompressor_.output_scanline;
         const auto remaining_scanlines = decompressor_.output_height - decompressor_.output_scanline;
         const auto scanline_count = remaining_scanlines > 16 ? 16 : remaining_scanlines;
-        jpeg_read_scanlines(&decompressor_, &row_pointers_[decompressor_.output_scanline],
-                            scanline_count);
+        jpeg_read_scanlines(&decompressor_, &row_pointers_[decompressor_.output_scanline], scanline_count);
         if (progress_callback != nullptr && decompressor_.output_scanline != start_scanline)
         {
-            const auto percent =
-                static_cast<int>((decompressor_.output_scanline * 100) / decompressor_.output_height);
+            const auto percent = static_cast<int>((decompressor_.output_scanline * 100) / decompressor_.output_height);
             progress_callback(percent, progress_context);
         }
     }

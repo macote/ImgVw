@@ -209,8 +209,7 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
     if (imgitem != nullptr)
     {
         const auto status = imgitem->status();
-        if ((slideshowwaitingforimage_ || firstimagepaint_) &&
-            status != ImgItem::Status::Ready &&
+        if ((slideshowwaitingforimage_ || firstimagepaint_) && status != ImgItem::Status::Ready &&
             status != ImgItem::Status::Error)
         {
             if (loaderstatsoverlayvisible_)
@@ -239,9 +238,9 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
         }
         else
         {
-            loaderstatsdrawn = !loaderstatsoverlayvisible_ &&
-                               DisplayLoadingProgress(pps->hdc, pps->rcPaint, imgitem.get(),
-                                                      browser_.GetCurrentFilePath());
+            loaderstatsdrawn =
+                !loaderstatsoverlayvisible_ &&
+                DisplayLoadingProgress(pps->hdc, pps->rcPaint, imgitem.get(), browser_.GetCurrentFilePath());
             if (!loaderstatsdrawn)
             {
                 loaderstatsdrawn =
@@ -646,8 +645,8 @@ BOOL ImgVwWindow::IsLoadingProgressOverlayVisible(const ImgItem* item) const
 void ImgVwWindow::UpdateLoadingProgressOverlayTimer()
 {
     const auto item = browser_.GetCurrentItem();
-    const auto waiting = item != nullptr && item->status() != ImgItem::Status::Ready &&
-                         item->status() != ImgItem::Status::Error;
+    const auto waiting =
+        item != nullptr && item->status() != ImgItem::Status::Ready && item->status() != ImgItem::Status::Error;
     if (!waiting)
     {
         if (loadingprogressoverlayvisible_)
@@ -952,9 +951,8 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
                 if (previoussourcebitmap != nullptr && previoussourcebitmap != HGDI_ERROR)
                 {
                     BitBlt(memorydc, intersection.left - overlayrect.left, intersection.top - overlayrect.top,
-                           intersection.right - intersection.left,
-                           intersection.bottom - intersection.top, sourcedc, intersection.left - imagerect.left,
-                           intersection.top - imagerect.top, SRCCOPY);
+                           intersection.right - intersection.left, intersection.bottom - intersection.top, sourcedc,
+                           intersection.left - imagerect.left, intersection.top - imagerect.top, SRCCOPY);
                     SelectObject(sourcedc, previoussourcebitmap);
                 }
 
