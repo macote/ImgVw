@@ -1200,6 +1200,12 @@ void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
     currentmonitor_ = primarymonitor;
     MonitorCreateContext context{hinst_, path_, primarymonitor, this, slideshowrandom_};
     EnumDisplayMonitors(nullptr, nullptr, CreateSlideShowWindowForMonitor, reinterpret_cast<LPARAM>(&context));
+    if (!slideshowwindows_.empty() && GetCapture() == hwnd_)
+    {
+        // Allow mouse input to reach slideshow windows on the other monitors.
+        ReleaseCapture();
+    }
+
     std::vector<SIZE> preloadtargetsizes;
     for (const auto window : slideshowwindows_)
     {
