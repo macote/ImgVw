@@ -1,4 +1,4 @@
-## 1.9.0 (2026-07-05)
+## 1.9.0 (2026-07-09)
 
 - Add multi-monitor random and sequential slideshow support with shared random ordering across displays
 - Improve image fitting, cache warmup, and monitor/DPI transitions when moving the viewer between displays
@@ -6,9 +6,12 @@
   registers Explorer Open With integration for supported images and folders, and supports Windows Settings uninstall
 - Allow dragging the viewer between monitors and refine monitor-edge snapping
 - Add native DPI-aware loading progress and loader statistics overlays for cache/loading diagnostics
+- Show consistent file details in loading overlays for JPEG and HEIF images
 - Improve startup handling for missing or empty folders
 - Fix slideshow toggle/cursor behavior and restore the painted slide after stopping multi-monitor slideshow mode
+- Fix context menus on secondary monitors during multi-monitor slideshows
 - Hide multi-monitor menu items on single-monitor systems and remove the Ctrl+Q exit accelerator
+- Refresh the application icon with high-resolution assets
 
 ## 1.8.0 (2026-06-24)
 
