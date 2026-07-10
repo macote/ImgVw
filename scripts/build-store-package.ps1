@@ -2,7 +2,7 @@
 param(
     [string] $IdentityName = "Marc-AndrCt.ImgVw",
     [string] $Publisher = "CN=B2B17E87-E414-4595-A511-7C4778B76C22",
-    [string] $PublisherDisplayName = "Marc-André Côté",
+    [string] $PublisherDisplayName = "",
     [string] $X86Binary = "bin\x86\ImgVw.exe",
     [string] $X64Binary = "bin\x64\ImgVw.exe",
     [string] $OutputDirectory = "packaging\store\out"
@@ -10,6 +10,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
+
+if (-not $PublisherDisplayName) {
+    # Keep the executable script ASCII-safe for Windows PowerShell 5.1, which treats UTF-8 without a BOM as ANSI.
+    $PublisherDisplayName = "Marc-Andr{0} C{1}t{0}" -f [char]0x00E9, [char]0x00F4
+}
 
 function Resolve-RepositoryPath([string] $Path) {
     if ([IO.Path]::IsPathRooted($Path)) {
