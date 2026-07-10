@@ -263,9 +263,6 @@ BOOL ImgVwWindow::InitializeBrowser(const std::wstring& path)
         return FALSE;
     }
 
-    const auto attributes = path.empty() ? INVALID_FILE_ATTRIBUTES : GetFileAttributes(path.c_str());
-    startupfileargument_ = attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
-
     browser_.SetNotificationWindow(hwnd_, kBrowserChangedMessage);
     UpdateClientSize(windowrectangle.right, windowrectangle.bottom);
     if (!browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom))
@@ -1586,10 +1583,6 @@ void ImgVwWindow::HandleStartupExitConditions()
 
         ShowMessageAndExit(launchedwithoutarguments_ ? L"No images were found.\n\nUsage: ImgVw [file-or-folder]"
                                                      : L"No images were found.");
-    }
-    else if (startupfileargument_ && stats.found_images == 1)
-    {
-        ShowMessageAndExit(L"Only one image was found for the selected file.");
     }
 }
 

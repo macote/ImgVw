@@ -8,6 +8,7 @@
 - Add native DPI-aware loading progress and loader statistics overlays for cache/loading diagnostics
 - Show consistent file details in loading overlays for JPEG and HEIF images
 - Improve startup handling for missing or empty folders
+- Display a selected image normally when it is the only supported image in its folder
 - Fix slideshow toggle/cursor behavior and restore the painted slide after stopping multi-monitor slideshow mode
 - Fix context menus on secondary monitors during multi-monitor slideshows
 - Hide multi-monitor menu items on single-monitor systems and remove the Ctrl+Q exit accelerator

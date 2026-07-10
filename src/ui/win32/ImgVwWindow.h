@@ -76,7 +76,6 @@ class ImgVwWindow final : public Window
     INT clientwidth_{};
     INT clientheight_{};
     BOOL browsesubfolders_{FALSE};
-    BOOL startupfileargument_{FALSE};
     BOOL launchedwithoutarguments_{FALSE};
     BOOL exitmessagedisplayed_{FALSE};
     HMONITOR currentmonitor_{nullptr};

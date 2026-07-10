@@ -12,3 +12,4 @@
 *.aps
 scratch.txt
 artifacts
+/packaging/store/out/
