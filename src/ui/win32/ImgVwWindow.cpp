@@ -1356,8 +1356,15 @@ RECT ImgVwWindow::CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& te
     const auto inset = ScaleForWindowDpi(16);
     const auto horizontalpadding = ScaleForWindowDpi(8);
     const auto verticalpadding = ScaleForWindowDpi(6);
-    RECT textrect{inset, inset, clientwidth_ > inset * 2 ? clientwidth_ - inset : ScaleForWindowDpi(784),
-                  clientheight_ > inset * 2 ? clientheight_ - inset : ScaleForWindowDpi(584)};
+    const auto horizontalmargin = inset;
+    const auto verticalmargin = inset;
+    const auto fallbackwidth = ScaleForWindowDpi(800);
+    const auto fallbackheight = ScaleForWindowDpi(600);
+    const auto availablewidth =
+        std::max(1, (clientwidth_ > 0 ? clientwidth_ : fallbackwidth) - horizontalmargin * 2 - horizontalpadding * 2);
+    const auto availableheight =
+        std::max(1, (clientheight_ > 0 ? clientheight_ : fallbackheight) - verticalmargin * 2 - verticalpadding * 2);
+    RECT textrect{0, 0, availablewidth, availableheight};
     const auto font = const_cast<ImgVwWindow*>(this)->GetLoaderStatsOverlayFont();
     const auto previousfont = font == nullptr ? nullptr : SelectObject(dc, font);
     DrawText(dc, text.c_str(), -1, &textrect, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
@@ -1366,8 +1373,10 @@ RECT ImgVwWindow::CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& te
         SelectObject(dc, previousfont);
     }
 
-    RECT backgroundrect{textrect.left - horizontalpadding, textrect.top - verticalpadding,
-                        textrect.right + horizontalpadding, textrect.bottom + verticalpadding};
+    const auto textwidth = std::min(availablewidth, static_cast<INT>(textrect.right - textrect.left));
+    const auto textheight = std::min(availableheight, static_cast<INT>(textrect.bottom - textrect.top));
+    RECT backgroundrect{horizontalmargin, verticalmargin, horizontalmargin + textwidth + horizontalpadding * 2,
+                        verticalmargin + textheight + verticalpadding * 2};
     return backgroundrect;
 }
 
