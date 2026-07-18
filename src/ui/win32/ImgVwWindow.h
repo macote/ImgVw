@@ -117,6 +117,7 @@ class ImgVwWindow final : public Window
     std::vector<ImgVwWindow*> slideshowwindows_;
     BOOL firstimagepaint_{TRUE};
 
+    BOOL filenameoverlayenabled_{FALSE};
     BOOL loaderstatsoverlayvisible_{FALSE};
     BOOL systemlighttheme_{FALSE};
     std::wstring loaderstatsoverlaytext_;
@@ -160,7 +161,7 @@ class ImgVwWindow final : public Window
     BOOL UpdateWindowDrag(WPARAM wParam, LPARAM lParam);
     void EndWindowDrag();
     void FinishWindowDrag();
-    void PerformAction();
+    void ToggleFilenameOverlay();
     void BrowseNext();
     void BrowsePrevious();
     void BrowseFirst();
@@ -209,8 +210,12 @@ class ImgVwWindow final : public Window
     BOOL IsLoadingProgressOverlayVisible(const ImgItem* item) const;
     void UpdateLoadingProgressOverlayTimer();
     BOOL IsLoaderStatsOverlayKeyDown() const;
+    BOOL IsFilenameOverlayVisible() const;
+    BOOL IsInfoOverlayVisible() const;
     void UpdateLoaderStatsOverlayVisibility();
     void UpdateLoaderStatsOverlayVisibilityForWindow();
+    void UpdateInfoOverlayForWindow();
+    void ClearInfoOverlay();
     std::wstring BuildLoaderStatsOverlayText();
     UINT GetWindowDpi() const;
     INT ScaleForWindowDpi(INT value) const;

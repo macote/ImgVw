@@ -248,14 +248,14 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
     }
 
     const auto imgitem = browser_.GetCurrentItem();
-    bool loaderstatsdrawn = false;
+    bool overlaydrawn = false;
     if (imgitem != nullptr)
     {
         const auto status = imgitem->status();
         if ((slideshowwaitingforimage_ || firstimagepaint_) && status != ImgItem::Status::Ready &&
             status != ImgItem::Status::Error)
         {
-            if (loaderstatsoverlayvisible_)
+            if (IsInfoOverlayVisible())
             {
                 DisplayFileInformation(pps->hdc, pps->rcPaint, imgitem.get(), browser_.GetCurrentFilePath());
             }
@@ -268,7 +268,7 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
 
         firstimagepaint_ = FALSE;
 
-        if (loaderstatsoverlayvisible_ && imgitem->status() == ImgItem::Status::Ready &&
+        if (IsInfoOverlayVisible() && imgitem->status() == ImgItem::Status::Ready &&
             !IsRectEmpty(&loaderstatsoverlayrect_) && ContainsRect(loaderstatsoverlayrect_, pps->rcPaint))
         {
             DrawLoaderStatsOverlay(pps->hdc, imgitem.get());
@@ -281,18 +281,17 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
         }
         else
         {
-            loaderstatsdrawn =
-                !loaderstatsoverlayvisible_ &&
-                DisplayLoadingProgress(pps->hdc, pps->rcPaint, imgitem.get(), browser_.GetCurrentFilePath());
-            if (!loaderstatsdrawn)
+            overlaydrawn = !IsInfoOverlayVisible() &&
+                           DisplayLoadingProgress(pps->hdc, pps->rcPaint, imgitem.get(), browser_.GetCurrentFilePath());
+            if (!overlaydrawn)
             {
-                loaderstatsdrawn =
+                overlaydrawn =
                     DisplayFileInformation(pps->hdc, pps->rcPaint, imgitem.get(), browser_.GetCurrentFilePath());
             }
         }
     }
 
-    if (loaderstatsoverlayvisible_ && !loaderstatsdrawn)
+    if (IsInfoOverlayVisible() && !overlaydrawn)
     {
         DrawLoaderStatsOverlay(pps->hdc, imgitem.get());
     }
@@ -790,7 +789,7 @@ void ImgVwWindow::HandleDpiChanged(LPARAM lParam)
         InvalidateScreen();
     }
 
-    if (loaderstatsoverlayvisible_)
+    if (IsInfoOverlayVisible())
     {
         RefreshLoaderStatsOverlay();
     }
@@ -811,7 +810,7 @@ void ImgVwWindow::UpdateSystemTheme()
     }
 
     systemlighttheme_ = light_theme;
-    if (loaderstatsoverlayvisible_)
+    if (IsInfoOverlayVisible())
     {
         RefreshLoaderStatsOverlay();
     }
@@ -956,7 +955,7 @@ bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
                                item->offsety(),
                                item->displaywidth(),
                                item->displayheight(),
-                               loaderstatsoverlayvisible_ && !IsRectEmpty(&loaderstatsoverlayrect_),
+                               IsInfoOverlayVisible() && !IsRectEmpty(&loaderstatsoverlayrect_),
                                loaderstatsoverlayrect_};
     return image_renderer_.Render(input).Succeeded();
 }
@@ -969,7 +968,7 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
         return false;
     }
 
-    const auto statsdrawn = loaderstatsoverlayvisible_;
+    const auto overlaydrawn = IsInfoOverlayVisible();
     auto text = BuildItemInfoOverlayText(item, filepath);
     RECT overlayrect{};
     if (loaderstatsoverlayvisible_)
@@ -1000,7 +999,7 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
         }
         FillRect(dc, &paintrect, backgroundbrush_);
         DrawTextOverlay(dc, overlayrect, text, nullptr);
-        return statsdrawn;
+        return overlaydrawn;
     }
 
     const auto previousbitmap = SelectObject(memorydc, bitmap);
@@ -1010,7 +1009,7 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
         DeleteDC(memorydc);
         FillRect(dc, &paintrect, backgroundbrush_);
         DrawTextOverlay(dc, overlayrect, text, nullptr);
-        return statsdrawn;
+        return overlaydrawn;
     }
 
     POINT previousorigin{};
@@ -1023,7 +1022,7 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
     SelectObject(memorydc, previousbitmap);
     DeleteObject(bitmap);
     DeleteDC(memorydc);
-    return statsdrawn;
+    return overlaydrawn;
 }
 
 bool ImgVwWindow::DisplayLoadingProgress(HDC dc, const RECT& paintrect, const ImgItem* item,
@@ -1086,7 +1085,7 @@ void ImgVwWindow::UpdateLoadingProgressOverlayTimer()
         {
             InvalidateRect(hwnd_, nullptr, FALSE);
         }
-        if (loaderstatsoverlayvisible_)
+        if (IsInfoOverlayVisible())
         {
             RefreshLoaderStatsOverlay();
         }
@@ -1121,7 +1120,7 @@ void ImgVwWindow::UpdateLoadingProgressOverlayTimer()
     {
         lastloadingprogresspercent_ = percent;
         loadingprogressoverlayvisible_ = visible;
-        if (loaderstatsoverlayvisible_)
+        if (IsInfoOverlayVisible())
         {
             RefreshLoaderStatsOverlay();
         }
@@ -1137,12 +1136,28 @@ BOOL ImgVwWindow::IsLoaderStatsOverlayKeyDown() const
     return (GetKeyState(VK_CONTROL) & 0x8000) != 0 && (GetKeyState(VK_MENU) & 0x8000) != 0;
 }
 
+BOOL ImgVwWindow::IsFilenameOverlayVisible() const
+{
+    const auto stateowner = owner_ == nullptr ? this : owner_;
+    return stateowner->filenameoverlayenabled_ && !IsLoaderStatsOverlayKeyDown();
+}
+
+BOOL ImgVwWindow::IsInfoOverlayVisible() const
+{
+    return loaderstatsoverlayvisible_ || IsFilenameOverlayVisible();
+}
+
 void ImgVwWindow::UpdateLoaderStatsOverlayVisibility()
 {
     if (owner_ != nullptr)
     {
         owner_->UpdateLoaderStatsOverlayVisibility();
         return;
+    }
+
+    if (IsLoaderStatsOverlayKeyDown())
+    {
+        filenameoverlayenabled_ = FALSE;
     }
 
     UpdateLoaderStatsOverlayVisibilityForWindow();
@@ -1168,18 +1183,35 @@ void ImgVwWindow::UpdateLoaderStatsOverlayVisibilityForWindow()
     {
         SetTimer(hwnd_, kLoaderStatsOverlayTimer, kLoaderStatsOverlayIntervalInMilliseconds, nullptr);
         UpdateLoadingProgressOverlayTimer();
-        RefreshLoaderStatsOverlay();
     }
     else
     {
         KillTimer(hwnd_, kLoaderStatsOverlayTimer);
-        const auto previousrect = loaderstatsoverlayrect_;
-        loaderstatsoverlaytext_.clear();
-        SetRectEmpty(&loaderstatsoverlayrect_);
-        if (!IsRectEmpty(&previousrect))
-        {
-            InvalidateRect(hwnd_, &previousrect, FALSE);
-        }
+    }
+
+    UpdateInfoOverlayForWindow();
+}
+
+void ImgVwWindow::UpdateInfoOverlayForWindow()
+{
+    if (IsInfoOverlayVisible())
+    {
+        RefreshLoaderStatsOverlay();
+    }
+    else
+    {
+        ClearInfoOverlay();
+    }
+}
+
+void ImgVwWindow::ClearInfoOverlay()
+{
+    const auto previousrect = loaderstatsoverlayrect_;
+    loaderstatsoverlaytext_.clear();
+    SetRectEmpty(&loaderstatsoverlayrect_);
+    if (!IsRectEmpty(&previousrect))
+    {
+        InvalidateRect(hwnd_, &previousrect, FALSE);
     }
 }
 
@@ -1356,7 +1388,22 @@ RECT ImgVwWindow::CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& te
 
 void ImgVwWindow::RefreshLoaderStatsOverlay()
 {
-    const auto text = BuildLoaderStatsOverlayText();
+    if (!IsInfoOverlayVisible())
+    {
+        ClearInfoOverlay();
+        return;
+    }
+
+    const auto currentitem = browser_.GetCurrentItem();
+    const auto text = loaderstatsoverlayvisible_
+                          ? BuildLoaderStatsOverlayText()
+                          : BuildItemInfoOverlayText(currentitem.get(), browser_.GetCurrentFilePath());
+    if (text.empty())
+    {
+        ClearInfoOverlay();
+        return;
+    }
+
     HDC dc = GetDC(hwnd_);
     if (dc == nullptr)
     {
@@ -1563,6 +1610,10 @@ void ImgVwWindow::DrawEmptyStateButton(const DRAWITEMSTRUCT* drawitem)
 void ImgVwWindow::InvalidateScreen()
 {
     slideshowwaitingforimage_ = FALSE;
+    if (IsFilenameOverlayVisible())
+    {
+        RefreshLoaderStatsOverlay();
+    }
     InvalidateRect(hwnd_, nullptr, FALSE);
     if (slideshowrunning_)
     {
@@ -1570,12 +1621,23 @@ void ImgVwWindow::InvalidateScreen()
     }
 }
 
-void ImgVwWindow::PerformAction()
+void ImgVwWindow::ToggleFilenameOverlay()
 {
-    const auto filepath = browser_.GetCurrentFilePath();
-    ShowCursor(TRUE);
-    MessageBox(hwnd_, filepath.c_str(), L"ImgVw", 0);
-    ShowCursor(FALSE);
+    if (owner_ != nullptr)
+    {
+        owner_->ToggleFilenameOverlay();
+        return;
+    }
+
+    filenameoverlayenabled_ = IsLoaderStatsOverlayKeyDown() ? FALSE : !filenameoverlayenabled_;
+    UpdateInfoOverlayForWindow();
+    for (const auto window : slideshowwindows_)
+    {
+        if (window != nullptr)
+        {
+            window->UpdateInfoOverlayForWindow();
+        }
+    }
 }
 
 void ImgVwWindow::UseBuiltInICCProfile()
@@ -1757,6 +1819,7 @@ void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
     {
         if (window != nullptr)
         {
+            window->UpdateInfoOverlayForWindow();
             preloadtargetsizes.push_back({window->clientwidth_, window->clientheight_});
         }
     }
@@ -2459,7 +2522,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else
             {
-                PerformAction();
+                ToggleFilenameOverlay();
             }
             break;
         case IDR_NEXT:
