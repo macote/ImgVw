@@ -12,7 +12,9 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 
 ## Usage
 
-Pass a file or folder as an argument.
+Pass a file or folder as an argument, or launch ImgVw without arguments and choose an image or folder from the start
+screen. You can also change to a different image or folder from the right-click menu while viewing, or drag one image
+or folder into the window.
 
 |            Shortcut             | Description                                    |
 | :-----------------------------: | :--------------------------------------------- |
@@ -21,6 +23,8 @@ Pass a file or folder as an argument.
 |              Home               | Go to first                                    |
 |               End               | Go to last                                     |
 |               F1                | About                                          |
+|            Ctrl + O             | Open image                                    |
+|       Ctrl + Shift + O          | Open folder                                   |
 |               F3                | Toggle slideshow                               |
 |               F4                | Toggle slideshow (random mode)                 |
 |               F5                | Toggle slideshow on all monitors               |

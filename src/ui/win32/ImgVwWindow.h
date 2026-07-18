@@ -6,10 +6,12 @@
 #include "ImgBrowser.h"
 #include "ImgItem.h"
 #include "ImgSettings.h"
+#include "PathPicker.h"
 #include <Windows.h>
 #include <Windowsx.h>
 #include <commctrl.h>
 #include <objidl.h>
+#include <shellapi.h>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -34,7 +36,6 @@ class ImgVwWindow final : public Window
   public:
     ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args) : Window(hinst)
     {
-        launchedwithoutarguments_ = args.size() <= 1;
         if (args.size() > 1)
         {
             path_ = args[1];
@@ -54,8 +55,16 @@ class ImgVwWindow final : public Window
 
   private:
     struct MonitorCreateContext;
+    enum class BrowseUiState
+    {
+        Collecting,
+        Viewing,
+        Empty,
+        NoImages,
+    };
 
     ImgBrowser browser_;
+    PathPicker path_picker_;
     FileOperations file_operations_;
     ImgRenderer image_renderer_;
     std::wstring path_;
@@ -76,8 +85,12 @@ class ImgVwWindow final : public Window
     INT clientwidth_{};
     INT clientheight_{};
     BOOL browsesubfolders_{FALSE};
-    BOOL launchedwithoutarguments_{FALSE};
-    BOOL exitmessagedisplayed_{FALSE};
+    BOOL browserinitialized_{FALSE};
+    BrowseUiState browseuistate_{BrowseUiState::Collecting};
+    std::wstring emptystatemessage_;
+    HWND openimagebutton_{nullptr};
+    HWND openfolderbutton_{nullptr};
+    HWND searchsubfoldersbutton_{nullptr};
     HMONITOR currentmonitor_{nullptr};
     BOOL draggingwindow_{FALSE};
     POINT dragstartpoint_{};
@@ -105,6 +118,18 @@ class ImgVwWindow final : public Window
                                         ImgVwWindow* owner);
     static BOOL CALLBACK CreateSlideShowWindowForMonitor(HMONITOR monitor, HDC dc, LPRECT rect, LPARAM param);
     BOOL InitializeBrowser(const std::wstring& path);
+    BOOL OpenPath(const std::wstring& path);
+    void OpenImage();
+    void OpenFolder();
+    void SelectPath(const PathPickerResult& result);
+    void HandleDroppedFiles(HDROP drop);
+    void BrowseEmptyStateSubFolders();
+    void CreateEmptyStateControls();
+    void ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders);
+    void HideEmptyState();
+    BOOL IsEmptyStateVisible() const;
+    void UpdateEmptyStateLayout();
+    void PaintEmptyState(PAINTSTRUCT* pps);
     BOOL UpdateClientSize(INT width, INT height);
     void HandleSize(WPARAM wParam, LPARAM lParam);
     void HandleDpiChanged(LPARAM lParam);
@@ -153,7 +178,6 @@ class ImgVwWindow final : public Window
     void DisplayCurrentSlideWhenReady();
     void DisplayCurrentSlideWithoutTimer();
     void HandleStartupExitConditions();
-    void ShowMessageAndExit(LPCWSTR message);
     void HandleBrowserChanged();
     BOOL SelectDefaultICCProfile();
     void UseBuiltInICCProfile();

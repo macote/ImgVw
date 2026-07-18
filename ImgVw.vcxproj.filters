@@ -124,6 +124,9 @@
     <ClInclude Include="src\platform\win32\ImgSettings.h">
       <Filter>Platform</Filter>
     </ClInclude>
+    <ClInclude Include="src\platform\win32\PathPicker.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
     <ClInclude Include="src\platform\win32\ProcessDpiAwareness.h">
       <Filter>Platform</Filter>
     </ClInclude>
@@ -190,6 +193,9 @@
       <Filter>Platform</Filter>
     </ClCompile>
     <ClCompile Include="src\platform\win32\ImageHeaderProbe.cpp">
+      <Filter>Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\win32\PathPicker.cpp">
       <Filter>Platform</Filter>
     </ClCompile>
     <ClCompile Include="src\platform\win32\ProcessDpiAwareness.cpp">

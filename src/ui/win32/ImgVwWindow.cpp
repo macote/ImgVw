@@ -70,28 +70,6 @@ struct ImgVwWindow::MonitorCreateContext
 
 ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring>& args)
 {
-    if (args.size() > 1)
-    {
-        const auto& path = args[1];
-        if (!path.empty())
-        {
-            std::wstring workpath = path;
-            if (workpath.back() == L'\\')
-            {
-                workpath = workpath.substr(0, workpath.size() - 1);
-            }
-            WIN32_FIND_DATA findfiledata{};
-            HANDLE findfilehandle = FindFirstFile(workpath.c_str(), &findfiledata);
-            if (findfilehandle == INVALID_HANDLE_VALUE)
-            {
-                std::wstring error_msg = L"The system cannot find the path specified:\n" + path;
-                MessageBox(nullptr, error_msg.c_str(), L"ImgVw Error", MB_OK | MB_ICONERROR);
-                return nullptr;
-            }
-            FindClose(findfilehandle);
-        }
-    }
-
     auto self = new ImgVwWindow(hInst, args);
     if (self != nullptr)
     {
@@ -194,9 +172,18 @@ LRESULT ImgVwWindow::OnCreate()
     }
 
     InitializeMonitorState();
-    if (!InitializeBrowser(path_))
+    CreateEmptyStateControls();
+    if (owner_ == nullptr)
     {
-        PostMessage(hwnd_, WM_CLOSE, 0, 0);
+        DragAcceptFiles(hwnd_, TRUE);
+    }
+    if (path_.empty())
+    {
+        ShowEmptyState(L"Open an image or browse a folder to begin.", FALSE);
+    }
+    else if (!InitializeBrowser(path_))
+    {
+        ShowEmptyState(L"The selected path could not be opened.", FALSE);
     }
 
     return FALSE;
@@ -204,6 +191,12 @@ LRESULT ImgVwWindow::OnCreate()
 
 void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
 {
+    if (IsEmptyStateVisible())
+    {
+        PaintEmptyState(pps);
+        return;
+    }
+
     const auto imgitem = browser_.GetCurrentItem();
     bool loaderstatsdrawn = false;
     if (imgitem != nullptr)
@@ -265,13 +258,299 @@ BOOL ImgVwWindow::InitializeBrowser(const std::wstring& path)
 
     browser_.SetNotificationWindow(hwnd_, kBrowserChangedMessage);
     UpdateClientSize(windowrectangle.right, windowrectangle.bottom);
-    if (!browser_.BrowseAsync(path_, windowrectangle.right, windowrectangle.bottom))
+    if (!browser_.BrowseAsync(path, windowrectangle.right, windowrectangle.bottom))
     {
-        std::wstring error_msg = L"The system cannot find the path specified:\n" + path_;
-        MessageBox(hwnd_, error_msg.c_str(), L"ImgVw Error", MB_OK | MB_ICONERROR);
         return FALSE;
     }
+    browserinitialized_ = TRUE;
+    browseuistate_ = BrowseUiState::Collecting;
     return TRUE;
+}
+
+BOOL ImgVwWindow::OpenPath(const std::wstring& path)
+{
+    if (path.empty())
+    {
+        return FALSE;
+    }
+
+    const auto was_empty = IsEmptyStateVisible();
+    if (was_empty)
+    {
+        HideEmptyState();
+    }
+    if (!InitializeBrowser(path))
+    {
+        if (was_empty)
+        {
+            ShowEmptyState(L"The selected path could not be opened.", FALSE);
+        }
+        else
+        {
+            MessageBox(hwnd_, L"The selected path could not be opened.", L"ImgVw Error", MB_OK | MB_ICONERROR);
+        }
+        return FALSE;
+    }
+
+    path_ = path;
+    browsesubfolders_ = FALSE;
+    InvalidateScreen();
+    return TRUE;
+}
+
+void ImgVwWindow::OpenImage()
+{
+    const auto restore_viewer_input = !IsEmptyStateVisible();
+    if (restore_viewer_input)
+    {
+        if (GetCapture() == hwnd_)
+        {
+            ReleaseCapture();
+        }
+        ShowCursor(TRUE);
+    }
+
+    SelectPath(path_picker_.SelectImage(hwnd_));
+
+    if (restore_viewer_input && !IsEmptyStateVisible())
+    {
+        SetCapture(hwnd_);
+        ShowCursor(FALSE);
+    }
+}
+
+void ImgVwWindow::OpenFolder()
+{
+    const auto restore_viewer_input = !IsEmptyStateVisible();
+    if (restore_viewer_input)
+    {
+        if (GetCapture() == hwnd_)
+        {
+            ReleaseCapture();
+        }
+        ShowCursor(TRUE);
+    }
+
+    SelectPath(path_picker_.SelectFolder(hwnd_));
+
+    if (restore_viewer_input && !IsEmptyStateVisible())
+    {
+        SetCapture(hwnd_);
+        ShowCursor(FALSE);
+    }
+}
+
+void ImgVwWindow::SelectPath(const PathPickerResult& result)
+{
+    if (result.status == PathPickerStatus::Cancelled)
+    {
+        return;
+    }
+
+    if (result.status == PathPickerStatus::Failed)
+    {
+        if (IsEmptyStateVisible())
+        {
+            ShowEmptyState(L"The file or folder picker could not be opened.", FALSE);
+        }
+        else
+        {
+            MessageBox(hwnd_, L"The file or folder picker could not be opened.", L"ImgVw Error", MB_OK | MB_ICONERROR);
+        }
+        return;
+    }
+
+    OpenPath(result.path);
+}
+
+void ImgVwWindow::HandleDroppedFiles(HDROP drop)
+{
+    const auto count = DragQueryFile(drop, 0xFFFFFFFF, nullptr, 0);
+    if (count != 1)
+    {
+        DragFinish(drop);
+        MessageBox(hwnd_, L"Drop one image or folder at a time.", L"ImgVw", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+
+    const auto path_length = DragQueryFile(drop, 0, nullptr, 0);
+    std::vector<wchar_t> path(path_length + 1);
+    DragQueryFile(drop, 0, path.data(), static_cast<UINT>(path.size()));
+    DragFinish(drop);
+    OpenPath(path.data());
+}
+
+void ImgVwWindow::BrowseEmptyStateSubFolders()
+{
+    if (!browserinitialized_ || browsesubfolders_)
+    {
+        return;
+    }
+
+    if (browser_.BrowseSubFoldersAsync())
+    {
+        browsesubfolders_ = TRUE;
+        ShowEmptyState(L"Searching subfolders for supported images...", FALSE);
+    }
+}
+
+void ImgVwWindow::CreateEmptyStateControls()
+{
+    if (owner_ != nullptr || openimagebutton_ != nullptr)
+    {
+        return;
+    }
+
+    const auto button_style = WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON;
+    openimagebutton_ = CreateWindow(L"BUTTON", L"Open image...", button_style, 0, 0, 0, 0, hwnd_,
+                                    reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_OPEN_IMAGE)), hinst_, nullptr);
+    openfolderbutton_ = CreateWindow(L"BUTTON", L"Open folder...", button_style, 0, 0, 0, 0, hwnd_,
+                                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_OPEN_FOLDER)), hinst_, nullptr);
+    searchsubfoldersbutton_ =
+        CreateWindow(L"BUTTON", L"Search subfolders", button_style, 0, 0, 0, 0, hwnd_,
+                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_SEARCH_SUBFOLDERS)), hinst_, nullptr);
+
+    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_})
+    {
+        if (button != nullptr && captionfont_ != nullptr)
+        {
+            SendMessage(button, WM_SETFONT, reinterpret_cast<WPARAM>(captionfont_), TRUE);
+        }
+    }
+}
+
+BOOL ImgVwWindow::IsEmptyStateVisible() const
+{
+    return browseuistate_ == BrowseUiState::Empty || browseuistate_ == BrowseUiState::NoImages;
+}
+
+void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders)
+{
+    if (owner_ != nullptr)
+    {
+        return;
+    }
+
+    const auto was_visible = IsEmptyStateVisible();
+    browseuistate_ = browserinitialized_ ? BrowseUiState::NoImages : BrowseUiState::Empty;
+    emptystatemessage_ = message;
+    if (!was_visible)
+    {
+        KillTimer(hwnd_, IDT_HIDEMOUSE);
+        mousehidetimerstarted_ = FALSE;
+        if (GetCapture() == hwnd_)
+        {
+            ReleaseCapture();
+        }
+        ShowCursor(TRUE);
+    }
+
+    if (openimagebutton_ != nullptr)
+    {
+        ShowWindow(openimagebutton_, SW_SHOW);
+    }
+    if (openfolderbutton_ != nullptr)
+    {
+        ShowWindow(openfolderbutton_, SW_SHOW);
+    }
+    if (searchsubfoldersbutton_ != nullptr)
+    {
+        ShowWindow(searchsubfoldersbutton_, show_search_subfolders ? SW_SHOW : SW_HIDE);
+    }
+
+    UpdateEmptyStateLayout();
+    if (openimagebutton_ != nullptr)
+    {
+        SetFocus(openimagebutton_);
+    }
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void ImgVwWindow::HideEmptyState()
+{
+    if (!IsEmptyStateVisible())
+    {
+        return;
+    }
+
+    browseuistate_ = BrowseUiState::Collecting;
+    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_})
+    {
+        if (button != nullptr)
+        {
+            ShowWindow(button, SW_HIDE);
+        }
+    }
+
+    if (primarywindow_)
+    {
+        SetCapture(hwnd_);
+        ShowCursor(FALSE);
+    }
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void ImgVwWindow::UpdateEmptyStateLayout()
+{
+    if (owner_ != nullptr || openimagebutton_ == nullptr || openfolderbutton_ == nullptr)
+    {
+        return;
+    }
+
+    RECT client_rect{};
+    if (!GetClientRect(hwnd_, &client_rect))
+    {
+        return;
+    }
+
+    const auto button_width = ScaleForWindowDpi(150);
+    const auto button_height = ScaleForWindowDpi(28);
+    const auto gap = ScaleForWindowDpi(12);
+    const auto buttons_width = button_width * 2 + gap;
+    const auto left = (client_rect.right - buttons_width) / 2;
+    const auto top = client_rect.bottom / 2 + ScaleForWindowDpi(24);
+    MoveWindow(openimagebutton_, left, top, button_width, button_height, TRUE);
+    MoveWindow(openfolderbutton_, left + button_width + gap, top, button_width, button_height, TRUE);
+    if (searchsubfoldersbutton_ != nullptr)
+    {
+        MoveWindow(searchsubfoldersbutton_, (client_rect.right - button_width) / 2, top + button_height + gap,
+                   button_width, button_height, TRUE);
+    }
+}
+
+void ImgVwWindow::PaintEmptyState(PAINTSTRUCT* pps)
+{
+    RECT client_rect{};
+    if (!GetClientRect(hwnd_, &client_rect))
+    {
+        return;
+    }
+
+    FillRect(pps->hdc, &client_rect, backgroundbrush_);
+    SetBkMode(pps->hdc, TRANSPARENT);
+    SetTextColor(pps->hdc, RGB(240, 240, 240));
+    const auto old_font = captionfont_ == nullptr ? nullptr : SelectObject(pps->hdc, captionfont_);
+
+    const auto horizontal_margin = ScaleForWindowDpi(24);
+    const auto title_top = client_rect.bottom / 2 - ScaleForWindowDpi(96);
+    RECT title_rect{horizontal_margin, title_top, client_rect.right - horizontal_margin,
+                    title_top + ScaleForWindowDpi(28)};
+    const auto title = browseuistate_ == BrowseUiState::NoImages ? L"No supported images were found" : L"ImgVw";
+    DrawText(pps->hdc, title, -1, &title_rect, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+
+    RECT message_rect{horizontal_margin, title_rect.bottom + ScaleForWindowDpi(8),
+                      client_rect.right - horizontal_margin, client_rect.bottom / 2 + ScaleForWindowDpi(16)};
+    DrawText(pps->hdc, emptystatemessage_.c_str(), -1, &message_rect, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
+
+    RECT drag_drop_rect{horizontal_margin, client_rect.bottom / 2 - ScaleForWindowDpi(12),
+                        client_rect.right - horizontal_margin, client_rect.bottom / 2 + ScaleForWindowDpi(12)};
+    DrawText(pps->hdc, L"You can also drag an image or folder here.", -1, &drag_drop_rect,
+             DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+
+    if (old_font != nullptr)
+    {
+        SelectObject(pps->hdc, old_font);
+    }
 }
 
 BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
@@ -310,6 +589,7 @@ void ImgVwWindow::HandleSize(WPARAM wParam, LPARAM lParam)
     {
         InvalidateScreen();
     }
+    UpdateEmptyStateLayout();
 }
 
 void ImgVwWindow::HandleDpiChanged(LPARAM lParam)
@@ -334,6 +614,7 @@ void ImgVwWindow::HandleDpiChanged(LPARAM lParam)
     {
         RefreshLoaderStatsOverlay();
     }
+    UpdateEmptyStateLayout();
 }
 
 void ImgVwWindow::InitializeMonitorState()
@@ -1567,7 +1848,7 @@ void ImgVwWindow::DisplayCurrentSlideWithoutTimer()
 
 void ImgVwWindow::HandleStartupExitConditions()
 {
-    if (owner_ != nullptr || exitmessagedisplayed_ || !browser_.IsCollectingComplete())
+    if (owner_ != nullptr || !browserinitialized_ || !browser_.IsCollectingComplete())
     {
         return;
     }
@@ -1575,28 +1856,24 @@ void ImgVwWindow::HandleStartupExitConditions()
     const auto stats = browser_.GetStats();
     if (stats.found_images == 0)
     {
-        if (!browsesubfolders_ && browser_.BrowseSubFoldersAsync())
-        {
-            browsesubfolders_ = TRUE;
-            return;
-        }
-
-        ShowMessageAndExit(launchedwithoutarguments_ ? L"No images were found.\n\nUsage: ImgVw [file-or-folder]"
-                                                     : L"No images were found.");
+        ShowEmptyState(browsesubfolders_ ? L"No supported images were found in this folder or its subfolders."
+                                         : L"No supported images were found in this folder.",
+                       browsesubfolders_ ? FALSE : TRUE);
     }
-}
-
-void ImgVwWindow::ShowMessageAndExit(LPCWSTR message)
-{
-    exitmessagedisplayed_ = TRUE;
-    ShowCursor(TRUE);
-    MessageBox(hwnd_, message, L"ImgVw", MB_OK | MB_ICONINFORMATION);
-    ShowCursor(FALSE);
-    CloseWindow();
+    else if (IsEmptyStateVisible())
+    {
+        HideEmptyState();
+        browseuistate_ = BrowseUiState::Viewing;
+    }
 }
 
 void ImgVwWindow::HandleBrowserChanged()
 {
+    if (browserinitialized_ && IsEmptyStateVisible() && browser_.GetStats().found_images > 0)
+    {
+        HideEmptyState();
+        browseuistate_ = BrowseUiState::Viewing;
+    }
     HandleStartupExitConditions();
     UpdateLoadingProgressOverlayTimer();
 
@@ -1647,6 +1924,11 @@ void ImgVwWindow::HandleBrowserChanged()
 
 BOOL ImgVwWindow::HandleMouseMove(WPARAM wParam, LPARAM lParam)
 {
+    if (IsEmptyStateVisible())
+    {
+        return FALSE;
+    }
+
     const auto points = MAKEPOINTS(lParam);
     if (mousemovelastpoints_.x == 0 && mousemovelastpoints_.y == 0)
     {
@@ -1670,6 +1952,13 @@ BOOL ImgVwWindow::HandleMouseMove(WPARAM wParam, LPARAM lParam)
 
 void ImgVwWindow::HandleHideMouseCursor()
 {
+    if (IsEmptyStateVisible())
+    {
+        KillTimer(hwnd_, IDT_HIDEMOUSE);
+        mousehidetimerstarted_ = FALSE;
+        return;
+    }
+
     KillTimer(hwnd_, IDT_HIDEMOUSE);
 
     LARGE_INTEGER counter, elapsed;
@@ -1796,9 +2085,16 @@ void ImgVwWindow::HandleContextMenu(LPARAM lParam)
         const auto popup = GetSubMenu(root, 0);
         UpdateContextMenuForMonitorCount(popup);
 
-        ShowCursor(TRUE);
+        const auto restore_viewer_cursor = !IsEmptyStateVisible();
+        if (restore_viewer_cursor)
+        {
+            ShowCursor(TRUE);
+        }
         TrackPopupMenu(popup, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd_, nullptr);
-        ShowCursor(FALSE);
+        if (restore_viewer_cursor)
+        {
+            ShowCursor(FALSE);
+        }
 
         DestroyMenu(root);
     }
@@ -1888,6 +2184,15 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         switch (LOWORD(wParam))
         {
+        case IDM_OPEN_IMAGE:
+            OpenImage();
+            break;
+        case IDM_OPEN_FOLDER:
+            OpenFolder();
+            break;
+        case IDM_SEARCH_SUBFOLDERS:
+            BrowseEmptyStateSubFolders();
+            break;
         case IDM_ABOUT:
             ShowCursor(TRUE);
             DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, reinterpret_cast<DLGPROC>(AboutDialogProc));
@@ -1953,6 +2258,9 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_CONTEXTMENU:
         HandleContextMenu(lParam);
         return TRUE;
+    case WM_DROPFILES:
+        HandleDroppedFiles(reinterpret_cast<HDROP>(wParam));
+        return 0;
     case WM_LBUTTONDOWN:
         if (BeginWindowDrag(lParam))
         {

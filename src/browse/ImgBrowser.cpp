@@ -64,14 +64,6 @@ ImgItem::Format ImgBrowser::ResolveFileFormat(const std::wstring& filepath)
 
 BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight)
 {
-    StopTargetQueueing();
-    Reset();
-
-    targetwidth_ = targetwidth;
-    targetheight_ = targetheight;
-    AddTargetSize(targetwidth_, targetheight_);
-    loader_.PrioritizeTargetSize(targetwidth_, targetheight_);
-
     WIN32_FIND_DATA findfiledata{};
     HANDLE findfilehandle{};
     BOOL forcedfolder{};
@@ -79,10 +71,7 @@ BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
 
     if (workpath.empty())
     {
-        const INT BUFFERSIZE = 4096;
-        TCHAR currentdirectory[BUFFERSIZE];
-        GetCurrentDirectory(BUFFERSIZE, currentdirectory);
-        workpath = currentdirectory;
+        return FALSE;
     }
 
     if (workpath.back() == L'\\')
@@ -92,37 +81,47 @@ BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
     }
 
     findfilehandle = FindFirstFile(workpath.c_str(), &findfiledata);
-    if (findfilehandle != INVALID_HANDLE_VALUE)
+    if (findfilehandle == INVALID_HANDLE_VALUE)
     {
-        FindClose(findfilehandle);
-        if (!(findfiledata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !forcedfolder)
-        {
-            const auto backslashposition = workpath.rfind(L'\\');
-            if (backslashposition != std::wstring::npos)
-            {
-                folderpath_ = workpath.substr(0, backslashposition + 1);
-            }
-            else
-            {
-                folderpath_ = L".\\";
-                workpath = folderpath_ + workpath;
-            }
+        return FALSE;
+    }
 
-            const auto imgformat = ResolveFileFormat(workpath);
-            if (imgformat != ImgItem::Format::Unsupported)
-            {
-                CollectFile(workpath, imgformat);
-                MoveToItem(workpath);
-            }
+    FindClose(findfilehandle);
+    if (!StopCollecting() || !StopTargetQueueing())
+    {
+        return FALSE;
+    }
+
+    Reset();
+
+    targetwidth_ = targetwidth;
+    targetheight_ = targetheight;
+    AddTargetSize(targetwidth_, targetheight_);
+    loader_.PrioritizeTargetSize(targetwidth_, targetheight_);
+
+    if (!(findfiledata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !forcedfolder)
+    {
+        const auto backslashposition = workpath.rfind(L'\\');
+        if (backslashposition != std::wstring::npos)
+        {
+            folderpath_ = workpath.substr(0, backslashposition + 1);
         }
         else
         {
-            folderpath_ = workpath + L"\\";
+            folderpath_ = L".\\";
+            workpath = folderpath_ + workpath;
+        }
+
+        const auto imgformat = ResolveFileFormat(workpath);
+        if (imgformat != ImgItem::Format::Unsupported)
+        {
+            CollectFile(workpath, imgformat);
+            MoveToItem(workpath);
         }
     }
     else
     {
-        return FALSE;
+        folderpath_ = workpath + L"\\";
     }
 
     ResetEvent(readyevent_);
@@ -201,11 +200,11 @@ BOOL ImgBrowser::IsCollectingComplete() const
     return WaitForSingleObject(collectorthread_, 0) == WAIT_OBJECT_0 ? TRUE : FALSE;
 }
 
-void ImgBrowser::StopCollecting()
+BOOL ImgBrowser::StopCollecting()
 {
     if (collectorthread_ == nullptr || collectorthread_ == INVALID_HANDLE_VALUE)
     {
-        return;
+        return TRUE;
     }
 
     cancellationflag_ = TRUE;
@@ -217,6 +216,7 @@ void ImgBrowser::StopCollecting()
 #if defined(IMGVW_DEBUG)
         OutputDebugString(L"ImgBrowser::StopCollecting: Warning: collector thread did not terminate within timeout.\n");
 #endif
+        return FALSE;
     }
     else if (waitResult == WAIT_FAILED)
     {
@@ -227,29 +227,27 @@ void ImgBrowser::StopCollecting()
                    static_cast<unsigned long>(error));
         OutputDebugString(buf);
 #endif
+        return FALSE;
     }
 
+    CloseHandle(collectorthread_);
+    collectorthread_ = nullptr;
     cancellationflag_ = FALSE;
+    return TRUE;
 }
 
 void ImgBrowser::StopBrowsing()
 {
     StopCollecting();
     StopTargetQueueing();
-    if (collectorthread_ != nullptr)
-    {
-        CloseHandle(collectorthread_);
-        collectorthread_ = nullptr;
-    }
-
     loader_.StopLoading();
 }
 
-void ImgBrowser::StopTargetQueueing()
+BOOL ImgBrowser::StopTargetQueueing()
 {
     if (targetqueuethreads_.empty())
     {
-        return;
+        return TRUE;
     }
 
     cancellationflag_ = TRUE;
@@ -267,6 +265,7 @@ void ImgBrowser::StopTargetQueueing()
 #if defined(IMGVW_DEBUG)
             OutputDebugString(L"ImgBrowser::StopTargetQueueing: Warning: target queue thread did not terminate.\n");
 #endif
+            return FALSE;
         }
         else if (waitResult == WAIT_FAILED)
         {
@@ -277,6 +276,7 @@ void ImgBrowser::StopTargetQueueing()
                        static_cast<unsigned long>(error));
             OutputDebugString(buf);
 #endif
+            return FALSE;
         }
 
         CloseHandle(thread);
@@ -284,6 +284,7 @@ void ImgBrowser::StopTargetQueueing()
 
     targetqueuethreads_.clear();
     cancellationflag_ = FALSE;
+    return TRUE;
 }
 
 void ImgBrowser::SetNotificationWindow(HWND hwnd, UINT message)
@@ -296,6 +297,10 @@ void ImgBrowser::SetNotificationWindow(HWND hwnd, UINT message)
 void ImgBrowser::Reset()
 {
     files_.Clear();
+    cache_.Clear();
+    folderpath_.clear();
+    folders_.clear();
+    recursive_ = FALSE;
     target_sizes_.clear();
 }
 

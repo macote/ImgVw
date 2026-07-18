@@ -96,8 +96,8 @@ class ImgBrowser final
     void CollectFile(const std::wstring& filepath, ImgItem::Format imgformat);
     void CollectFolder(const std::wstring& folderpath);
     void CollectSubFolders();
-    void StopCollecting();
-    void StopTargetQueueing();
+    BOOL StopCollecting();
+    BOOL StopTargetQueueing();
     void NotifyChanged();
     static DWORD WINAPI StaticThreadCollect(void* browserinstance);
     static DWORD WINAPI StaticThreadCollectSubFolders(void* browserinstance);
