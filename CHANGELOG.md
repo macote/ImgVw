@@ -4,8 +4,17 @@
   directory
 - Add native image and folder pickers, drag-and-drop opening, and Open image/Open folder commands with shortcuts
 - Add recovery controls for empty folders, including optional recursive subfolder searching
+- Improve the welcome screen with keyboard navigation, sensible focus for empty-folder recovery, and a scalable logo
 - Match the start screen to the diagnostic overlay styling and follow the system light/dark app preference, with a
   light fallback on Windows XP
+- Keep active random slideshow cycles stable as images are added or deleted, avoid duplicate visible images across
+  monitors, and report cycle progress in the diagnostics overlay
+- Show diagnostics on every slideshow monitor and improve overlay font rendering, DPI padding, column alignment, and
+  status presentation
+- Prevent the F5/F6 multi-monitor slideshow shortcuts from starting multi-monitor mode when only one display is
+  available
+- Replace the Enter path dialog with a persistent current-file overlay on every monitor; pressing Ctrl + Alt clears
+  the filename toggle while displaying diagnostics
 
 ## 1.9.0 (2026-07-09)
 

@@ -26,8 +26,8 @@ or folder into the window.
 |              Home               | Go to first                                    |
 |               End               | Go to last                                     |
 |               F1                | About                                          |
-|            Ctrl + O             | Open image                                    |
-|       Ctrl + Shift + O          | Open folder                                   |
+|            Ctrl + O             | Open image                                     |
+|        Ctrl + Shift + O         | Open folder                                    |
 |               F3                | Toggle slideshow                               |
 |               F4                | Toggle slideshow (random mode)                 |
 |               F5                | Toggle slideshow on all monitors               |
@@ -37,11 +37,15 @@ or folder into the window.
 |               F9                | Add images found in subfolders                 |
 |               F11               | Select default CMYK ICC profile                |
 |               F12               | Use the built-in CMYK ICC profile              |
-|           Ctrl + Alt            | Display loader statistics overlay              |
+|           Ctrl + Alt            | Display diagnostics                            |
 |             Delete              | Move to recycle bin if possible or delete      |
 |         Shift + Delete          | Delete                                         |
-|              Enter              | Display current file path                      |
+|              Enter              | Toggle persistent current file path overlay    |
 |             Escape              | Exit                                           |
+
+Enter shows the current file path persistently as images change. In multi-monitor slideshow mode, each monitor shows
+the path for its own image. Holding Ctrl + Alt temporarily shows diagnostics on every monitor and clears the persistent
+file path toggle; releasing the keys hides the diagnostics without restoring the path overlay.
 
 ## Installation
 

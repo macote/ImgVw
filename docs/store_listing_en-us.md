@@ -1,7 +1,7 @@
 # Microsoft Store listing — English (United States)
 
-This is the release-owned copy for the initial ImgVw Microsoft Store listing. Partner Center text fields use plain
-text; copy the text inside each block without the Markdown fences.
+This is the release-owned copy for the ImgVw Microsoft Store listing and update metadata. Partner Center text fields
+use plain text; copy the text inside each block without the Markdown fences.
 
 ## Product name
 
@@ -20,7 +20,9 @@ orientation and uses embedded color profiles when available, with color-manageme
 images.
 
 Use regular or randomized slideshows on one display or across multiple monitors. Recursive browsing can add supported
-images from subfolders when you need to explore a larger collection.
+images from subfolders when you need to explore a larger collection. Press Enter to keep the current file path visible
+as images change, including a separate path on each slideshow monitor. Hold Ctrl+Alt to inspect loading and cache
+diagnostics across every display.
 
 Supported file types: JPEG (.jpg, .jpeg), PNG (.png), HEIF (.heic, .heif, .hif), BMP (.bmp), GIF (.gif), icon (.ico),
 and TIFF (.tif, .tiff).
@@ -38,9 +40,10 @@ A small, fast, offline image viewer for browsing local images, folders, and slid
 ## What's new in this version
 
 ```text
-Start quickly after launching from the Microsoft Store: choose an image or folder from the new welcome screen, or drag
-one into the viewer. ImgVw no longer tries to browse the Windows system folder when launched without a file. The new
-start screen also follows your Windows light or dark app preference.
+The welcome screen now has improved keyboard navigation, sensible empty-folder recovery focus, and a scalable logo.
+Random slideshows keep a stable cycle as images are added or deleted and avoid showing the same image on multiple
+monitors. Enter now toggles a persistent current-file overlay, while Ctrl+Alt shows improved diagnostics on every
+display.
 ```
 
 ## Product features
@@ -54,9 +57,11 @@ EXIF orientation for automatically rotated images
 Embedded and fallback ICC color management
 Regular and randomized slideshow modes
 Multi-monitor slideshows
+Persistent current-file overlay and multi-monitor diagnostics
 Optional recursive subfolder browsing
 Offline, local image processing
 Free and open-source
+Open images and folders using native pickers or drag and drop
 ```
 
 ## Supplemental fields
@@ -71,12 +76,17 @@ Free and open-source
 Use PNG screenshots at 1366×768 or larger. Capture the application with non-private sample images and no unrelated
 desktop content. Recommended order and captions:
 
-1. Main image browsing view — `Browse local image collections with a clean, focused viewing experience.`
-2. About dialog over the viewer — `ImgVw is a lightweight, free and open-source Windows image viewer.`
+1. Welcome screen — `Open an image or folder from a keyboard-friendly start screen.`
+2. Main browsing view with the file overlay — `Keep the current file path visible while browsing local images.`
 3. Recursive browsing or a varied folder — `Browse supported images in a folder and optionally include subfolders.`
-4. Slideshow or multi-monitor view — `Run regular or randomized slideshows on one display or across multiple monitors.`
+4. Slideshow or diagnostics view — `Run slideshows across multiple monitors and inspect loading diagnostics.`
 
 Do not add marketing text or logos over the screenshots. A minimum of one screenshot is required; four are recommended.
+
+Ready welcome-screen captures:
+
+- `packaging/store/ListingAssets/Screenshots/WelcomeScreenDark-1920x1080.png` — preferred Store upload
+- `packaging/store/ListingAssets/Screenshots/WelcomeScreenDark-1366x768.png` — minimum-size alternative
 
 ## Store logo
 

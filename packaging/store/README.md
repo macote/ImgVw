@@ -35,3 +35,9 @@ requires signing it with a certificate whose subject matches `Publisher`.
 
 The Store package supports Windows 10 version 1809 (build 17763) and later. This packaging-only minimum does not alter
 the portable executable's Windows XP compatibility target.
+
+## Submission metadata
+
+Use `docs/store_listing_en-us.md` as the canonical English Partner Center listing and update text. Review its
+description, product features, What's new section, and screenshot captions for every Store release. Keep the What's new
+text consistent with the corresponding release section in `CHANGELOG.md` before uploading the bundle.
