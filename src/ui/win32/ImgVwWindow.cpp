@@ -1722,6 +1722,11 @@ void ImgVwWindow::ToggleMultiMonitorSlideShow(BOOL slideshowrandom)
 
 void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
 {
+    if (!HasMultipleMonitors())
+    {
+        return;
+    }
+
     StopSlideShow();
     DestroySlideShowWindows();
 
