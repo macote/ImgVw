@@ -1162,10 +1162,28 @@ void ImgVwWindow::UpdateLoadingProgressOverlayTimer()
 
 BOOL ImgVwWindow::IsLoaderStatsOverlayKeyDown() const
 {
-    return owner_ == nullptr && (GetKeyState(VK_CONTROL) & 0x8000) != 0 && (GetKeyState(VK_MENU) & 0x8000) != 0;
+    return (GetKeyState(VK_CONTROL) & 0x8000) != 0 && (GetKeyState(VK_MENU) & 0x8000) != 0;
 }
 
 void ImgVwWindow::UpdateLoaderStatsOverlayVisibility()
+{
+    if (owner_ != nullptr)
+    {
+        owner_->UpdateLoaderStatsOverlayVisibility();
+        return;
+    }
+
+    UpdateLoaderStatsOverlayVisibilityForWindow();
+    for (const auto window : slideshowwindows_)
+    {
+        if (window != nullptr)
+        {
+            window->UpdateLoaderStatsOverlayVisibilityForWindow();
+        }
+    }
+}
+
+void ImgVwWindow::UpdateLoaderStatsOverlayVisibilityForWindow()
 {
     const auto visible = IsLoaderStatsOverlayKeyDown();
     if (loaderstatsoverlayvisible_ == visible)
@@ -1195,8 +1213,9 @@ void ImgVwWindow::UpdateLoaderStatsOverlayVisibility()
 
 std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
 {
-    const auto randomslideshow = slideshowrunning_ && slideshowrandom_;
-    const auto stats = browser_.GetStats();
+    const auto statssource = owner_ == nullptr ? this : owner_;
+    const auto randomslideshow = statssource->slideshowrunning_ && statssource->slideshowrandom_;
+    const auto stats = statssource->browser_.GetStats();
     std::wstringstream text;
     std::size_t cached{};
     for (const auto& size_stats : stats.sizes)
@@ -1205,18 +1224,18 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
         cached += size_total;
     }
 
-    text << L"found: " << stats.found_images << L"; cached: " << cached << L"; queued: " << stats.loader.queued
-         << L"; slots: " << stats.loader.free_slots << L"/" << stats.loader.maximum_slots;
+    text << L"Found: " << stats.found_images << L"; Cached: " << cached << L"; Queued: " << stats.loader.queued
+         << L"; Slots: " << stats.loader.free_slots << L"/" << stats.loader.maximum_slots;
     const auto temppath = ImgSettings::GetInstance().temppath();
     ULARGE_INTEGER freebytesavailable{};
     if (!temppath.empty() && GetDiskFreeSpaceEx(temppath.c_str(), &freebytesavailable, nullptr, nullptr))
     {
-        text << L"; free: " << FormatByteSize(freebytesavailable.QuadPart);
+        text << L"; Free: " << FormatByteSize(freebytesavailable.QuadPart);
     }
 
     if (randomslideshow)
     {
-        text << L"\r\nMode: Random slideshow; cycle: " << stats.random.position << L" / " << stats.random.total;
+        text << L"\r\nMode: Random slideshow; Cycle: " << stats.random.position << L" / " << stats.random.total;
         if (stats.random.total > 0)
         {
             text << L" (" << FormatPercent(stats.random.position, stats.random.total) << L")";

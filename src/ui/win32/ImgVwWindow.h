@@ -212,6 +212,7 @@ class ImgVwWindow final : public Window
     void UpdateLoadingProgressOverlayTimer();
     BOOL IsLoaderStatsOverlayKeyDown() const;
     void UpdateLoaderStatsOverlayVisibility();
+    void UpdateLoaderStatsOverlayVisibilityForWindow();
     std::wstring BuildLoaderStatsOverlayText();
     UINT GetWindowDpi() const;
     INT ScaleForWindowDpi(INT value) const;
