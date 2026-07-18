@@ -37,7 +37,11 @@ A small, fast, offline image viewer for browsing local images, folders, and slid
 
 ## What's new in this version
 
-Leave blank for the first submission, as directed by Partner Center.
+```text
+Start quickly after launching from the Microsoft Store: choose an image or folder from the new welcome screen, or drag
+one into the viewer. ImgVw no longer tries to browse the Windows system folder when launched without a file. The new
+start screen also follows your Windows light or dark app preference.
+```
 
 ## Product features
 

@@ -1,3 +1,12 @@
+## 1.10.0 (2026-07-17)
+
+- Add a safe launch screen for Microsoft Store and other no-argument launches, instead of browsing the process current
+  directory
+- Add native image and folder pickers, drag-and-drop opening, and Open image/Open folder commands with shortcuts
+- Add recovery controls for empty folders, including optional recursive subfolder searching
+- Match the start screen to the diagnostic overlay styling and follow the system light/dark app preference, with a
+  light fallback on Windows XP
+
 ## 1.9.0 (2026-07-09)
 
 - Add multi-monitor random and sequential slideshow support with shared random ordering across displays
