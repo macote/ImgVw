@@ -1,4 +1,6 @@
 ﻿#include "ImgBrowser.h"
+#include "ImageFormatResolver.h"
+
 #include <Shlwapi.h>
 #include <algorithm>
 
@@ -59,7 +61,7 @@ void ImgBrowser::CollectFolder(const std::wstring& folderpath)
 
 ImgItem::Format ImgBrowser::ResolveFileFormat(const std::wstring& filepath)
 {
-    return ImgItemFactory::ResolveFormat(filepath);
+    return ImageFormatResolver::Resolve(filepath);
 }
 
 BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight)

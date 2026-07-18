@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ImgItemFactory.h"
+#include "ImageDispatcher.h"
 #include <Windows.h>
 #include <algorithm>
 #include <cstddef>
@@ -62,7 +62,6 @@ class ImgCache
     {
         map_.clear();
     }
-    std::shared_ptr<ImgItem> Add(std::wstring filepath, INT targetwidth, INT targetheight);
     std::shared_ptr<ImgItem> Add(std::wstring filepath, INT targetwidth, INT targetheight, ImgItem::Format imgformat);
     void Remove(std::wstring filepath);
     std::shared_ptr<ImgItem> Get(const std::wstring& filepath, INT targetwidth, INT targetheight) const;
@@ -71,11 +70,6 @@ class ImgCache
   private:
     std::map<ImgCacheKey, std::shared_ptr<ImgItem>> map_;
 };
-
-inline std::shared_ptr<ImgItem> ImgCache::Add(std::wstring filepath, INT targetwidth, INT targetheight)
-{
-    return Add(filepath, targetwidth, targetheight, ImgItemFactory::ResolveFormat(filepath));
-}
 
 inline std::shared_ptr<ImgItem> ImgCache::Add(std::wstring filepath, INT targetwidth, INT targetheight,
                                               ImgItem::Format imgformat)
@@ -87,7 +81,7 @@ inline std::shared_ptr<ImgItem> ImgCache::Add(std::wstring filepath, INT targetw
         return existing->second;
     }
 
-    const auto imgitem = ImgItemFactory::Create(filepath, targetwidth, targetheight, imgformat);
+    const auto imgitem = ImageDispatcher::Create(filepath, targetwidth, targetheight, imgformat);
     map_.emplace(std::make_pair(key, imgitem));
     return imgitem;
 }

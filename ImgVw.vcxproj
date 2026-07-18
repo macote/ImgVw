@@ -179,7 +179,9 @@
     <ClInclude Include="src\browse\ImgBrowser.h" />
     <ClInclude Include="src\image\ColorProfile.h" />
     <ClInclude Include="src\image\ColorTransform.h" />
+    <ClInclude Include="src\image\ImageDispatcher.h" />
     <ClInclude Include="src\image\ImageFormatDetector.h" />
+    <ClInclude Include="src\image\ImageFormatResolver.h" />
     <ClInclude Include="src\image\ExifOrientation.h" />
     <ClInclude Include="src\image\ImgResampler.h" />
     <ClInclude Include="src\image\ImgBitmap.h" />
@@ -188,7 +190,6 @@
     <ClInclude Include="src\image\ImgGDIItem.h" />
     <ClInclude Include="src\image\ImgHEIFItem.h" />
     <ClInclude Include="src\image\ImgItem.h" />
-    <ClInclude Include="src\image\ImgItemFactory.h" />
     <ClInclude Include="src\image\ImgItemHelper.h" />
     <ClInclude Include="src\image\ImgJPEGDecoder.h" />
     <ClInclude Include="src\image\ImgJPEGItem.h" />
@@ -210,7 +211,9 @@
     <ClCompile Include="src\browse\ImgBrowser.cpp" />
     <ClCompile Include="src\image\ColorProfile.cpp" />
     <ClCompile Include="src\image\ColorTransform.cpp" />
+    <ClCompile Include="src\image\ImageDispatcher.cpp" />
     <ClCompile Include="src\image\ImageFormatDetector.cpp" />
+    <ClCompile Include="src\image\ImageFormatResolver.cpp" />
     <ClCompile Include="src\image\ExifOrientation.cpp" />
     <ClCompile Include="src\image\ImgResampler.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />

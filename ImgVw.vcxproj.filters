@@ -67,7 +67,13 @@
     <ClInclude Include="src\image\ColorTransform.h">
       <Filter>Image</Filter>
     </ClInclude>
+    <ClInclude Include="src\image\ImageDispatcher.h">
+      <Filter>Image</Filter>
+    </ClInclude>
     <ClInclude Include="src\image\ImageFormatDetector.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="src\image\ImageFormatResolver.h">
       <Filter>Image</Filter>
     </ClInclude>
     <ClInclude Include="src\image\ExifOrientation.h">
@@ -92,9 +98,6 @@
       <Filter>Image</Filter>
     </ClInclude>
     <ClInclude Include="src\image\ImgItem.h">
-      <Filter>Image</Filter>
-    </ClInclude>
-    <ClInclude Include="src\image\ImgItemFactory.h">
       <Filter>Image</Filter>
     </ClInclude>
     <ClInclude Include="src\image\ImgItemHelper.h">
@@ -156,7 +159,13 @@
     <ClCompile Include="src\image\ColorTransform.cpp">
       <Filter>Image</Filter>
     </ClCompile>
+    <ClCompile Include="src\image\ImageDispatcher.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
     <ClCompile Include="src\image\ImageFormatDetector.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="src\image\ImageFormatResolver.cpp">
       <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ExifOrientation.cpp">

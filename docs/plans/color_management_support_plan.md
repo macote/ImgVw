@@ -331,7 +331,7 @@ For performance, operations may be fused, but tests must demonstrate equivalent 
 - `src/image/ImgJPEGDecoder.cpp`
 - `src/image/ImgJPEGItem.cpp`
 - `src/image/ImgGDIItem.cpp` or its PNG replacement
-- `src/image/ImgItemFactory.h`
+- `src/image/ImageDispatcher.h`
 - new shared color-management files under `src/image/`
 - new PNG decoder/item files under `src/image/`
 - HEIF files listed in `artifacts/libheif_support_plan.md`

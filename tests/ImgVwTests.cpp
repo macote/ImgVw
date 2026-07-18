@@ -2,11 +2,11 @@
 #include "ColorTransform.h"
 #include "FileOperations.h"
 #include "ImageFormatDetector.h"
+#include "ImageFormatResolver.h"
 #include "ImgResampler.h"
 #include "ImgFileList.h"
 #include "ImgCache.h"
 #include "ImgGDIItem.h"
-#include "ImgItemFactory.h"
 #include "ImgJPEGDecoder.h"
 #include "ImgRenderer.h"
 #include "ImgLoader.h"
@@ -324,7 +324,7 @@ void TestImageFormatDetectorSignatures()
           "truncated signatures are unknown");
 }
 
-void TestImgItemFactoryResolvesSupportedExtensionsOnly()
+void TestImageFormatResolverUsesSupportedExtensionsOnly()
 {
     const auto png_named_heic = TempPath(L"imgvw_png_named_heic.heic");
     const auto jpeg_named_png = TempPath(L"imgvw_jpeg_named_png.png");
@@ -336,13 +336,13 @@ void TestImgItemFactoryResolvesSupportedExtensionsOnly()
     WriteBytes(random_named_jpg, {1, 2, 3, 4});
     WriteBytes(jpeg_named_bin, {0xFF, 0xD8, 0xFF, 0xE0});
 
-    Check(ImgItemFactory::ResolveFormat(png_named_heic) == ImgItem::Format::PNG,
+    Check(ImageFormatResolver::Resolve(png_named_heic) == ImgItem::Format::PNG,
           "PNG bytes with supported HEIC extension route to GDI PNG path");
-    Check(ImgItemFactory::ResolveFormat(jpeg_named_png) == ImgItem::Format::JPEG,
+    Check(ImageFormatResolver::Resolve(jpeg_named_png) == ImgItem::Format::JPEG,
           "JPEG bytes with supported PNG extension route to JPEG path");
-    Check(ImgItemFactory::ResolveFormat(random_named_jpg) == ImgItem::Format::JPEG,
+    Check(ImageFormatResolver::Resolve(random_named_jpg) == ImgItem::Format::JPEG,
           "unknown bytes with supported extension use extension fallback");
-    Check(ImgItemFactory::ResolveFormat(jpeg_named_bin) == ImgItem::Format::Unsupported,
+    Check(ImageFormatResolver::Resolve(jpeg_named_bin) == ImgItem::Format::Unsupported,
           "supported bytes with unsupported extension are not probed");
 
     DeleteFileW(png_named_heic.c_str());
@@ -687,7 +687,7 @@ int main()
     TestImgCacheKeyUsesViewport();
     TestLoaderShutdown();
     TestImageFormatDetectorSignatures();
-    TestImgItemFactoryResolvesSupportedExtensionsOnly();
+    TestImageFormatResolverUsesSupportedExtensionsOnly();
     TestGdiItemPreservesTopRowOrientation();
     TestFileOperationPathList();
     TestFileOperationFlags();

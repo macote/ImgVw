@@ -4,6 +4,7 @@
 #include "ProcessDpiAwareness.h"
 #include "resource.h"
 #include <Windows.h>
+#include <gdiplus.h>
 #include <shellapi.h>
 
 class ImgVw

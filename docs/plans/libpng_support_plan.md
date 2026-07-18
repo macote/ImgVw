@@ -58,7 +58,7 @@ Do not depend on the libpng or zlib packages installed in MSYS2, vcpkg, or the d
 PNG already has a distinct `ImgItem::Format::PNG`, but it currently routes to `ImgGDIItem`:
 
 - `ImgItemHelper::GetImgFormatFromExtension()` maps `.png` to `PNG`.
-- `ImgItemFactory::Create()` constructs `ImgGDIItem` for `PNG`.
+- `ImageDispatcher::Create()` constructs `ImgGDIItem` for `PNG`.
 - `ImgGDIItem` uses GDI+ for decode, resize, conversion, and buffer extraction.
 - `ImgLoader` invokes `ImgItem::Load()` on worker threads.
 - `ImgResampler` can downscale RGBA8 pixels independently of GDI+.
@@ -359,7 +359,7 @@ Do not vendor an APNG-patched libpng or add a second animation decoder in this c
 
 Keep `ImgItem::Format::PNG`.
 
-Update `ImgItemFactory::Create()` so `PNG` constructs `ImgPNGItem` rather than `ImgGDIItem`.
+Update `ImageDispatcher::Create()` so `PNG` constructs `ImgPNGItem` rather than `ImgGDIItem`.
 
 The planned content dispatcher in `artifacts/content_based_image_dispatch_plan.md` currently routes PNG content to
 `ImgGDIItem`; update that plan and implementation to route recognized PNG signatures to `ImgPNGItem`.
