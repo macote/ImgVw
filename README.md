@@ -1,4 +1,6 @@
-# ImgVw
+<p align="center">
+  <img src="resources/ImgVw.svg" alt="ImgVw" width="240" />
+</p>
 
 ImgVw is a simple, fast and portable image viewer for Windows.
 
