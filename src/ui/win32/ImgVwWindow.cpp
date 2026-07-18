@@ -80,6 +80,19 @@ std::wstring FormatByteSize(unsigned long long bytes)
     return text.str();
 }
 
+void WriteByteSizeColumn(std::wostream& text, unsigned long long bytes, std::streamsize width)
+{
+    constexpr std::streamsize kUnitWidth = 2;
+    const auto formatted = FormatByteSize(bytes);
+    const auto separator = formatted.rfind(L' ');
+    const auto value = formatted.substr(0, separator);
+    const auto unit = formatted.substr(separator + 1);
+    const auto valuewidth = width - kUnitWidth - 1;
+
+    text << std::right << std::setw(valuewidth) << value << L' ' << std::left << std::setw(kUnitWidth) << unit
+         << std::right;
+}
+
 std::wstring FormatPercent(std::size_t numerator, std::size_t denominator)
 {
     std::wstringstream text;
@@ -1246,7 +1259,7 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
     text << L"--------------------------------------------------------------------------\r\n";
     text << std::left << std::setw(12) << L"Size" << std::right << std::setw(8) << L"Ready" << std::setw(10)
          << L"Loaded" << std::setw(10) << L"Loading" << std::setw(10) << L"Queued" << std::setw(8) << L"Errors"
-         << std::setw(13) << L"Used" << L"\r\n";
+         << std::setw(10) << L"Used" << std::setw(3) << L"" << L"\r\n";
     text << L"--------------------------------------------------------------------------\r\n";
 
     for (const auto& size_stats : stats.sizes)
@@ -1256,8 +1269,9 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
         size << size_stats.targetwidth << L"x" << size_stats.targetheight;
         text << std::left << std::setw(12) << size.str() << std::right << std::setw(8)
              << FormatPercent(size_stats.ready, size_total) << std::setw(10) << size_stats.ready << std::setw(10)
-             << size_stats.loading << std::setw(10) << size_stats.queued << std::setw(8) << size_stats.error
-             << std::setw(13) << FormatByteSize(size_stats.temp_file_bytes) << L"\r\n";
+             << size_stats.loading << std::setw(10) << size_stats.queued << std::setw(8) << size_stats.error;
+        WriteByteSizeColumn(text, size_stats.temp_file_bytes, 13);
+        text << L"\r\n";
     }
 
     const auto currentitem = browser_.GetCurrentItem();
