@@ -31,7 +31,7 @@ else
 	LDPATHS = -L3rd-party/libjpeg-turbo -L3rd-party/Little-CMS -L3rd-party/libheif -L3rd-party/libde265
 endif
 
-LDLIBS = -lmsimg32 -lcomctl32 -lshell32 -lshlwapi -lole32 -luuid -lgdiplus -luxtheme -ljpeg -llcms2 -lheif -lde265
+LDLIBS = -lmsimg32 -lcomctl32 -ladvapi32 -lshell32 -lshlwapi -lole32 -luuid -lgdiplus -luxtheme -ljpeg -llcms2 -lheif -lde265
 
 ifneq (${config},release)
 	CFLAGS += -D_DEBUG -g

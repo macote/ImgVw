@@ -104,6 +104,7 @@ class ImgVwWindow final : public Window
     BOOL firstimagepaint_{TRUE};
 
     BOOL loaderstatsoverlayvisible_{FALSE};
+    BOOL systemlighttheme_{FALSE};
     std::wstring loaderstatsoverlaytext_;
     RECT loaderstatsoverlayrect_{};
     HFONT loaderstatsoverlayfont_{nullptr};
@@ -134,6 +135,7 @@ class ImgVwWindow final : public Window
     void HandleSize(WPARAM wParam, LPARAM lParam);
     void HandleDpiChanged(LPARAM lParam);
     void InitializeMonitorState();
+    void UpdateSystemTheme();
     void HandleWindowPosChanged();
     BOOL ApplyMonitorBounds(HMONITOR monitor);
     BOOL HasMultipleMonitors() const;
@@ -201,7 +203,9 @@ class ImgVwWindow final : public Window
     void ResetLoaderStatsOverlayLayout();
     RECT CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& text) const;
     void RefreshLoaderStatsOverlay();
-    void DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item);
+    void DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item,
+                         UINT textformat = DT_LEFT | DT_NOPREFIX, COLORREF fallbackbackground = RGB(0, 0, 0));
+    void DrawEmptyStateButton(const DRAWITEMSTRUCT* drawitem);
     void DrawLoaderStatsOverlay(HDC dc, const ImgItem* item);
     void PaintContent(PAINTSTRUCT* pps);
     void DeleteCurrentItem(BOOL allowundo);

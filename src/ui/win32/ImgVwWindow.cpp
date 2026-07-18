@@ -15,6 +15,40 @@ typedef UINT(WINAPI* GetDpiForWindowProc)(HWND hwnd);
 
 constexpr UINT kDefaultDpi = 96;
 
+struct OverlayColors
+{
+    COLORREF background;
+    COLORREF panel;
+    COLORREF border;
+    COLORREF text;
+};
+
+OverlayColors GetOverlayColors(BOOL light_theme)
+{
+    return light_theme ? OverlayColors{RGB(245, 245, 245), RGB(255, 255, 255), RGB(140, 140, 140), RGB(50, 50, 50)}
+                       : OverlayColors{RGB(0, 0, 0), RGB(0, 0, 0), RGB(90, 90, 90), RGB(180, 180, 180)};
+}
+
+BOOL IsSystemLightTheme()
+{
+    HKEY personalize_key{};
+    const auto open_result =
+        RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0,
+                     KEY_QUERY_VALUE, &personalize_key);
+    if (open_result != ERROR_SUCCESS)
+    {
+        // Windows XP has no AppsUseLightTheme preference. Keep its traditional light appearance.
+        return TRUE;
+    }
+
+    DWORD value{};
+    DWORD value_size = sizeof(value);
+    const auto query_result = RegQueryValueEx(personalize_key, L"AppsUseLightTheme", nullptr, nullptr,
+                                              reinterpret_cast<LPBYTE>(&value), &value_size);
+    RegCloseKey(personalize_key);
+    return query_result == ERROR_SUCCESS ? (value != 0 ? TRUE : FALSE) : TRUE;
+}
+
 std::wstring FormatByteSize(unsigned long long bytes)
 {
     static const wchar_t* kUnits[] = {L"B", L"KB", L"MB", L"GB", L"TB"};
@@ -172,6 +206,7 @@ LRESULT ImgVwWindow::OnCreate()
     }
 
     InitializeMonitorState();
+    UpdateSystemTheme();
     CreateEmptyStateControls();
     if (owner_ == nullptr)
     {
@@ -401,7 +436,7 @@ void ImgVwWindow::CreateEmptyStateControls()
         return;
     }
 
-    const auto button_style = WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON;
+    const auto button_style = WS_CHILD | WS_TABSTOP | BS_OWNERDRAW;
     openimagebutton_ = CreateWindow(L"BUTTON", L"Open image...", button_style, 0, 0, 0, 0, hwnd_,
                                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_OPEN_IMAGE)), hinst_, nullptr);
     openfolderbutton_ = CreateWindow(L"BUTTON", L"Open folder...", button_style, 0, 0, 0, 0, hwnd_,
@@ -508,7 +543,7 @@ void ImgVwWindow::UpdateEmptyStateLayout()
     const auto gap = ScaleForWindowDpi(12);
     const auto buttons_width = button_width * 2 + gap;
     const auto left = (client_rect.right - buttons_width) / 2;
-    const auto top = client_rect.bottom / 2 + ScaleForWindowDpi(24);
+    const auto top = client_rect.bottom / 2 + ScaleForWindowDpi(55);
     MoveWindow(openimagebutton_, left, top, button_width, button_height, TRUE);
     MoveWindow(openfolderbutton_, left + button_width + gap, top, button_width, button_height, TRUE);
     if (searchsubfoldersbutton_ != nullptr)
@@ -526,31 +561,25 @@ void ImgVwWindow::PaintEmptyState(PAINTSTRUCT* pps)
         return;
     }
 
-    FillRect(pps->hdc, &client_rect, backgroundbrush_);
-    SetBkMode(pps->hdc, TRANSPARENT);
-    SetTextColor(pps->hdc, RGB(240, 240, 240));
-    const auto old_font = captionfont_ == nullptr ? nullptr : SelectObject(pps->hdc, captionfont_);
-
-    const auto horizontal_margin = ScaleForWindowDpi(24);
-    const auto title_top = client_rect.bottom / 2 - ScaleForWindowDpi(96);
-    RECT title_rect{horizontal_margin, title_top, client_rect.right - horizontal_margin,
-                    title_top + ScaleForWindowDpi(28)};
-    const auto title = browseuistate_ == BrowseUiState::NoImages ? L"No supported images were found" : L"ImgVw";
-    DrawText(pps->hdc, title, -1, &title_rect, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
-
-    RECT message_rect{horizontal_margin, title_rect.bottom + ScaleForWindowDpi(8),
-                      client_rect.right - horizontal_margin, client_rect.bottom / 2 + ScaleForWindowDpi(16)};
-    DrawText(pps->hdc, emptystatemessage_.c_str(), -1, &message_rect, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
-
-    RECT drag_drop_rect{horizontal_margin, client_rect.bottom / 2 - ScaleForWindowDpi(12),
-                        client_rect.right - horizontal_margin, client_rect.bottom / 2 + ScaleForWindowDpi(12)};
-    DrawText(pps->hdc, L"You can also drag an image or folder here.", -1, &drag_drop_rect,
-             DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
-
-    if (old_font != nullptr)
+    const auto colors = GetOverlayColors(systemlighttheme_);
+    const auto background = CreateSolidBrush(colors.background);
+    if (background != nullptr)
     {
-        SelectObject(pps->hdc, old_font);
+        FillRect(pps->hdc, &client_rect, background);
+        DeleteObject(background);
     }
+
+    const auto available_width = static_cast<INT>(client_rect.right) - ScaleForWindowDpi(48);
+    const auto panel_width = std::min(available_width, ScaleForWindowDpi(460));
+    const auto panel_height = ScaleForWindowDpi(132);
+    const auto panel_left = (client_rect.right - panel_width) / 2;
+    const auto panel_top = client_rect.bottom / 2 - ScaleForWindowDpi(118);
+    const RECT panel_rect{panel_left, panel_top, panel_left + panel_width, panel_top + panel_height};
+
+    const auto title = browseuistate_ == BrowseUiState::NoImages ? L"No supported images were found" : L"ImgVw";
+    const auto text =
+        std::wstring(title) + L"\r\n\r\n" + emptystatemessage_ + L"\r\n\r\nYou can also drag an image or folder here.";
+    DrawTextOverlay(pps->hdc, panel_rect, text, nullptr, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX, colors.background);
 }
 
 BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
@@ -620,6 +649,22 @@ void ImgVwWindow::HandleDpiChanged(LPARAM lParam)
 void ImgVwWindow::InitializeMonitorState()
 {
     currentmonitor_ = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+}
+
+void ImgVwWindow::UpdateSystemTheme()
+{
+    const auto light_theme = IsSystemLightTheme();
+    if (systemlighttheme_ == light_theme)
+    {
+        return;
+    }
+
+    systemlighttheme_ = light_theme;
+    if (loaderstatsoverlayvisible_)
+    {
+        RefreshLoaderStatsOverlay();
+    }
+    InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 void ImgVwWindow::HandleWindowPosChanged()
@@ -1179,7 +1224,8 @@ void ImgVwWindow::RefreshLoaderStatsOverlay()
     InvalidateRect(hwnd_, &invalidaterect, FALSE);
 }
 
-void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item)
+void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item,
+                                  UINT textformat, COLORREF fallbackbackground)
 {
     if (text.empty() || IsRectEmpty(&overlayrect))
     {
@@ -1212,7 +1258,13 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
     }
 
     RECT backgroundrect{0, 0, overlaywidth, overlayheight};
-    FillRect(memorydc, &backgroundrect, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    const auto colors = GetOverlayColors(systemlighttheme_);
+    const auto fallback_background = CreateSolidBrush(fallbackbackground);
+    if (fallback_background != nullptr)
+    {
+        FillRect(memorydc, &backgroundrect, fallback_background);
+        DeleteObject(fallback_background);
+    }
 
     if (item != nullptr && item->status() == ImgItem::Status::Ready)
     {
@@ -1244,7 +1296,12 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
     if (paneldc != nullptr && panelbitmap != nullptr)
     {
         const auto previouspanelbitmap = SelectObject(paneldc, panelbitmap);
-        FillRect(paneldc, &backgroundrect, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+        const auto panel_brush = CreateSolidBrush(colors.panel);
+        if (panel_brush != nullptr)
+        {
+            FillRect(paneldc, &backgroundrect, panel_brush);
+            DeleteObject(panel_brush);
+        }
 
         BLENDFUNCTION blend{};
         blend.BlendOp = AC_SRC_OVER;
@@ -1263,7 +1320,7 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
         DeleteDC(paneldc);
     }
 
-    const auto borderpen = CreatePen(PS_SOLID, 1, RGB(90, 90, 90));
+    const auto borderpen = CreatePen(PS_SOLID, 1, colors.border);
     if (borderpen != nullptr)
     {
         const auto previouspen = SelectObject(memorydc, borderpen);
@@ -1275,7 +1332,7 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
     }
 
     SetBkMode(memorydc, TRANSPARENT);
-    SetTextColor(memorydc, RGB(180, 180, 180));
+    SetTextColor(memorydc, colors.text);
     const auto horizontalpadding = ScaleForWindowDpi(8);
     const auto verticalpadding = ScaleForWindowDpi(6);
     RECT textrect{horizontalpadding, verticalpadding, overlaywidth - horizontalpadding,
@@ -1284,12 +1341,12 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
     if (overlayfont != nullptr)
     {
         const auto previousfont = SelectObject(memorydc, overlayfont);
-        DrawText(memorydc, text.c_str(), -1, &textrect, DT_LEFT | DT_NOPREFIX);
+        DrawText(memorydc, text.c_str(), -1, &textrect, textformat);
         SelectObject(memorydc, previousfont);
     }
     else
     {
-        DrawText(memorydc, text.c_str(), -1, &textrect, DT_LEFT | DT_NOPREFIX);
+        DrawText(memorydc, text.c_str(), -1, &textrect, textformat);
     }
 
     BitBlt(dc, overlayrect.left, overlayrect.top, overlaywidth, overlayheight, memorydc, 0, 0, SRCCOPY);
@@ -1301,6 +1358,24 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
 void ImgVwWindow::DrawLoaderStatsOverlay(HDC dc, const ImgItem* item)
 {
     DrawTextOverlay(dc, loaderstatsoverlayrect_, loaderstatsoverlaytext_, item);
+}
+
+void ImgVwWindow::DrawEmptyStateButton(const DRAWITEMSTRUCT* drawitem)
+{
+    if (drawitem == nullptr || drawitem->CtlType != ODT_BUTTON)
+    {
+        return;
+    }
+
+    wchar_t text[64]{};
+    GetWindowText(drawitem->hwndItem, text, _countof(text));
+    const auto colors = GetOverlayColors(systemlighttheme_);
+    DrawTextOverlay(drawitem->hDC, drawitem->rcItem, text, nullptr,
+                    DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX, colors.background);
+    if ((drawitem->itemState & ODS_FOCUS) != 0)
+    {
+        DrawFocusRect(drawitem->hDC, &drawitem->rcItem);
+    }
 }
 
 void ImgVwWindow::InvalidateScreen()
@@ -2168,6 +2243,10 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_WINDOWPOSCHANGED:
         HandleWindowPosChanged();
         break;
+    case WM_SETTINGCHANGE:
+    case WM_THEMECHANGED:
+        UpdateSystemTheme();
+        return 0;
     case WM_KEYDOWN:
     case WM_KEYUP:
     case WM_SYSKEYDOWN:
@@ -2255,6 +2334,13 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         return FALSE;
+    case WM_DRAWITEM:
+        if (wParam == IDM_OPEN_IMAGE || wParam == IDM_OPEN_FOLDER || wParam == IDM_SEARCH_SUBFOLDERS)
+        {
+            DrawEmptyStateButton(reinterpret_cast<DRAWITEMSTRUCT*>(lParam));
+            return TRUE;
+        }
+        break;
     case WM_CONTEXTMENU:
         HandleContextMenu(lParam);
         return TRUE;
