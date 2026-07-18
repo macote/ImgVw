@@ -1195,7 +1195,9 @@ void ImgVwWindow::UpdateLoaderStatsOverlayVisibility()
 
 std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
 {
+    const auto randomslideshow = slideshowrunning_ && slideshowrandom_;
     const auto stats = browser_.GetStats();
+    std::wstringstream text;
     std::size_t cached{};
     for (const auto& size_stats : stats.sizes)
     {
@@ -1203,7 +1205,6 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
         cached += size_total;
     }
 
-    std::wstringstream text;
     text << L"found: " << stats.found_images << L"; cached: " << cached << L"; queued: " << stats.loader.queued
          << L"; slots: " << stats.loader.free_slots << L"/" << stats.loader.maximum_slots;
     const auto temppath = ImgSettings::GetInstance().temppath();
@@ -1211,6 +1212,15 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
     if (!temppath.empty() && GetDiskFreeSpaceEx(temppath.c_str(), &freebytesavailable, nullptr, nullptr))
     {
         text << L"; free: " << FormatByteSize(freebytesavailable.QuadPart);
+    }
+
+    if (randomslideshow)
+    {
+        text << L"\r\nMode: Random slideshow; cycle: " << stats.random.position << L" / " << stats.random.total;
+        if (stats.random.total > 0)
+        {
+            text << L" (" << FormatPercent(stats.random.position, stats.random.total) << L")";
+        }
     }
 
     text << L"\r\n";

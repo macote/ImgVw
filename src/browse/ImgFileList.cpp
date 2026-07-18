@@ -251,6 +251,16 @@ bool ImgFileList::MoveToRandomExcluding(const std::vector<std::wstring>& exclude
     return true;
 }
 
+ImgFileListRandomProgress ImgFileList::GetRandomProgress() const
+{
+    if (random_index_ == kRandomIndexPark)
+    {
+        return {0, random_order_.size()};
+    }
+
+    return {std::min(random_index_, random_order_.size()), random_order_.size()};
+}
+
 bool ImgFileList::RemoveCurrent()
 {
     if (current_ == files_.end())

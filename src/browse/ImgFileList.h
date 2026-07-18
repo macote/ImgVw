@@ -11,6 +11,12 @@ struct ImgFileListPathLess
     bool operator()(const std::wstring& left, const std::wstring& right) const;
 };
 
+struct ImgFileListRandomProgress
+{
+    std::size_t position{};
+    std::size_t total{};
+};
+
 class ImgFileList final
 {
   public:
@@ -32,6 +38,7 @@ class ImgFileList final
     void BeginRandomCycle();
     bool MoveToRandom();
     bool MoveToRandomExcluding(const std::vector<std::wstring>& excluded);
+    ImgFileListRandomProgress GetRandomProgress() const;
     bool RemoveCurrent();
     std::vector<std::wstring> PathsFromCurrent() const;
 

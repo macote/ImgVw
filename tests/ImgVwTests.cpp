@@ -277,6 +277,27 @@ void TestRandomNavigationInsertsNewFilesIntoCurrentCycle()
     Check(remaining == expected, "new files are randomly inserted without repeating the active cycle");
 }
 
+void TestRandomNavigationReportsCycleProgress()
+{
+    ImgFileList files(7);
+    files.Add(L"a.jpg");
+    files.Add(L"b.jpg");
+    files.Add(L"c.jpg");
+    Check(files.MoveTo(L"a.jpg"), "select current file before random progress test");
+    files.BeginRandomCycle();
+
+    auto progress = files.GetRandomProgress();
+    Check(progress.position == 1 && progress.total == 3, "random cycle counts the displayed file as consumed");
+
+    Check(files.MoveToRandom(), "advance random cycle before progress update");
+    progress = files.GetRandomProgress();
+    Check(progress.position == 2 && progress.total == 3, "random cycle progress advances with navigation");
+
+    files.Add(L"d.jpg");
+    progress = files.GetRandomProgress();
+    Check(progress.position == 2 && progress.total == 4, "random cycle progress includes inserted files");
+}
+
 void TestBeginningRandomCycleConsumesCurrentFile()
 {
     ImgFileList files(7);
@@ -788,6 +809,7 @@ int main()
     TestRemoval();
     TestRandomNavigation();
     TestRandomNavigationInsertsNewFilesIntoCurrentCycle();
+    TestRandomNavigationReportsCycleProgress();
     TestBeginningRandomCycleConsumesCurrentFile();
     TestRandomNavigationPreservesCycleAfterRemoval();
     TestRandomNavigationKeepsInsertedFileAfterActiveRemoval();

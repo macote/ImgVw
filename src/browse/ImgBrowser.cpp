@@ -518,6 +518,7 @@ ImgBrowserStats ImgBrowser::GetStats()
     ImgBrowserStats stats;
     EnterCriticalSection(&browsecriticalsection_);
     stats.found_images = files_.Size();
+    stats.random = files_.GetRandomProgress();
     stats.targetwidth = targetwidth_;
     stats.targetheight = targetheight_;
     stats.sizes = cache_.GetSizeStats();

@@ -11,6 +11,7 @@
 struct ImgBrowserStats
 {
     std::size_t found_images{};
+    ImgFileListRandomProgress random;
     INT targetwidth{};
     INT targetheight{};
     ImgLoaderStats loader;
