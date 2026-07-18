@@ -1207,7 +1207,8 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
 
     if (randomslideshow)
     {
-        text << L"\r\nMode: Random slideshow; Cycle: " << stats.random.position << L" / " << stats.random.total;
+        text << L"\r\n--------------------------------------------------------------------------\r\n";
+        text << L"Mode: Random slideshow; Cycle: " << stats.random.position << L" / " << stats.random.total;
         if (stats.random.total > 0)
         {
             text << L" (" << FormatPercent(stats.random.position, stats.random.total) << L")";
