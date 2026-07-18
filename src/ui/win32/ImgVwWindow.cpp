@@ -1322,8 +1322,16 @@ HFONT ImgVwWindow::GetLoaderStatsOverlayFont()
     }
 
     LOGFONT logfont{};
-    logfont.lfHeight = -MulDiv(9, static_cast<INT>(dpi), 72);
+    logfont.lfHeight = -MulDiv(10, static_cast<INT>(dpi), 72);
     logfont.lfWeight = FW_NORMAL;
+    logfont.lfOutPrecision = OUT_TT_PRECIS;
+    logfont.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
+    BOOL fontsmoothing{};
+    UINT fontsmoothingtype{};
+    const auto cleartypeenabled = SystemParametersInfo(SPI_GETFONTSMOOTHING, 0, &fontsmoothing, 0) && fontsmoothing &&
+                                  SystemParametersInfo(SPI_GETFONTSMOOTHINGTYPE, 0, &fontsmoothingtype, 0) &&
+                                  fontsmoothingtype == FE_FONTSMOOTHINGCLEARTYPE;
+    logfont.lfQuality = cleartypeenabled ? CLEARTYPE_NATURAL_QUALITY : ANTIALIASED_QUALITY;
     lstrcpy(logfont.lfFaceName, L"Lucida Console");
 
     loaderstatsoverlayfont_ = CreateFontIndirect(&logfont);
