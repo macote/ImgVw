@@ -9,10 +9,12 @@
 #include "PathPicker.h"
 #include <Windows.h>
 #include <Windowsx.h>
+#include <Gdiplus.h>
 #include <commctrl.h>
 #include <objidl.h>
 #include <shellapi.h>
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -56,6 +58,14 @@ class ImgVwWindow final : public Window
 
   private:
     struct MonitorCreateContext;
+    struct EmptyStateLayout
+    {
+        INT panel_width{};
+        INT panel_height{};
+        INT logo_width{};
+        INT logo_height{};
+        INT buttons_top{};
+    };
     enum class BrowseUiState
     {
         Collecting,
@@ -73,6 +83,8 @@ class ImgVwWindow final : public Window
     std::wstring paintedslidepath_;
     WORD activeparam_{};
     HFONT captionfont_{nullptr};
+    std::unique_ptr<Gdiplus::Image> emptystatelogo_;
+    IStream* emptystatelogostream_{nullptr};
     HCURSOR arrowcursor_{nullptr};
     LARGE_INTEGER qpcfrequency_{};
     BOOL slideshowrunning_{};
@@ -128,10 +140,12 @@ class ImgVwWindow final : public Window
     void SelectPath(const PathPickerResult& result);
     void HandleDroppedFiles(HDROP drop);
     void BrowseEmptyStateSubFolders();
+    void LoadEmptyStateLogo();
     void CreateEmptyStateControls();
     void ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders);
     void HideEmptyState();
     BOOL IsEmptyStateVisible() const;
+    EmptyStateLayout CalculateEmptyStateLayout(const RECT& client_rect) const;
     void UpdateEmptyStateLayout();
     void PaintEmptyState(PAINTSTRUCT* pps);
     BOOL UpdateClientSize(INT width, INT height);
@@ -207,7 +221,8 @@ class ImgVwWindow final : public Window
     RECT CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& text) const;
     void RefreshLoaderStatsOverlay();
     void DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item,
-                         UINT textformat = DT_LEFT | DT_NOPREFIX, COLORREF fallbackbackground = RGB(0, 0, 0));
+                         UINT textformat = DT_LEFT | DT_NOPREFIX, COLORREF fallbackbackground = RGB(0, 0, 0),
+                         BOOL vertically_center_text = FALSE);
     void DrawEmptyStateButton(const DRAWITEMSTRUCT* drawitem);
     void DrawLoaderStatsOverlay(HDC dc, const ImgItem* item);
     void PaintContent(PAINTSTRUCT* pps);

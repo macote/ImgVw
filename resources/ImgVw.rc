@@ -80,6 +80,7 @@ LANGUAGE LANG_ENGLISH,
     //
 
     IDR_DEFAULT_CMYK_ICC RCDATA "color\\CGATS21_CRPC5.icc"
+    IDR_WELCOME_LOGO RCDATA "ImgVwWelcome.png"
 
     /////////////////////////////////////////////////////////////////////////////
     //

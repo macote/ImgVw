@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 
@@ -195,6 +196,7 @@ LRESULT ImgVwWindow::OnCreate()
     {
         captionfont_ = CreateFontIndirect(&nonclientmetrics.lfMessageFont);
     }
+    LoadEmptyStateLogo();
 
     QueryPerformanceFrequency(&qpcfrequency_);
     arrowcursor_ = LoadCursor(nullptr, IDC_ARROW);
@@ -446,6 +448,57 @@ void ImgVwWindow::BrowseEmptyStateSubFolders()
     }
 }
 
+void ImgVwWindow::LoadEmptyStateLogo()
+{
+    const auto resource = FindResource(hinst_, MAKEINTRESOURCE(IDR_WELCOME_LOGO), RT_RCDATA);
+    if (resource == nullptr)
+    {
+        return;
+    }
+
+    const auto resource_size = SizeofResource(hinst_, resource);
+    const auto resource_handle = LoadResource(hinst_, resource);
+    const auto resource_data = resource_handle == nullptr ? nullptr : LockResource(resource_handle);
+    if (resource_size == 0 || resource_data == nullptr)
+    {
+        return;
+    }
+
+    const auto image_memory = GlobalAlloc(GMEM_MOVEABLE, resource_size);
+    if (image_memory == nullptr)
+    {
+        return;
+    }
+
+    const auto image_data = GlobalLock(image_memory);
+    if (image_data == nullptr)
+    {
+        GlobalFree(image_memory);
+        return;
+    }
+
+    std::memcpy(image_data, resource_data, resource_size);
+    GlobalUnlock(image_memory);
+
+    IStream* image_stream{};
+    if (FAILED(CreateStreamOnHGlobal(image_memory, TRUE, &image_stream)))
+    {
+        GlobalFree(image_memory);
+        return;
+    }
+
+    auto image = std::make_unique<Gdiplus::Image>(image_stream, FALSE);
+    if (image->GetLastStatus() != Gdiplus::Ok || image->GetWidth() == 0 || image->GetHeight() == 0)
+    {
+        image.reset();
+        image_stream->Release();
+        return;
+    }
+
+    emptystatelogostream_ = image_stream;
+    emptystatelogo_ = std::move(image);
+}
+
 void ImgVwWindow::CreateEmptyStateControls()
 {
     if (owner_ != nullptr || openimagebutton_ != nullptr)
@@ -550,6 +603,31 @@ void ImgVwWindow::HideEmptyState()
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
+ImgVwWindow::EmptyStateLayout ImgVwWindow::CalculateEmptyStateLayout(const RECT& client_rect) const
+{
+    EmptyStateLayout layout;
+    const auto available_width = std::max(0, static_cast<INT>(client_rect.right) - ScaleForWindowDpi(48));
+    layout.panel_width = std::min(available_width, ScaleForWindowDpi(460));
+    layout.panel_height = ScaleForWindowDpi(browseuistate_ == BrowseUiState::NoImages ? 132 : 96);
+
+    if (emptystatelogo_ != nullptr && emptystatelogo_->GetWidth() > 0 && emptystatelogo_->GetHeight() > 0)
+    {
+        layout.logo_width = layout.panel_width * 4 / 5;
+        layout.logo_height = MulDiv(layout.logo_width, static_cast<INT>(emptystatelogo_->GetHeight()),
+                                    static_cast<INT>(emptystatelogo_->GetWidth()));
+    }
+
+    const auto logo_gap = layout.logo_height > 0 ? ScaleForWindowDpi(12) : 0;
+    const auto panel_button_gap = ScaleForWindowDpi(20);
+    const auto button_height = ScaleForWindowDpi(28);
+    const auto button_row_gap = ScaleForWindowDpi(12);
+    const auto content_height =
+        layout.logo_height + logo_gap + layout.panel_height + panel_button_gap + button_height * 2 + button_row_gap;
+    const auto content_top = std::max(0, (static_cast<INT>(client_rect.bottom) - content_height) / 2);
+    layout.buttons_top = content_top + layout.logo_height + logo_gap + layout.panel_height + panel_button_gap;
+    return layout;
+}
+
 void ImgVwWindow::UpdateEmptyStateLayout()
 {
     if (owner_ != nullptr || openimagebutton_ == nullptr || openfolderbutton_ == nullptr)
@@ -563,12 +641,13 @@ void ImgVwWindow::UpdateEmptyStateLayout()
         return;
     }
 
+    const auto layout = CalculateEmptyStateLayout(client_rect);
     const auto button_width = ScaleForWindowDpi(150);
     const auto button_height = ScaleForWindowDpi(28);
     const auto gap = ScaleForWindowDpi(12);
     const auto buttons_width = button_width * 2 + gap;
     const auto left = (client_rect.right - buttons_width) / 2;
-    const auto top = client_rect.bottom / 2 + ScaleForWindowDpi(55);
+    const auto top = layout.buttons_top;
     MoveWindow(openimagebutton_, left, top, button_width, button_height, TRUE);
     MoveWindow(openfolderbutton_, left + button_width + gap, top, button_width, button_height, TRUE);
     const auto secondary_top = top + button_height + gap;
@@ -611,17 +690,34 @@ void ImgVwWindow::PaintEmptyState(PAINTSTRUCT* pps)
         DeleteObject(background);
     }
 
-    const auto available_width = static_cast<INT>(client_rect.right) - ScaleForWindowDpi(48);
-    const auto panel_width = std::min(available_width, ScaleForWindowDpi(460));
-    const auto panel_height = ScaleForWindowDpi(132);
+    const auto layout = CalculateEmptyStateLayout(client_rect);
+    const auto panel_width = layout.panel_width;
+    const auto panel_height = layout.panel_height;
     const auto panel_left = (client_rect.right - panel_width) / 2;
-    const auto panel_top = client_rect.bottom / 2 - ScaleForWindowDpi(118);
+    const auto panel_top = layout.buttons_top - ScaleForWindowDpi(20) - panel_height;
     const RECT panel_rect{panel_left, panel_top, panel_left + panel_width, panel_top + panel_height};
 
-    const auto title = browseuistate_ == BrowseUiState::NoImages ? L"No supported images were found" : L"ImgVw";
-    const auto text =
-        std::wstring(title) + L"\r\n\r\n" + emptystatemessage_ + L"\r\n\r\nYou can also drag an image or folder here.";
-    DrawTextOverlay(pps->hdc, panel_rect, text, nullptr, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX, colors.background);
+    const auto text = emptystatemessage_ + L"\r\n\r\nYou can also drag an image or folder here.";
+    DrawTextOverlay(pps->hdc, panel_rect, text, nullptr, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX, colors.background,
+                    TRUE);
+
+    if (emptystatelogo_ != nullptr && layout.logo_width > 0 && layout.logo_height > 0)
+    {
+        const auto logo_left = (client_rect.right - layout.logo_width) / 2;
+        const auto logo_top = panel_top - layout.logo_height - ScaleForWindowDpi(12);
+        Gdiplus::Graphics graphics(pps->hdc);
+        graphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+        graphics.SetCompositingQuality(Gdiplus::CompositingQualityHighQuality);
+        graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+        graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+        graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+        Gdiplus::ImageAttributes image_attributes;
+        image_attributes.SetWrapMode(Gdiplus::WrapModeTileFlipXY);
+        const Gdiplus::Rect destination(logo_left, logo_top, layout.logo_width, layout.logo_height);
+        graphics.DrawImage(emptystatelogo_.get(), destination, 0, 0, emptystatelogo_->GetWidth(),
+                           emptystatelogo_->GetHeight(), Gdiplus::UnitPixel, &image_attributes);
+    }
 }
 
 BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
@@ -1267,7 +1363,7 @@ void ImgVwWindow::RefreshLoaderStatsOverlay()
 }
 
 void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item,
-                                  UINT textformat, COLORREF fallbackbackground)
+                                  UINT textformat, COLORREF fallbackbackground, BOOL vertically_center_text)
 {
     if (text.empty() || IsRectEmpty(&overlayrect))
     {
@@ -1380,15 +1476,24 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
     RECT textrect{horizontalpadding, verticalpadding, overlaywidth - horizontalpadding,
                   overlayheight - verticalpadding};
     const auto overlayfont = GetLoaderStatsOverlayFont();
+    const auto previousfont = overlayfont == nullptr ? nullptr : SelectObject(memorydc, overlayfont);
+    if (vertically_center_text)
+    {
+        RECT measured_text{0, 0, textrect.right - textrect.left, 0};
+        DrawText(memorydc, text.c_str(), -1, &measured_text, textformat | DT_CALCRECT);
+        const auto available_height = textrect.bottom - textrect.top;
+        const auto text_height = measured_text.bottom - measured_text.top;
+        if (text_height < available_height)
+        {
+            textrect.top += (available_height - text_height) / 2;
+            textrect.bottom = textrect.top + text_height;
+        }
+    }
+
+    DrawText(memorydc, text.c_str(), -1, &textrect, textformat);
     if (overlayfont != nullptr)
     {
-        const auto previousfont = SelectObject(memorydc, overlayfont);
-        DrawText(memorydc, text.c_str(), -1, &textrect, textformat);
         SelectObject(memorydc, previousfont);
-    }
-    else
-    {
-        DrawText(memorydc, text.c_str(), -1, &textrect, textformat);
     }
 
     BitBlt(dc, overlayrect.left, overlayrect.top, overlaywidth, overlayheight, memorydc, 0, 0, SRCCOPY);
@@ -2270,6 +2375,12 @@ void ImgVwWindow::OnNCDestroy()
     browser_.StopBrowsing();
     DeleteObject(backgroundbrush_);
     DeleteObject(captionfont_);
+    emptystatelogo_.reset();
+    if (emptystatelogostream_ != nullptr)
+    {
+        emptystatelogostream_->Release();
+        emptystatelogostream_ = nullptr;
+    }
     DeleteObject(loaderstatsoverlayfont_);
     if (owner_ != nullptr)
     {
