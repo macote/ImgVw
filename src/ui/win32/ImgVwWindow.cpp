@@ -1044,60 +1044,19 @@ bool ImgVwWindow::DisplayLoadingProgress(HDC dc, const RECT& paintrect, const Im
 std::wstring ImgVwWindow::BuildItemInfoOverlayText(const ImgItem* item, const std::wstring& filepath) const
 {
     std::wstringstream text;
+    if (item == nullptr || item->status() != ImgItem::Status::Ready)
+    {
+        auto percent = 0;
+        if (item != nullptr && item->status() == ImgItem::Status::Loading)
+        {
+            percent = std::max(item->loadingprogresspercent(), 0);
+        }
+
+        text << L"[" << percent << L"%] ";
+    }
     text << filepath;
-    const auto status = BuildItemStatusText(item);
-    if (!status.empty())
-    {
-        text << L"\r\n" << status;
-    }
 
     return text.str();
-}
-
-std::wstring ImgVwWindow::BuildItemStatusText(const ImgItem* item) const
-{
-    if (item == nullptr)
-    {
-        return L"Status: Unknown";
-    }
-
-    std::wstringstream text;
-    text << L"Status: ";
-    switch (item->status())
-    {
-    case ImgItem::Status::Queued:
-        text << L"Queued";
-        break;
-    case ImgItem::Status::Loading:
-        text << L"Loading";
-        break;
-    case ImgItem::Status::Ready:
-        text << L"Ready";
-        break;
-    case ImgItem::Status::Error:
-        text << L"Error";
-        break;
-    }
-
-    const auto percent = GetDisplayProgressPercent(item);
-    if (percent >= 0 && (item->status() == ImgItem::Status::Queued || item->status() == ImgItem::Status::Loading))
-    {
-        text << L" (" << percent << L"%)";
-    }
-
-    return text.str();
-}
-
-INT ImgVwWindow::GetDisplayProgressPercent(const ImgItem* item) const
-{
-    auto percent = item == nullptr ? -1 : item->loadingprogresspercent();
-    if (percent < 0 && item != nullptr && item->status() != ImgItem::Status::Ready &&
-        item->status() != ImgItem::Status::Error && item->supportsloadingprogress())
-    {
-        percent = 0;
-    }
-
-    return percent;
 }
 
 BOOL ImgVwWindow::IsLoadingProgressOverlayVisible(const ImgItem* item) const

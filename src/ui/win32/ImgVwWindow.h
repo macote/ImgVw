@@ -206,8 +206,6 @@ class ImgVwWindow final : public Window
     bool DisplayFileInformation(HDC dc, const RECT& paintrect, const ImgItem* item, const std::wstring& filepath);
     bool DisplayLoadingProgress(HDC dc, const RECT& paintrect, const ImgItem* item, const std::wstring& filepath);
     std::wstring BuildItemInfoOverlayText(const ImgItem* item, const std::wstring& filepath) const;
-    std::wstring BuildItemStatusText(const ImgItem* item) const;
-    INT GetDisplayProgressPercent(const ImgItem* item) const;
     BOOL IsLoadingProgressOverlayVisible(const ImgItem* item) const;
     void UpdateLoadingProgressOverlayTimer();
     BOOL IsLoaderStatsOverlayKeyDown() const;
