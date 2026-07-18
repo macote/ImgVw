@@ -52,6 +52,7 @@ class ImgVwWindow final : public Window
         return kClassName;
     }
     static ImgVwWindow* Create(HINSTANCE hInst, const std::vector<std::wstring>& args);
+    BOOL TranslateEmptyStateDialogMessage(MSG* message) const;
 
   private:
     struct MonitorCreateContext;
@@ -91,6 +92,7 @@ class ImgVwWindow final : public Window
     HWND openimagebutton_{nullptr};
     HWND openfolderbutton_{nullptr};
     HWND searchsubfoldersbutton_{nullptr};
+    HWND exitbutton_{nullptr};
     HMONITOR currentmonitor_{nullptr};
     BOOL draggingwindow_{FALSE};
     POINT dragstartpoint_{};
@@ -122,6 +124,7 @@ class ImgVwWindow final : public Window
     BOOL OpenPath(const std::wstring& path);
     void OpenImage();
     void OpenFolder();
+    void RestoreEmptyStateButtonFocus(HWND button);
     void SelectPath(const PathPickerResult& result);
     void HandleDroppedFiles(HDROP drop);
     void BrowseEmptyStateSubFolders();

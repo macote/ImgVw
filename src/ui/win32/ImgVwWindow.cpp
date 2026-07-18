@@ -346,6 +346,7 @@ void ImgVwWindow::OpenImage()
     }
 
     SelectPath(path_picker_.SelectImage(hwnd_));
+    RestoreEmptyStateButtonFocus(openimagebutton_);
 
     if (restore_viewer_input && !IsEmptyStateVisible())
     {
@@ -367,11 +368,27 @@ void ImgVwWindow::OpenFolder()
     }
 
     SelectPath(path_picker_.SelectFolder(hwnd_));
+    RestoreEmptyStateButtonFocus(openfolderbutton_);
 
     if (restore_viewer_input && !IsEmptyStateVisible())
     {
         SetCapture(hwnd_);
         ShowCursor(FALSE);
+    }
+}
+
+void ImgVwWindow::RestoreEmptyStateButtonFocus(HWND button)
+{
+    if (!IsEmptyStateVisible() || button == nullptr || !IsWindowVisible(button))
+    {
+        return;
+    }
+
+    SetFocus(button);
+    if (GetFocus() == button)
+    {
+        InvalidateRect(button, nullptr, FALSE);
+        UpdateWindow(button);
     }
 }
 
@@ -437,15 +454,17 @@ void ImgVwWindow::CreateEmptyStateControls()
     }
 
     const auto button_style = WS_CHILD | WS_TABSTOP | BS_OWNERDRAW;
-    openimagebutton_ = CreateWindow(L"BUTTON", L"Open image...", button_style, 0, 0, 0, 0, hwnd_,
+    openimagebutton_ = CreateWindow(L"BUTTON", L"Open &image...", button_style, 0, 0, 0, 0, hwnd_,
                                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_OPEN_IMAGE)), hinst_, nullptr);
-    openfolderbutton_ = CreateWindow(L"BUTTON", L"Open folder...", button_style, 0, 0, 0, 0, hwnd_,
+    openfolderbutton_ = CreateWindow(L"BUTTON", L"Open &folder...", button_style, 0, 0, 0, 0, hwnd_,
                                      reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_OPEN_FOLDER)), hinst_, nullptr);
     searchsubfoldersbutton_ =
-        CreateWindow(L"BUTTON", L"Search subfolders", button_style, 0, 0, 0, 0, hwnd_,
+        CreateWindow(L"BUTTON", L"&Search subfolders", button_style, 0, 0, 0, 0, hwnd_,
                      reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_SEARCH_SUBFOLDERS)), hinst_, nullptr);
+    exitbutton_ = CreateWindow(L"BUTTON", L"E&xit", button_style, 0, 0, 0, 0, hwnd_,
+                               reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_EXIT)), hinst_, nullptr);
 
-    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_})
+    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_, exitbutton_})
     {
         if (button != nullptr && captionfont_ != nullptr)
         {
@@ -492,11 +511,17 @@ void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_s
     {
         ShowWindow(searchsubfoldersbutton_, show_search_subfolders ? SW_SHOW : SW_HIDE);
     }
+    if (exitbutton_ != nullptr)
+    {
+        ShowWindow(exitbutton_, SW_SHOW);
+    }
 
     UpdateEmptyStateLayout();
-    if (openimagebutton_ != nullptr)
+    const auto focusbutton =
+        show_search_subfolders && searchsubfoldersbutton_ != nullptr ? searchsubfoldersbutton_ : openimagebutton_;
+    if (focusbutton != nullptr)
     {
-        SetFocus(openimagebutton_);
+        SetFocus(focusbutton);
     }
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
@@ -509,7 +534,7 @@ void ImgVwWindow::HideEmptyState()
     }
 
     browseuistate_ = BrowseUiState::Collecting;
-    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_})
+    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_, exitbutton_})
     {
         if (button != nullptr)
         {
@@ -546,11 +571,28 @@ void ImgVwWindow::UpdateEmptyStateLayout()
     const auto top = client_rect.bottom / 2 + ScaleForWindowDpi(55);
     MoveWindow(openimagebutton_, left, top, button_width, button_height, TRUE);
     MoveWindow(openfolderbutton_, left + button_width + gap, top, button_width, button_height, TRUE);
+    const auto secondary_top = top + button_height + gap;
     if (searchsubfoldersbutton_ != nullptr)
     {
-        MoveWindow(searchsubfoldersbutton_, (client_rect.right - button_width) / 2, top + button_height + gap,
-                   button_width, button_height, TRUE);
+        const auto search_visible = IsWindowVisible(searchsubfoldersbutton_);
+        const auto search_left = search_visible ? left : (client_rect.right - button_width) / 2;
+        MoveWindow(searchsubfoldersbutton_, search_left, secondary_top, button_width, button_height, TRUE);
+        if (exitbutton_ != nullptr)
+        {
+            const auto exit_left = search_visible ? left + button_width + gap : (client_rect.right - button_width) / 2;
+            MoveWindow(exitbutton_, exit_left, secondary_top, button_width, button_height, TRUE);
+        }
     }
+    else if (exitbutton_ != nullptr)
+    {
+        MoveWindow(exitbutton_, (client_rect.right - button_width) / 2, secondary_top, button_width, button_height,
+                   TRUE);
+    }
+}
+
+BOOL ImgVwWindow::TranslateEmptyStateDialogMessage(MSG* message) const
+{
+    return message != nullptr && IsEmptyStateVisible() && IsDialogMessage(hwnd_, message);
 }
 
 void ImgVwWindow::PaintEmptyState(PAINTSTRUCT* pps)
@@ -1370,11 +1412,26 @@ void ImgVwWindow::DrawEmptyStateButton(const DRAWITEMSTRUCT* drawitem)
     wchar_t text[64]{};
     GetWindowText(drawitem->hwndItem, text, _countof(text));
     const auto colors = GetOverlayColors(systemlighttheme_);
-    DrawTextOverlay(drawitem->hDC, drawitem->rcItem, text, nullptr,
-                    DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX, colors.background);
+    auto text_format = DT_CENTER | DT_SINGLELINE | DT_VCENTER;
+    if ((drawitem->itemState & ODS_NOACCEL) != 0)
+    {
+        text_format |= DT_HIDEPREFIX;
+    }
+    DrawTextOverlay(drawitem->hDC, drawitem->rcItem, text, nullptr, text_format, colors.background);
     if ((drawitem->itemState & ODS_FOCUS) != 0)
     {
-        DrawFocusRect(drawitem->hDC, &drawitem->rcItem);
+        const auto focus_brush = CreateSolidBrush(RGB(123, 104, 238));
+        if (focus_brush != nullptr)
+        {
+            auto focus_rect = drawitem->rcItem;
+            const auto focus_width = std::max(2, ScaleForWindowDpi(3));
+            for (INT inset = 0; inset < focus_width && !IsRectEmpty(&focus_rect); ++inset)
+            {
+                FrameRect(drawitem->hDC, &focus_rect, focus_brush);
+                InflateRect(&focus_rect, -1, -1);
+            }
+            DeleteObject(focus_brush);
+        }
     }
 }
 
@@ -2277,7 +2334,17 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, reinterpret_cast<DLGPROC>(AboutDialogProc));
             break;
         case IDR_ENTER:
-            PerformAction();
+            if (IsEmptyStateVisible())
+            {
+                const auto focused_window = GetFocus();
+                const auto focused_button = focused_window == openimagebutton_ || focused_window == openfolderbutton_ ||
+                                            focused_window == searchsubfoldersbutton_ || focused_window == exitbutton_;
+                SendMessage(focused_button ? focused_window : openimagebutton_, BM_CLICK, 0, 0);
+            }
+            else
+            {
+                PerformAction();
+            }
             break;
         case IDR_NEXT:
             BrowseNext();
@@ -2335,7 +2402,8 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         return FALSE;
     case WM_DRAWITEM:
-        if (wParam == IDM_OPEN_IMAGE || wParam == IDM_OPEN_FOLDER || wParam == IDM_SEARCH_SUBFOLDERS)
+        if (wParam == IDM_OPEN_IMAGE || wParam == IDM_OPEN_FOLDER || wParam == IDM_SEARCH_SUBFOLDERS ||
+            wParam == IDM_EXIT)
         {
             DrawEmptyStateButton(reinterpret_cast<DRAWITEMSTRUCT*>(lParam));
             return TRUE;
