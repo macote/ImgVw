@@ -1663,6 +1663,10 @@ void ImgVwWindow::ToggleSlideShow(BOOL slideshowrandom)
     StopMultiMonitorSlideShow();
     StopSlideShow();
     slideshowrandom_ = slideshowrandom;
+    if (slideshowrandom_)
+    {
+        browser_.BeginRandomCycle();
+    }
     StartSlideShow();
 }
 
@@ -1703,6 +1707,10 @@ void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
     DestroySlideShowWindows();
 
     slideshowrandom_ = slideshowrandom;
+    if (slideshowrandom_)
+    {
+        browser_.BeginRandomCycle();
+    }
     slideshowrunning_ = TRUE;
     multimonitorslideshowrunning_ = TRUE;
     multimonitorslideshowindex_ = 0;
@@ -1973,31 +1981,26 @@ BOOL ImgVwWindow::AdvanceSharedRandomSlide(ImgVwWindow* target)
         return FALSE;
     }
 
-    std::wstring filepath;
-    BOOL foundpath = FALSE;
-    const auto maxattempts = MultiMonitorSlideShowWindowCount() * 4 + 8;
-    for (std::size_t attempt = 0; attempt < maxattempts; ++attempt)
+    std::vector<std::wstring> visiblepaths;
+    if (!displayslidepath_.empty())
     {
-        if (!browser_.MoveToRandom())
+        visiblepaths.push_back(displayslidepath_);
+    }
+    for (const auto window : slideshowwindows_)
+    {
+        if (window != nullptr && !window->displayslidepath_.empty())
         {
-            RestoreSharedOwnerDisplayCursor();
-            return FALSE;
-        }
-
-        filepath = browser_.GetCurrentFilePath();
-        if (!filepath.empty() && !IsSlidePathVisible(filepath))
-        {
-            foundpath = TRUE;
-            break;
+            visiblepaths.push_back(window->displayslidepath_);
         }
     }
 
-    if (!foundpath)
+    if (!browser_.MoveToRandomExcluding(visiblepaths))
     {
         RestoreSharedOwnerDisplayCursor();
         return FALSE;
     }
 
+    const auto filepath = browser_.GetCurrentFilePath();
     if (target == this)
     {
         target->DisplayCurrentSlideWithoutTimer();
@@ -2016,29 +2019,6 @@ void ImgVwWindow::RestoreSharedOwnerDisplayCursor()
     {
         browser_.MoveToItem(displayslidepath_);
     }
-}
-
-BOOL ImgVwWindow::IsSlidePathVisible(const std::wstring& filepath)
-{
-    if (filepath.empty())
-    {
-        return FALSE;
-    }
-
-    if (displayslidepath_ == filepath)
-    {
-        return TRUE;
-    }
-
-    for (const auto window : slideshowwindows_)
-    {
-        if (window != nullptr && window->displayslidepath_ == filepath)
-        {
-            return TRUE;
-        }
-    }
-
-    return FALSE;
 }
 
 BOOL ImgVwWindow::DisplaySlidePath(const std::wstring& filepath)

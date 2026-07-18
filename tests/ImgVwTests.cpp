@@ -254,6 +254,110 @@ void TestRandomNavigation()
     Check(files.CurrentPath() != last, "random cycles do not repeat the boundary item");
 }
 
+void TestRandomNavigationInsertsNewFilesIntoCurrentCycle()
+{
+    ImgFileList files(7);
+    files.Add(L"a.jpg");
+    files.Add(L"b.jpg");
+    files.Add(L"c.jpg");
+    Check(files.MoveTo(L"a.jpg"), "select current file before random insertion test");
+    files.BeginRandomCycle();
+    files.Add(L"d.jpg");
+    files.Add(L"e.jpg");
+
+    const std::set<std::wstring> expected = {L"b.jpg", L"c.jpg", L"d.jpg", L"e.jpg"};
+    std::set<std::wstring> remaining;
+    for (std::size_t index = 0; index < expected.size(); ++index)
+    {
+        Check(files.MoveToRandom(), "new file is available in the current random cycle");
+        Check(files.CurrentPath() != L"a.jpg", "random insertion does not reset consumed paths");
+        remaining.insert(files.CurrentPath());
+    }
+
+    Check(remaining == expected, "new files are randomly inserted without repeating the active cycle");
+}
+
+void TestBeginningRandomCycleConsumesCurrentFile()
+{
+    ImgFileList files(7);
+    files.Add(L"a.jpg");
+    files.Add(L"b.jpg");
+    files.Add(L"c.jpg");
+    Check(files.MoveTo(L"b.jpg"), "select current file before beginning random cycle");
+
+    files.BeginRandomCycle();
+
+    std::set<std::wstring> remaining;
+    for (std::size_t index = 1; index < files.Size(); ++index)
+    {
+        Check(files.MoveToRandom(), "fresh random cycle advances past current file");
+        Check(files.CurrentPath() != L"b.jpg", "fresh random cycle does not redisplay current file");
+        remaining.insert(files.CurrentPath());
+    }
+
+    const std::set<std::wstring> expected = {L"a.jpg", L"c.jpg"};
+    Check(remaining == expected, "fresh random cycle retains every other file");
+}
+
+void TestRandomNavigationPreservesCycleAfterRemoval()
+{
+    ImgFileList files(7);
+    files.Add(L"a.jpg");
+    files.Add(L"b.jpg");
+    files.Add(L"c.jpg");
+    files.Add(L"d.jpg");
+    Check(files.MoveTo(L"a.jpg"), "select current file before removal test");
+    files.BeginRandomCycle();
+
+    Check(files.MoveToRandom(), "random cycle advances before removal");
+    const auto removed = files.CurrentPath();
+    Check(files.RemoveCurrent(), "remove consumed random item");
+
+    std::set<std::wstring> remaining;
+    for (std::size_t index = 0; index < 2; ++index)
+    {
+        Check(files.MoveToRandom(), "random cycle continues after removal");
+        Check(files.CurrentPath() != L"a.jpg", "consumed current item is not reshuffled after removal");
+        Check(files.CurrentPath() != removed, "removed item does not reappear");
+        remaining.insert(files.CurrentPath());
+    }
+
+    Check(remaining.size() == 2, "remaining random cycle does not repeat an item after removal");
+}
+
+void TestRandomNavigationKeepsInsertedFileAfterActiveRemoval()
+{
+    ImgFileList files(7);
+    files.Add(L"a.jpg");
+    files.BeginRandomCycle();
+    files.Add(L"b.jpg");
+
+    Check(files.RemoveCurrent(), "remove the only active random-cycle item");
+    Check(files.MoveToRandom(), "inserted item continues the active random cycle");
+    Check(files.CurrentPath() == L"b.jpg", "inserted item remains available after consumed cycle becomes empty");
+}
+
+void TestRandomNavigationDoesNotConsumeExcludedFiles()
+{
+    ImgFileList files(7);
+    files.Add(L"a.jpg");
+    files.Add(L"b.jpg");
+    files.Add(L"c.jpg");
+    files.Add(L"d.jpg");
+    Check(files.MoveTo(L"a.jpg"), "select current file before exclusion test");
+    files.BeginRandomCycle();
+
+    Check(files.MoveToRandomExcluding({L"b.jpg", L"c.jpg"}), "random navigation finds the only eligible file");
+    Check(files.CurrentPath() == L"d.jpg", "random navigation skips excluded files");
+    Check(!files.MoveToRandomExcluding({L"b.jpg", L"c.jpg", L"d.jpg"}),
+          "random navigation holds when no file is eligible");
+
+    Check(files.MoveToRandomExcluding({L"c.jpg", L"d.jpg"}), "previously excluded file remains eligible");
+    Check(files.CurrentPath() == L"b.jpg", "rejected random candidate was not consumed");
+    Check(files.MoveToRandomExcluding({L"b.jpg", L"d.jpg"}), "last excluded file remains eligible");
+    Check(files.CurrentPath() == L"c.jpg", "all unconsumed candidates remain available");
+}
+
 void TestClear()
 {
     ImgFileList files(1);
@@ -683,6 +787,11 @@ int main()
     TestPathsFromCurrent();
     TestRemoval();
     TestRandomNavigation();
+    TestRandomNavigationInsertsNewFilesIntoCurrentCycle();
+    TestBeginningRandomCycleConsumesCurrentFile();
+    TestRandomNavigationPreservesCycleAfterRemoval();
+    TestRandomNavigationKeepsInsertedFileAfterActiveRemoval();
+    TestRandomNavigationDoesNotConsumeExcludedFiles();
     TestClear();
     TestImgCacheKeyUsesViewport();
     TestLoaderShutdown();

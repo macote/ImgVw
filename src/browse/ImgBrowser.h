@@ -55,7 +55,9 @@ class ImgBrowser final
     BOOL MoveToLast();
     BOOL MoveToItem(const std::wstring& filepath);
     BOOL MoveToOrAddItem(const std::wstring& filepath);
+    void BeginRandomCycle();
     BOOL MoveToRandom();
+    BOOL MoveToRandomExcluding(const std::vector<std::wstring>& excluded);
     void RemoveCurrentItem();
     void ReloadCurrentItem();
     BOOL PreloadTargetSize(INT targetwidth, INT targetheight);

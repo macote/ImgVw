@@ -29,7 +29,9 @@ class ImgFileList final
     bool MoveToFirst();
     bool MoveToLast();
     bool MoveTo(const std::wstring& filepath);
+    void BeginRandomCycle();
     bool MoveToRandom();
+    bool MoveToRandomExcluding(const std::vector<std::wstring>& excluded);
     bool RemoveCurrent();
     std::vector<std::wstring> PathsFromCurrent() const;
 

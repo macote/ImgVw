@@ -591,10 +591,25 @@ BOOL ImgBrowser::MoveToOrAddItem(const std::wstring& filepath)
     return moveSuccess;
 }
 
+void ImgBrowser::BeginRandomCycle()
+{
+    EnterCriticalSection(&browsecriticalsection_);
+    files_.BeginRandomCycle();
+    LeaveCriticalSection(&browsecriticalsection_);
+}
+
 BOOL ImgBrowser::MoveToRandom()
 {
     EnterCriticalSection(&browsecriticalsection_);
     const auto moveSuccess = files_.MoveToRandom();
+    LeaveCriticalSection(&browsecriticalsection_);
+    return moveSuccess;
+}
+
+BOOL ImgBrowser::MoveToRandomExcluding(const std::vector<std::wstring>& excluded)
+{
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto moveSuccess = files_.MoveToRandomExcluding(excluded);
     LeaveCriticalSection(&browsecriticalsection_);
     return moveSuccess;
 }

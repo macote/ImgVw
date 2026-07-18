@@ -192,7 +192,6 @@ class ImgVwWindow final : public Window
     BOOL AdvanceSharedSequentialSlide(ImgVwWindow* target);
     BOOL AdvanceSharedRandomSlide(ImgVwWindow* target);
     void RestoreSharedOwnerDisplayCursor();
-    BOOL IsSlidePathVisible(const std::wstring& filepath);
     BOOL DisplaySlidePath(const std::wstring& filepath);
     void DisplayCurrentSlideWhenReady();
     void DisplayCurrentSlideWithoutTimer();

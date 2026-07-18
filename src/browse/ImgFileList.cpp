@@ -84,7 +84,16 @@ bool ImgFileList::Add(const std::wstring& filepath)
         return false;
     }
 
-    random_order_.push_back(filepath);
+    if (random_index_ == kRandomIndexPark)
+    {
+        random_order_.push_back(filepath);
+    }
+    else
+    {
+        random_order_.push_back(filepath);
+        std::uniform_int_distribution<std::size_t> insertion(random_index_, random_order_.size() - 1);
+        std::iter_swap(random_order_.begin() + insertion(random_engine_), std::prev(random_order_.end()));
+    }
     if (current_ == files_.end() || !current_pinned_)
     {
         current_ = files_.begin();
@@ -169,7 +178,34 @@ bool ImgFileList::MoveTo(const std::wstring& filepath)
     return true;
 }
 
+void ImgFileList::BeginRandomCycle()
+{
+    std::shuffle(random_order_.begin(), random_order_.end(), random_engine_);
+
+    if (current_ == files_.end())
+    {
+        random_index_ = random_order_.empty() ? kRandomIndexPark : 0;
+        return;
+    }
+
+    const auto currentpath = *current_;
+    const auto match = std::find(random_order_.begin(), random_order_.end(), currentpath);
+    if (match != random_order_.end())
+    {
+        std::iter_swap(random_order_.begin(), match);
+        random_index_ = 1;
+        return;
+    }
+
+    random_index_ = random_order_.empty() ? kRandomIndexPark : 0;
+}
+
 bool ImgFileList::MoveToRandom()
+{
+    return MoveToRandomExcluding({});
+}
+
+bool ImgFileList::MoveToRandomExcluding(const std::vector<std::wstring>& excluded)
 {
     if (files_.empty())
     {
@@ -179,19 +215,31 @@ bool ImgFileList::MoveToRandom()
     if (random_index_ >= random_order_.size())
     {
         std::wstring last;
-        if (random_index_ != kRandomIndexPark)
+        if (random_index_ != kRandomIndexPark && !random_order_.empty())
         {
             last = random_order_.back();
         }
 
-        do
+        std::shuffle(random_order_.begin(), random_order_.end(), random_engine_);
+        if (random_order_.size() > 1 && last == random_order_.front())
         {
-            std::shuffle(random_order_.begin(), random_order_.end(), random_engine_);
-        } while (random_order_.size() > 1 && last == random_order_.front());
+            std::uniform_int_distribution<std::size_t> replacement(1, random_order_.size() - 1);
+            std::iter_swap(random_order_.begin(), random_order_.begin() + replacement(random_engine_));
+        }
 
         random_index_ = 0;
     }
 
+    const auto next = std::find_if(random_order_.begin() + random_index_, random_order_.end(),
+                                   [&excluded](const std::wstring& filepath) {
+                                       return std::find(excluded.begin(), excluded.end(), filepath) == excluded.end();
+                                   });
+    if (next == random_order_.end())
+    {
+        return false;
+    }
+
+    std::iter_swap(random_order_.begin() + random_index_, next);
     current_ = files_.find(random_order_[random_index_]);
     ++random_index_;
     if (current_ == files_.end())
@@ -212,8 +260,16 @@ bool ImgFileList::RemoveCurrent()
 
     const auto removed = *current_;
     current_ = files_.erase(current_);
-    random_order_.erase(std::remove(random_order_.begin(), random_order_.end(), removed), random_order_.end());
-    random_index_ = kRandomIndexPark;
+    const auto randommatch = std::find(random_order_.begin(), random_order_.end(), removed);
+    if (randommatch != random_order_.end())
+    {
+        const auto removedindex = static_cast<std::size_t>(std::distance(random_order_.begin(), randommatch));
+        random_order_.erase(randommatch);
+        if (random_index_ != kRandomIndexPark && removedindex < random_index_)
+        {
+            --random_index_;
+        }
+    }
     if (files_.empty())
     {
         current_pinned_ = false;
