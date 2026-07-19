@@ -1217,19 +1217,69 @@ void ImgVwWindow::ClearInfoOverlay()
 
 std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
 {
-    const auto statssource = owner_ == nullptr ? this : owner_;
-    const auto randomslideshow = statssource->slideshowrunning_ && statssource->slideshowrandom_;
-    const auto stats = statssource->browser_.GetStats();
-    std::wstringstream text;
-    std::size_t cached{};
-    for (const auto& size_stats : stats.sizes)
+    const auto slideshowowner = owner_ == nullptr ? this : owner_;
+    const auto randomslideshow = slideshowowner->slideshowrunning_ && slideshowowner->slideshowrandom_;
+    const auto sharedstats = slideshowowner->browser_.GetStats();
+
+    struct TargetSizeStats
     {
-        const auto size_total = size_stats.queued + size_stats.loading + size_stats.ready + size_stats.error;
-        cached += size_total;
+        ImgCacheSizeStats size;
+        ImgLoaderStats loader;
+    };
+
+    std::vector<TargetSizeStats> targetstats;
+    const auto addtargets = [&targetstats](ImgVwWindow* window) {
+        if (window == nullptr)
+        {
+            return;
+        }
+
+        const auto stats = window->browser_.GetStats();
+        const auto duplicate =
+            std::find_if(targetstats.begin(), targetstats.end(), [&stats](const TargetSizeStats& target) {
+                return target.size.targetwidth == stats.targetwidth && target.size.targetheight == stats.targetheight;
+            });
+        if (duplicate != targetstats.end())
+        {
+            return;
+        }
+
+        TargetSizeStats target{{}, stats.loader};
+        target.size.targetwidth = stats.targetwidth;
+        target.size.targetheight = stats.targetheight;
+        const auto size = std::find_if(stats.sizes.begin(), stats.sizes.end(), [&stats](const ImgCacheSizeStats& item) {
+            return item.targetwidth == stats.targetwidth && item.targetheight == stats.targetheight;
+        });
+        if (size != stats.sizes.end())
+        {
+            target.size = *size;
+        }
+        targetstats.push_back(target);
+    };
+
+    addtargets(slideshowowner);
+    for (const auto window : slideshowowner->slideshowwindows_)
+    {
+        addtargets(window);
     }
 
-    text << L"Found: " << stats.found_images << L"; Cached: " << cached << L"; Queued: " << stats.loader.queued
-         << L"; Slots: " << stats.loader.free_slots << L"/" << stats.loader.maximum_slots;
+    std::wstringstream text;
+    std::size_t cached{};
+    std::size_t queued{};
+    std::size_t freeslots{};
+    std::size_t maximumslots{};
+    for (const auto& target : targetstats)
+    {
+        const auto& size_stats = target.size;
+        const auto size_total = size_stats.queued + size_stats.loading + size_stats.ready + size_stats.error;
+        cached += size_total;
+        queued += target.loader.queued;
+        freeslots += target.loader.free_slots;
+        maximumslots += target.loader.maximum_slots;
+    }
+
+    text << L"Found: " << sharedstats.found_images << L"; Cached: " << cached << L"; Queued: " << queued << L"; Slots: "
+         << freeslots << L"/" << maximumslots;
     const auto temppath = ImgSettings::GetInstance().temppath();
     ULARGE_INTEGER freebytesavailable{};
     if (!temppath.empty() && GetDiskFreeSpaceEx(temppath.c_str(), &freebytesavailable, nullptr, nullptr))
@@ -1240,10 +1290,10 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
     if (randomslideshow)
     {
         text << L"\r\n--------------------------------------------------------------------------\r\n";
-        text << L"Mode: Random slideshow; Cycle: " << stats.random.position << L" / " << stats.random.total;
-        if (stats.random.total > 0)
+        text << L"Mode: Random slideshow; Cycle: " << sharedstats.random.position << L" / " << sharedstats.random.total;
+        if (sharedstats.random.total > 0)
         {
-            text << L" (" << FormatPercent(stats.random.position, stats.random.total) << L")";
+            text << L" (" << FormatPercent(sharedstats.random.position, sharedstats.random.total) << L")";
         }
     }
 
@@ -1254,8 +1304,9 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
          << std::setw(10) << L"Used" << std::setw(3) << L"" << L"\r\n";
     text << L"--------------------------------------------------------------------------\r\n";
 
-    for (const auto& size_stats : stats.sizes)
+    for (const auto& target : targetstats)
     {
+        const auto& size_stats = target.size;
         const auto size_total = size_stats.queued + size_stats.loading + size_stats.ready + size_stats.error;
         std::wstringstream size;
         size << size_stats.targetwidth << L"x" << size_stats.targetheight;
