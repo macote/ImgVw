@@ -41,6 +41,9 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
   - `make arch=x64 config=release`
 - The Makefile defines `WINVER=0x0501` and `_WIN32_WINNT=0x0501`; do not introduce newer Win32 APIs without guards or
   compatible fallbacks.
+- Prefer incremental builds and tests for routine verification. Use clean builds only when necessary, such as after
+  build-system, configuration, toolchain, or dependency changes; when investigating stale outputs; or for release
+  validation. The `-Clean` commands above are examples, not the default for every change.
 - When possible, verify changes with at least one local build path. If a toolchain is unavailable, state that clearly.
 - Do not assume MSYS2 is installed at `C:\msys64`; use the repository scripts' discovery logic or call the scripts
   directly.
@@ -95,6 +98,7 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
   ownership, async loading, navigation safety, and tests.
 - Before staging or committing, inspect staged and unstaged changes separately. Preserve user-made staged changes unless
   the user explicitly asks to replace them.
+- Use the repository's existing plain, imperative commit-message style; do not use Conventional Commit prefixes.
 - For history rewrites, tag moves, force pushes, or replacing GitHub releases, create a backup ref first when practical,
   then verify the final tree/refs before pushing.
 - When cleaning local branches, only delete branches that are merged or explicitly identified as disposable backup
