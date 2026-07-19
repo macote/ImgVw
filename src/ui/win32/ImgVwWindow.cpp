@@ -349,6 +349,11 @@ BOOL ImgVwWindow::OpenPath(const std::wstring& path)
 
 void ImgVwWindow::OpenImage()
 {
+    if (IsSearchingSubfolders())
+    {
+        return;
+    }
+
     const auto restore_viewer_input = !IsEmptyStateVisible();
     if (restore_viewer_input)
     {
@@ -371,6 +376,11 @@ void ImgVwWindow::OpenImage()
 
 void ImgVwWindow::OpenFolder()
 {
+    if (IsSearchingSubfolders())
+    {
+        return;
+    }
+
     const auto restore_viewer_input = !IsEmptyStateVisible();
     if (restore_viewer_input)
     {
@@ -431,6 +441,12 @@ void ImgVwWindow::SelectPath(const PathPickerResult& result)
 
 void ImgVwWindow::HandleDroppedFiles(HDROP drop)
 {
+    if (IsSearchingSubfolders())
+    {
+        DragFinish(drop);
+        return;
+    }
+
     const auto count = DragQueryFile(drop, 0xFFFFFFFF, nullptr, 0);
     if (count != 1)
     {
@@ -456,7 +472,7 @@ void ImgVwWindow::BrowseEmptyStateSubFolders()
     if (browser_.BrowseSubFoldersAsync())
     {
         browsesubfolders_ = TRUE;
-        ShowEmptyState(L"Searching subfolders for supported images...", FALSE);
+        ShowSearchingSubfoldersState();
     }
 }
 
@@ -540,7 +556,13 @@ void ImgVwWindow::CreateEmptyStateControls()
 
 BOOL ImgVwWindow::IsEmptyStateVisible() const
 {
-    return browseuistate_ == BrowseUiState::Empty || browseuistate_ == BrowseUiState::NoImages;
+    return browseuistate_ == BrowseUiState::Empty || browseuistate_ == BrowseUiState::NoImages ||
+           browseuistate_ == BrowseUiState::SearchingSubfolders;
+}
+
+BOOL ImgVwWindow::IsSearchingSubfolders() const
+{
+    return browseuistate_ == BrowseUiState::SearchingSubfolders;
 }
 
 void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders)
@@ -591,6 +613,30 @@ void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_s
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
+void ImgVwWindow::ShowSearchingSubfoldersState()
+{
+    browseuistate_ = BrowseUiState::SearchingSubfolders;
+    emptystatemessage_ = L"Searching subfolders for supported images...";
+    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_})
+    {
+        if (button != nullptr)
+        {
+            ShowWindow(button, SW_HIDE);
+        }
+    }
+    if (exitbutton_ != nullptr)
+    {
+        ShowWindow(exitbutton_, SW_SHOW);
+    }
+
+    UpdateEmptyStateLayout();
+    if (exitbutton_ != nullptr)
+    {
+        SetFocus(exitbutton_);
+    }
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void ImgVwWindow::HideEmptyState()
 {
     if (!IsEmptyStateVisible())
@@ -633,8 +679,9 @@ ImgVwWindow::EmptyStateLayout ImgVwWindow::CalculateEmptyStateLayout(const RECT&
     const auto panel_button_gap = ScaleForWindowDpi(20);
     const auto button_height = ScaleForWindowDpi(28);
     const auto button_row_gap = ScaleForWindowDpi(12);
-    const auto content_height =
-        layout.logo_height + logo_gap + layout.panel_height + panel_button_gap + button_height * 2 + button_row_gap;
+    const auto button_rows = IsSearchingSubfolders() ? 1 : 2;
+    const auto content_height = layout.logo_height + logo_gap + layout.panel_height + panel_button_gap +
+                                button_height * button_rows + button_row_gap * (button_rows - 1);
     const auto content_top = std::max(0, (static_cast<INT>(client_rect.bottom) - content_height) / 2);
     layout.buttons_top = content_top + layout.logo_height + logo_gap + layout.panel_height + panel_button_gap;
     return layout;
@@ -660,6 +707,15 @@ void ImgVwWindow::UpdateEmptyStateLayout()
     const auto buttons_width = button_width * 2 + gap;
     const auto left = (client_rect.right - buttons_width) / 2;
     const auto top = layout.buttons_top;
+    if (IsSearchingSubfolders())
+    {
+        if (exitbutton_ != nullptr)
+        {
+            MoveWindow(exitbutton_, (client_rect.right - button_width) / 2, top, button_width, button_height, TRUE);
+        }
+        return;
+    }
+
     MoveWindow(openimagebutton_, left, top, button_width, button_height, TRUE);
     MoveWindow(openfolderbutton_, left + button_width + gap, top, button_width, button_height, TRUE);
     const auto secondary_top = top + button_height + gap;
@@ -709,7 +765,9 @@ void ImgVwWindow::PaintEmptyState(PAINTSTRUCT* pps)
     const auto panel_top = layout.buttons_top - ScaleForWindowDpi(20) - panel_height;
     const RECT panel_rect{panel_left, panel_top, panel_left + panel_width, panel_top + panel_height};
 
-    const auto text = emptystatemessage_ + L"\r\n\r\nYou can also drag an image or folder here.";
+    const auto text = IsSearchingSubfolders()
+                          ? emptystatemessage_
+                          : emptystatemessage_ + L"\r\n\r\nYou can also drag an image or folder here.";
     DrawTextOverlay(pps->hdc, panel_rect, text, nullptr, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX, colors.background,
                     TRUE);
 

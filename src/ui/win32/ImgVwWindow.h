@@ -72,6 +72,7 @@ class ImgVwWindow final : public Window
         Viewing,
         Empty,
         NoImages,
+        SearchingSubfolders,
     };
 
     ImgBrowser browser_;
@@ -144,8 +145,10 @@ class ImgVwWindow final : public Window
     void LoadEmptyStateLogo();
     void CreateEmptyStateControls();
     void ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders);
+    void ShowSearchingSubfoldersState();
     void HideEmptyState();
     BOOL IsEmptyStateVisible() const;
+    BOOL IsSearchingSubfolders() const;
     EmptyStateLayout CalculateEmptyStateLayout(const RECT& client_rect) const;
     void UpdateEmptyStateLayout();
     void PaintEmptyState(PAINTSTRUCT* pps);
