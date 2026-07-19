@@ -178,6 +178,27 @@ bool ImgFileList::MoveTo(const std::wstring& filepath)
     return true;
 }
 
+ImgFileListProgress ImgFileList::GetSequentialProgress() const
+{
+    if (current_ == files_.end())
+    {
+        return {0, files_.size()};
+    }
+
+    return {static_cast<std::size_t>(std::distance(files_.begin(), current_)) + 1, files_.size()};
+}
+
+ImgFileListProgress ImgFileList::GetSequentialProgress(const std::wstring& filepath) const
+{
+    const auto match = files_.find(filepath);
+    if (match == files_.end())
+    {
+        return {0, files_.size()};
+    }
+
+    return {static_cast<std::size_t>(std::distance(files_.begin(), match)) + 1, files_.size()};
+}
+
 void ImgFileList::BeginRandomCycle()
 {
     std::shuffle(random_order_.begin(), random_order_.end(), random_engine_);
@@ -251,7 +272,7 @@ bool ImgFileList::MoveToRandomExcluding(const std::vector<std::wstring>& exclude
     return true;
 }
 
-ImgFileListRandomProgress ImgFileList::GetRandomProgress() const
+ImgFileListProgress ImgFileList::GetRandomProgress() const
 {
     if (random_index_ == kRandomIndexPark)
     {

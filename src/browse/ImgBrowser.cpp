@@ -3,6 +3,27 @@
 
 #include <Shlwapi.h>
 #include <algorithm>
+#include <utility>
+
+void ImgBrowser::ShareLoadContext(const std::shared_ptr<ImgBrowserLoadContext>& context)
+{
+    if (context == nullptr || loadcontext_ == context)
+    {
+        return;
+    }
+
+    EnterCriticalSection(&browsecriticalsection_);
+    if (notificationhwnd_ != nullptr)
+    {
+        loadcontext_->loader->RemoveNotificationWindow(notificationhwnd_);
+    }
+    loadcontext_ = context;
+    if (notificationhwnd_ != nullptr && notificationmessage_ != 0)
+    {
+        loadcontext_->loader->SetNotificationWindow(notificationhwnd_, notificationmessage_);
+    }
+    LeaveCriticalSection(&browsecriticalsection_);
+}
 
 void ImgBrowser::CollectFile(const std::wstring& filepath, ImgItem::Format imgformat)
 {
@@ -64,7 +85,7 @@ ImgItem::Format ImgBrowser::ResolveFileFormat(const std::wstring& filepath)
     return ImageFormatResolver::Resolve(filepath);
 }
 
-BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight)
+BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight, BOOL clearloadcontext)
 {
     WIN32_FIND_DATA findfiledata{};
     HANDLE findfilehandle{};
@@ -94,12 +115,16 @@ BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
         return FALSE;
     }
 
+    if (clearloadcontext)
+    {
+        loadcontext_->Clear();
+    }
+
     Reset();
 
     targetwidth_ = targetwidth;
     targetheight_ = targetheight;
-    AddTargetSize(targetwidth_, targetheight_);
-    loader_.PrioritizeTargetSize(targetwidth_, targetheight_);
+    loadcontext_->loader->PrioritizeTargetSize(targetwidth_, targetheight_);
 
     if (!(findfiledata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && !forcedfolder)
     {
@@ -141,17 +166,24 @@ BOOL ImgBrowser::UpdateTargetSize(INT targetwidth, INT targetheight)
 
     EnterCriticalSection(&browsecriticalsection_);
     const auto changed = targetwidth_ != targetwidth || targetheight_ != targetheight;
+    const auto previouswidth = targetwidth_;
+    const auto previousheight = targetheight_;
+    BOOL keep_previous_target = FALSE;
     if (changed)
     {
         targetwidth_ = targetwidth;
         targetheight_ = targetheight;
-        AddTargetSize(targetwidth_, targetheight_);
+        keep_previous_target = IsTargetSizeActiveLocked(previouswidth, previousheight);
     }
 
     LeaveCriticalSection(&browsecriticalsection_);
     if (changed)
     {
-        loader_.PrioritizeTargetSize(targetwidth, targetheight);
+        if (!keep_previous_target)
+        {
+            loadcontext_->loader->DiscardQueuedItemsForTargetSize(previouswidth, previousheight);
+        }
+        loadcontext_->loader->PrioritizeTargetSize(targetwidth, targetheight);
         QueueTargetSizeAsync(targetwidth, targetheight, TRUE);
     }
 
@@ -242,7 +274,12 @@ void ImgBrowser::StopBrowsing()
 {
     StopCollecting();
     StopTargetQueueing();
-    loader_.StopLoading();
+    if (notificationhwnd_ != nullptr)
+    {
+        loadcontext_->loader->RemoveNotificationWindow(notificationhwnd_);
+        notificationhwnd_ = nullptr;
+        notificationmessage_ = 0;
+    }
 }
 
 BOOL ImgBrowser::StopTargetQueueing()
@@ -291,37 +328,40 @@ BOOL ImgBrowser::StopTargetQueueing()
 
 void ImgBrowser::SetNotificationWindow(HWND hwnd, UINT message)
 {
+    if (notificationhwnd_ != nullptr && notificationhwnd_ != hwnd)
+    {
+        loadcontext_->loader->RemoveNotificationWindow(notificationhwnd_);
+    }
     notificationhwnd_ = hwnd;
     notificationmessage_ = message;
-    loader_.SetNotificationWindow(hwnd, message);
+    loadcontext_->loader->SetNotificationWindow(hwnd, message);
 }
 
 void ImgBrowser::Reset()
 {
     files_.Clear();
-    cache_.Clear();
     folderpath_.clear();
     folders_.clear();
     recursive_ = FALSE;
-    target_sizes_.clear();
+    preload_target_sizes_.clear();
 }
 
-BOOL ImgBrowser::AddTargetSize(INT targetwidth, INT targetheight)
+BOOL ImgBrowser::AddPreloadTargetSize(INT targetwidth, INT targetheight)
 {
-    const auto match = std::find_if(target_sizes_.begin(), target_sizes_.end(),
+    const auto match = std::find_if(preload_target_sizes_.begin(), preload_target_sizes_.end(),
                                     [targetwidth, targetheight](const TargetSize& target_size) {
                                         return target_size.width == targetwidth && target_size.height == targetheight;
                                     });
-    if (match != target_sizes_.end())
+    if (match != preload_target_sizes_.end())
     {
         return FALSE;
     }
 
-    target_sizes_.push_back({targetwidth, targetheight});
+    preload_target_sizes_.push_back({targetwidth, targetheight});
     return TRUE;
 }
 
-BOOL ImgBrowser::AddTargetSizes(const std::vector<SIZE>& target_sizes, std::vector<TargetSize>* added_sizes)
+BOOL ImgBrowser::AddPreloadTargetSizes(const std::vector<SIZE>& target_sizes, std::vector<TargetSize>* added_sizes)
 {
     BOOL added = FALSE;
     for (const auto& target_size : target_sizes)
@@ -331,7 +371,7 @@ BOOL ImgBrowser::AddTargetSizes(const std::vector<SIZE>& target_sizes, std::vect
             continue;
         }
 
-        if (AddTargetSize(target_size.cx, target_size.cy))
+        if (AddPreloadTargetSize(target_size.cx, target_size.cy))
         {
             added = TRUE;
             if (added_sizes != nullptr)
@@ -342,6 +382,19 @@ BOOL ImgBrowser::AddTargetSizes(const std::vector<SIZE>& target_sizes, std::vect
     }
 
     return added;
+}
+
+BOOL ImgBrowser::IsTargetSizeActiveLocked(INT targetwidth, INT targetheight) const
+{
+    if (targetwidth_ == targetwidth && targetheight_ == targetheight)
+    {
+        return TRUE;
+    }
+
+    return std::find_if(preload_target_sizes_.begin(), preload_target_sizes_.end(),
+                        [targetwidth, targetheight](const TargetSize& target_size) {
+                            return target_size.width == targetwidth && target_size.height == targetheight;
+                        }) != preload_target_sizes_.end();
 }
 
 void ImgBrowser::QueueTargetSizes(const std::vector<TargetSize>& target_sizes, BOOL loadnext)
@@ -372,11 +425,14 @@ void ImgBrowser::QueueTargetSizes(const std::vector<TargetSize>& target_sizes, B
             }
 
             EnterCriticalSection(&browsecriticalsection_);
-            const auto imgitem = GetOrCreateCachedItem(filepath, target_size.width, target_size.height, imgformat);
+            const auto active = IsTargetSizeActiveLocked(target_size.width, target_size.height);
+            const auto imgitem = active
+                                     ? GetOrCreateCachedItem(filepath, target_size.width, target_size.height, imgformat)
+                                     : std::shared_ptr<ImgItem>();
             LeaveCriticalSection(&browsecriticalsection_);
             if (imgitem != nullptr)
             {
-                loader_.QueueItem(imgitem, next);
+                loadcontext_->loader->QueueItem(imgitem, next);
                 next = FALSE;
             }
         }
@@ -403,15 +459,64 @@ void ImgBrowser::QueueTargetSizesAsync(const std::vector<TargetSize>& target_siz
     targetqueuethreads_.push_back(thread);
 }
 
+void ImgBrowser::QueuePathsAsync(std::vector<std::wstring> paths, INT targetwidth, INT targetheight)
+{
+    CleanupTargetQueueThreads();
+
+    const auto request = new PathQueueRequest{this, std::move(paths), targetwidth, targetheight};
+    const auto thread = CreateThread(nullptr, 0, StaticThreadQueuePaths, request, 0, nullptr);
+    if (thread == nullptr)
+    {
+        delete request;
+        return;
+    }
+
+    targetqueuethreads_.push_back(thread);
+}
+
+void ImgBrowser::QueuePaths(const std::vector<std::wstring>& paths, INT targetwidth, INT targetheight)
+{
+    for (const auto& filepath : paths)
+    {
+        if (cancellationflag_)
+        {
+            break;
+        }
+
+        const auto imgformat = ResolveFileFormat(filepath);
+        EnterCriticalSection(&browsecriticalsection_);
+        const auto active = IsTargetSizeActiveLocked(targetwidth, targetheight);
+        const auto imgitem = active ? GetOrCreateCachedItem(filepath, targetwidth, targetheight, imgformat)
+                                    : std::shared_ptr<ImgItem>();
+        LeaveCriticalSection(&browsecriticalsection_);
+        if (imgitem != nullptr)
+        {
+            loadcontext_->loader->QueueItem(imgitem, FALSE);
+        }
+    }
+}
+
 void ImgBrowser::QueueFileForTargetSizes(const std::wstring& filepath, ImgItem::Format imgformat, BOOL loadnext)
 {
     BOOL next = loadnext;
-    for (const auto& target_size : target_sizes_)
+    const auto currentitem = GetOrCreateCachedItem(filepath, targetwidth_, targetheight_, imgformat);
+    if (currentitem != nullptr)
     {
+        loadcontext_->loader->QueueItem(currentitem, next);
+        next = FALSE;
+    }
+
+    for (const auto& target_size : preload_target_sizes_)
+    {
+        if (target_size.width == targetwidth_ && target_size.height == targetheight_)
+        {
+            continue;
+        }
+
         const auto imgitem = GetOrCreateCachedItem(filepath, target_size.width, target_size.height, imgformat);
         if (imgitem != nullptr)
         {
-            loader_.QueueItem(imgitem, next);
+            loadcontext_->loader->QueueItem(imgitem, next);
             next = FALSE;
         }
     }
@@ -455,7 +560,7 @@ std::shared_ptr<ImgItem> ImgBrowser::GetCurrentItem()
     {
         if (imgitem->status() == ImgItem::Status::Queued)
         {
-            loader_.QueueItem(imgitem, TRUE);
+            loadcontext_->loader->QueueItem(imgitem, TRUE);
         }
 
         return imgitem;
@@ -477,7 +582,7 @@ void ImgBrowser::ReloadCurrentItem()
             imgitem->Unload();
         }
 
-        loader_.QueueItem(imgitem, TRUE);
+        loadcontext_->loader->QueueItem(imgitem, TRUE);
     }
 }
 
@@ -489,7 +594,7 @@ BOOL ImgBrowser::PreloadTargetSize(INT targetwidth, INT targetheight)
     }
 
     EnterCriticalSection(&browsecriticalsection_);
-    const auto added = AddTargetSize(targetwidth, targetheight);
+    const auto added = AddPreloadTargetSize(targetwidth, targetheight);
     LeaveCriticalSection(&browsecriticalsection_);
     if (added)
     {
@@ -503,7 +608,7 @@ BOOL ImgBrowser::PreloadTargetSizes(const std::vector<SIZE>& target_sizes)
 {
     std::vector<TargetSize> added_sizes;
     EnterCriticalSection(&browsecriticalsection_);
-    const auto added = AddTargetSizes(target_sizes, &added_sizes);
+    const auto added = AddPreloadTargetSizes(target_sizes, &added_sizes);
     LeaveCriticalSection(&browsecriticalsection_);
     if (added)
     {
@@ -518,14 +623,23 @@ ImgBrowserStats ImgBrowser::GetStats()
     ImgBrowserStats stats;
     EnterCriticalSection(&browsecriticalsection_);
     stats.found_images = files_.Size();
+    stats.sequential = files_.GetSequentialProgress();
     stats.random = files_.GetRandomProgress();
     stats.targetwidth = targetwidth_;
     stats.targetheight = targetheight_;
-    stats.sizes = cache_.GetSizeStats();
+    stats.sizes = loadcontext_->cache->GetSizeStats();
     LeaveCriticalSection(&browsecriticalsection_);
-    stats.loader = loader_.GetStats();
+    stats.loader = loadcontext_->loader->GetStats();
 
     return stats;
+}
+
+ImgFileListProgress ImgBrowser::GetSequentialProgress(const std::wstring& filepath)
+{
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto progress = files_.GetSequentialProgress(filepath);
+    LeaveCriticalSection(&browsecriticalsection_);
+    return progress;
 }
 
 BOOL ImgBrowser::MoveToNext()
@@ -599,6 +713,25 @@ void ImgBrowser::BeginRandomCycle()
     LeaveCriticalSection(&browsecriticalsection_);
 }
 
+void ImgBrowser::PreloadFrom(ImgBrowser& source)
+{
+    if (this == &source)
+    {
+        return;
+    }
+
+    EnterCriticalSection(&source.browsecriticalsection_);
+    auto paths = source.files_.PathsFromCurrent();
+    LeaveCriticalSection(&source.browsecriticalsection_);
+
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto targetwidth = targetwidth_;
+    const auto targetheight = targetheight_;
+    LeaveCriticalSection(&browsecriticalsection_);
+
+    QueuePathsAsync(std::move(paths), targetwidth, targetheight);
+}
+
 BOOL ImgBrowser::MoveToRandom()
 {
     EnterCriticalSection(&browsecriticalsection_);
@@ -621,7 +754,7 @@ void ImgBrowser::RemoveCurrentItem()
     const auto filepath = files_.CurrentPath();
     if (!filepath.empty())
     {
-        cache_.Remove(filepath);
+        loadcontext_->cache->Remove(filepath);
         files_.RemoveCurrent();
     }
 
@@ -656,10 +789,10 @@ std::shared_ptr<ImgItem> ImgBrowser::GetOrCreateCachedItem(const std::wstring& f
         return {};
     }
 
-    auto imgitem = cache_.Get(filepath, targetwidth, targetheight);
+    auto imgitem = loadcontext_->cache->Get(filepath, targetwidth, targetheight);
     if (imgitem == nullptr)
     {
-        imgitem = cache_.Add(filepath, targetwidth, targetheight, imgformat);
+        imgitem = loadcontext_->cache->Add(filepath, targetwidth, targetheight, imgformat);
     }
 
     return imgitem;
@@ -707,6 +840,18 @@ DWORD WINAPI ImgBrowser::StaticThreadQueueTargetSize(void* targetsizequeuereques
     if (request != nullptr && request->browser != nullptr)
     {
         request->browser->QueueTargetSizes(request->sizes, request->loadnext);
+    }
+
+    delete request;
+    return 0;
+}
+
+DWORD WINAPI ImgBrowser::StaticThreadQueuePaths(void* pathqueuerequest)
+{
+    const auto request = reinterpret_cast<PathQueueRequest*>(pathqueuerequest);
+    if (request != nullptr && request->browser != nullptr)
+    {
+        request->browser->QueuePaths(request->paths, request->targetwidth, request->targetheight);
     }
 
     delete request;

@@ -51,16 +51,25 @@ struct ImgCacheKey
 class ImgCache
 {
   public:
-    ImgCache() {}
+    ImgCache()
+    {
+        if (!InitializeCriticalSectionAndSpinCount(&criticalsection_, 0x00000400))
+        {
+            // TODO: handle error
+        }
+    }
     ~ImgCache()
     {
         Clear();
+        DeleteCriticalSection(&criticalsection_);
     }
     ImgCache(const ImgCache&) = delete;
     ImgCache& operator=(const ImgCache&) = delete;
     void Clear()
     {
+        EnterCriticalSection(&criticalsection_);
         map_.clear();
+        LeaveCriticalSection(&criticalsection_);
     }
     std::shared_ptr<ImgItem> Add(std::wstring filepath, INT targetwidth, INT targetheight, ImgItem::Format imgformat);
     void Remove(std::wstring filepath);
@@ -69,25 +78,31 @@ class ImgCache
 
   private:
     std::map<ImgCacheKey, std::shared_ptr<ImgItem>> map_;
+    mutable CRITICAL_SECTION criticalsection_;
 };
 
 inline std::shared_ptr<ImgItem> ImgCache::Add(std::wstring filepath, INT targetwidth, INT targetheight,
                                               ImgItem::Format imgformat)
 {
+    EnterCriticalSection(&criticalsection_);
     const ImgCacheKey key{filepath, targetwidth, targetheight};
     const auto existing = map_.find(key);
     if (existing != map_.end())
     {
-        return existing->second;
+        const auto imgitem = existing->second;
+        LeaveCriticalSection(&criticalsection_);
+        return imgitem;
     }
 
     const auto imgitem = ImageDispatcher::Create(filepath, targetwidth, targetheight, imgformat);
     map_.emplace(std::make_pair(key, imgitem));
+    LeaveCriticalSection(&criticalsection_);
     return imgitem;
 }
 
 inline void ImgCache::Remove(std::wstring filepath)
 {
+    EnterCriticalSection(&criticalsection_);
     auto item = map_.begin();
     while (item != map_.end())
     {
@@ -100,10 +115,12 @@ inline void ImgCache::Remove(std::wstring filepath)
             ++item;
         }
     }
+    LeaveCriticalSection(&criticalsection_);
 }
 
 inline std::shared_ptr<ImgItem> ImgCache::Get(const std::wstring& filepath, INT targetwidth, INT targetheight) const
 {
+    EnterCriticalSection(&criticalsection_);
     std::shared_ptr<ImgItem> imgitem(nullptr);
     const ImgCacheKey key{filepath, targetwidth, targetheight};
     const auto result = map_.find(key);
@@ -112,11 +129,13 @@ inline std::shared_ptr<ImgItem> ImgCache::Get(const std::wstring& filepath, INT 
         imgitem = (*result).second;
     }
 
+    LeaveCriticalSection(&criticalsection_);
     return imgitem;
 }
 
 inline std::vector<ImgCacheSizeStats> ImgCache::GetSizeStats() const
 {
+    EnterCriticalSection(&criticalsection_);
     std::vector<ImgCacheSizeStats> stats;
     for (const auto& item : map_)
     {
@@ -151,5 +170,6 @@ inline std::vector<ImgCacheSizeStats> ImgCache::GetSizeStats() const
         }
     }
 
+    LeaveCriticalSection(&criticalsection_);
     return stats;
 }

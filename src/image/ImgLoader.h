@@ -19,6 +19,12 @@ struct ImgLoaderStats
     std::size_t maximum_slots{};
 };
 
+struct ImgLoaderNotification
+{
+    HWND hwnd{};
+    UINT message{};
+};
+
 class LoaderItem
 {
   public:
@@ -108,6 +114,9 @@ class ImgLoader
     void QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext = FALSE);
     void PrioritizeTargetSize(INT targetwidth, INT targetheight);
     void SetNotificationWindow(HWND hwnd, UINT message);
+    void RemoveNotificationWindow(HWND hwnd);
+    void DiscardQueuedItems();
+    void DiscardQueuedItemsForTargetSize(INT targetwidth, INT targetheight);
     void StopLoading();
     ImgLoaderStats GetStats();
 
@@ -122,8 +131,7 @@ class ImgLoader
     BOOL preferredtargetsizeset_{FALSE};
     INT preferredtargetwidth_{};
     INT preferredtargetheight_{};
-    HWND notificationhwnd_{nullptr};
-    UINT notificationmessage_{};
+    std::vector<ImgLoaderNotification> notifications_;
     CountingSemaphore loadersemaphore_;
     CRITICAL_SECTION queuecriticalsection_;
 

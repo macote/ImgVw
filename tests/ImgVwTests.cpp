@@ -151,8 +151,14 @@ void TestOrderedNavigation()
     Check(!files.MoveToPrevious(), "cannot move before first");
     Check(files.MoveToNext(), "move next succeeds");
     Check(files.CurrentPath() == L"b.jpg", "next path is selected");
+    auto progress = files.GetSequentialProgress();
+    Check(progress.position == 2 && progress.total == 3, "sequential progress follows sorted navigation");
+    progress = files.GetSequentialProgress(L"c.jpg");
+    Check(progress.position == 3 && progress.total == 3, "sequential progress can follow a shared cursor path");
     Check(files.MoveToLast(), "move to last succeeds");
     Check(files.CurrentPath() == L"c.jpg", "last path is selected");
+    progress = files.GetSequentialProgress();
+    Check(progress.position == 3 && progress.total == 3, "sequential progress reaches the final file");
     Check(!files.MoveToNext(), "cannot move after last");
     Check(files.MoveTo(L"a.jpg"), "move to known path succeeds");
     Check(!files.MoveTo(L"missing.jpg"), "move to unknown path fails");
@@ -415,6 +421,31 @@ void TestLoaderShutdown()
         loader.StopLoading();
         loader.StopLoading();
     }
+}
+
+void TestLoaderDiscardsQueuedItems()
+{
+    ImgLoader loader;
+    loader.StopLoading();
+
+    loader.QueueItem(std::make_shared<ImgGDIItem>(L"queued.png", 800, 600));
+    Check(loader.GetStats().queued == 1, "stopped loader retains queued test item");
+
+    loader.DiscardQueuedItems();
+    Check(loader.GetStats().queued == 0, "discard removes queued loader items");
+}
+
+void TestLoaderDiscardsQueuedItemsForTargetSize()
+{
+    ImgLoader loader;
+    loader.StopLoading();
+
+    loader.QueueItem(std::make_shared<ImgGDIItem>(L"first.png", 800, 600));
+    loader.QueueItem(std::make_shared<ImgGDIItem>(L"second.png", 800, 600));
+    loader.QueueItem(std::make_shared<ImgGDIItem>(L"other.png", 1920, 1080));
+    loader.DiscardQueuedItemsForTargetSize(800, 600);
+
+    Check(loader.GetStats().queued == 1, "target-size discard preserves queue work for other sizes");
 }
 
 void TestImageFormatDetectorSignatures()
@@ -817,6 +848,8 @@ int main()
     TestClear();
     TestImgCacheKeyUsesViewport();
     TestLoaderShutdown();
+    TestLoaderDiscardsQueuedItems();
+    TestLoaderDiscardsQueuedItemsForTargetSize();
     TestImageFormatDetectorSignatures();
     TestImageFormatResolverUsesSupportedExtensionsOnly();
     TestGdiItemPreservesTopRowOrientation();

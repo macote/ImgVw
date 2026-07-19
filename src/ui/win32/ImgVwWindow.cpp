@@ -156,6 +156,18 @@ ImgVwWindow* ImgVwWindow::CreateOnMonitor(HINSTANCE hInst, const std::wstring& p
     auto self = new ImgVwWindow(hInst, path, owner, FALSE);
     if (self != nullptr)
     {
+        const auto loadcontext =
+            owner == nullptr ? std::shared_ptr<ImgBrowserLoadContext>() : owner->FindTargetLoadContext(width, height);
+        if (loadcontext != nullptr)
+        {
+            // Preserve independent navigation while sharing decoded images and loader capacity for this target size.
+            self->browser_.ShareLoadContext(loadcontext);
+        }
+        else if (owner != nullptr)
+        {
+            owner->RememberTargetLoadContext(width, height, self->browser_.loadcontext());
+        }
+
         self->backgroundbrush_ = CreateSolidBrush(RGB(0, 0, 0));
         self->manualcursor_ = TRUE;
         self->dontfillbackground_ = TRUE;
@@ -297,7 +309,7 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
     }
 }
 
-BOOL ImgVwWindow::InitializeBrowser(const std::wstring& path)
+BOOL ImgVwWindow::InitializeBrowser(const std::wstring& path, BOOL clearloadcontext)
 {
     RECT windowrectangle{};
     if (!GetClientRect(hwnd_, &windowrectangle))
@@ -307,7 +319,7 @@ BOOL ImgVwWindow::InitializeBrowser(const std::wstring& path)
 
     browser_.SetNotificationWindow(hwnd_, kBrowserChangedMessage);
     UpdateClientSize(windowrectangle.right, windowrectangle.bottom);
-    if (!browser_.BrowseAsync(path, windowrectangle.right, windowrectangle.bottom))
+    if (!browser_.BrowseAsync(path, windowrectangle.right, windowrectangle.bottom, clearloadcontext))
     {
         return FALSE;
     }
@@ -328,7 +340,8 @@ BOOL ImgVwWindow::OpenPath(const std::wstring& path)
     {
         HideEmptyState();
     }
-    if (!InitializeBrowser(path))
+    StopMultiMonitorSlideShow();
+    if (!InitializeBrowser(path, TRUE))
     {
         if (was_empty)
         {
@@ -341,6 +354,7 @@ BOOL ImgVwWindow::OpenPath(const std::wstring& path)
         return FALSE;
     }
 
+    targetloadcontexts_.clear();
     path_ = path;
     browsesubfolders_ = FALSE;
     InvalidateScreen();
@@ -1276,7 +1290,8 @@ void ImgVwWindow::ClearInfoOverlay()
 std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
 {
     const auto slideshowowner = owner_ == nullptr ? this : owner_;
-    const auto randomslideshow = slideshowowner->slideshowrunning_ && slideshowowner->slideshowrandom_;
+    const auto slideshowrunning = slideshowowner->slideshowrunning_;
+    const auto randomslideshow = slideshowrunning && slideshowowner->slideshowrandom_;
     const auto sharedstats = slideshowowner->browser_.GetStats();
 
     struct TargetSizeStats
@@ -1345,13 +1360,20 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
         text << L"; Free: " << FormatByteSize(freebytesavailable.QuadPart);
     }
 
-    if (randomslideshow)
+    if (slideshowrunning)
     {
-        text << L"\r\n--------------------------------------------------------------------------\r\n";
-        text << L"Mode: Random slideshow; Cycle: " << sharedstats.random.position << L" / " << sharedstats.random.total;
-        if (sharedstats.random.total > 0)
+        auto progress = randomslideshow ? sharedstats.random : sharedstats.sequential;
+        if (!randomslideshow && slideshowowner->multimonitorslideshowrunning_ &&
+            !slideshowowner->multimonitorslideshowcursorpath_.empty())
         {
-            text << L" (" << FormatPercent(sharedstats.random.position, sharedstats.random.total) << L")";
+            progress = slideshowowner->browser_.GetSequentialProgress(slideshowowner->multimonitorslideshowcursorpath_);
+        }
+        text << L"\r\n--------------------------------------------------------------------------\r\n";
+        text << L"Mode: " << (randomslideshow ? L"Random" : L"Sequential") << L" slideshow; Cycle: "
+             << progress.position << L" / " << progress.total;
+        if (progress.total > 0)
+        {
+            text << L" (" << FormatPercent(progress.position, progress.total) << L")";
         }
     }
 
@@ -1915,6 +1937,7 @@ void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
 
     const auto primarymonitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
     currentmonitor_ = primarymonitor;
+    RememberTargetLoadContext(clientwidth_, clientheight_, browser_.loadcontext());
     MonitorCreateContext context{hinst_, path_, primarymonitor, this, slideshowrandom_};
     EnumDisplayMonitors(nullptr, nullptr, CreateSlideShowWindowForMonitor, reinterpret_cast<LPARAM>(&context));
     if (!slideshowwindows_.empty() && GetCapture() == hwnd_)
@@ -1923,16 +1946,20 @@ void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
         ReleaseCapture();
     }
 
-    std::vector<SIZE> preloadtargetsizes;
+    std::vector<std::shared_ptr<ImgBrowserLoadContext>> preloadedcontexts;
     for (const auto window : slideshowwindows_)
     {
         if (window != nullptr)
         {
             window->UpdateInfoOverlayForWindow();
-            preloadtargetsizes.push_back({window->clientwidth_, window->clientheight_});
+            const auto context = window->browser_.loadcontext();
+            if (std::find(preloadedcontexts.begin(), preloadedcontexts.end(), context) == preloadedcontexts.end())
+            {
+                window->browser_.PreloadFrom(browser_);
+                preloadedcontexts.push_back(context);
+            }
         }
     }
-    browser_.PreloadTargetSizes(preloadtargetsizes);
 
     for (std::size_t index = 0; index < MultiMonitorSlideShowWindowCount(); ++index)
     {
@@ -2009,6 +2036,43 @@ ImgVwWindow* ImgVwWindow::MultiMonitorSlideShowWindowAt(std::size_t index)
 std::size_t ImgVwWindow::MultiMonitorSlideShowWindowCount() const
 {
     return 1 + slideshowwindows_.size();
+}
+
+std::shared_ptr<ImgBrowserLoadContext> ImgVwWindow::FindTargetLoadContext(INT width, INT height) const
+{
+    const auto match = std::find_if(targetloadcontexts_.begin(), targetloadcontexts_.end(),
+                                    [width, height](const TargetLoadContext& context) {
+                                        return context.width == width && context.height == height;
+                                    });
+    return match == targetloadcontexts_.end() ? std::shared_ptr<ImgBrowserLoadContext>() : match->context;
+}
+
+void ImgVwWindow::RememberTargetLoadContext(INT width, INT height,
+                                            const std::shared_ptr<ImgBrowserLoadContext>& context)
+{
+    if (context == nullptr || width <= 0 || height <= 0)
+    {
+        return;
+    }
+
+    targetloadcontexts_.erase(std::remove_if(targetloadcontexts_.begin(), targetloadcontexts_.end(),
+                                             [width, height, &context](const TargetLoadContext& item) {
+                                                 return item.context == context &&
+                                                        (item.width != width || item.height != height);
+                                             }),
+                              targetloadcontexts_.end());
+
+    const auto match = std::find_if(
+        targetloadcontexts_.begin(), targetloadcontexts_.end(),
+        [width, height](const TargetLoadContext& item) { return item.width == width && item.height == height; });
+    if (match == targetloadcontexts_.end())
+    {
+        targetloadcontexts_.push_back({width, height, context});
+    }
+    else
+    {
+        match->context = context;
+    }
 }
 
 void ImgVwWindow::DestroySlideShowWindows()

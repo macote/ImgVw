@@ -239,8 +239,65 @@ void ImgLoader::PrioritizeTargetSize(INT targetwidth, INT targetheight)
 
 void ImgLoader::SetNotificationWindow(HWND hwnd, UINT message)
 {
-    notificationhwnd_ = hwnd;
-    notificationmessage_ = message;
+    EnterCriticalSection(&queuecriticalsection_);
+    const auto existing = std::find_if(notifications_.begin(), notifications_.end(),
+                                       [hwnd](const ImgLoaderNotification& item) { return item.hwnd == hwnd; });
+    if (existing != notifications_.end())
+    {
+        existing->message = message;
+    }
+    else if (hwnd != nullptr && message != 0)
+    {
+        notifications_.push_back({hwnd, message});
+    }
+    LeaveCriticalSection(&queuecriticalsection_);
+}
+
+void ImgLoader::RemoveNotificationWindow(HWND hwnd)
+{
+    EnterCriticalSection(&queuecriticalsection_);
+    notifications_.erase(std::remove_if(notifications_.begin(), notifications_.end(),
+                                        [hwnd](const ImgLoaderNotification& item) { return item.hwnd == hwnd; }),
+                         notifications_.end());
+    LeaveCriticalSection(&queuecriticalsection_);
+}
+
+void ImgLoader::DiscardQueuedItems()
+{
+    EnterCriticalSection(&queuecriticalsection_);
+    for (const auto& imgitem : queue_)
+    {
+        pendingitems_.erase(imgitem.get());
+    }
+    queue_.clear();
+    if (queue_.empty())
+    {
+        ResetEvent(workevent_);
+    }
+    LeaveCriticalSection(&queuecriticalsection_);
+}
+
+void ImgLoader::DiscardQueuedItemsForTargetSize(INT targetwidth, INT targetheight)
+{
+    EnterCriticalSection(&queuecriticalsection_);
+    auto item = queue_.begin();
+    while (item != queue_.end())
+    {
+        if ((*item)->targetwidth() == targetwidth && (*item)->targetheight() == targetheight)
+        {
+            pendingitems_.erase(item->get());
+            item = queue_.erase(item);
+        }
+        else
+        {
+            ++item;
+        }
+    }
+    if (queue_.empty())
+    {
+        ResetEvent(workevent_);
+    }
+    LeaveCriticalSection(&queuecriticalsection_);
 }
 
 ImgLoaderStats ImgLoader::GetStats()
@@ -298,10 +355,15 @@ void ImgLoader::CompleteItem(const std::shared_ptr<ImgItem>& imgitem, BOOL notif
 
 void ImgLoader::NotifyLoadComplete()
 {
-    if (notificationhwnd_ != nullptr && notificationmessage_ != 0)
+    EnterCriticalSection(&queuecriticalsection_);
+    for (const auto& notification : notifications_)
     {
-        PostMessage(notificationhwnd_, notificationmessage_, 0, 0);
+        if (notification.hwnd != nullptr && notification.message != 0)
+        {
+            PostMessage(notification.hwnd, notification.message, 0, 0);
+        }
     }
+    LeaveCriticalSection(&queuecriticalsection_);
 }
 
 DWORD WINAPI ImgLoader::StaticThreadLoop(void* imgloaderinstance)

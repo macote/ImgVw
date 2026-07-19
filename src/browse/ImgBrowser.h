@@ -11,17 +11,30 @@
 struct ImgBrowserStats
 {
     std::size_t found_images{};
-    ImgFileListRandomProgress random;
+    ImgFileListProgress sequential;
+    ImgFileListProgress random;
     INT targetwidth{};
     INT targetheight{};
     ImgLoaderStats loader;
     std::vector<ImgCacheSizeStats> sizes;
 };
 
+struct ImgBrowserLoadContext
+{
+    std::shared_ptr<ImgCache> cache{std::make_shared<ImgCache>()};
+    std::shared_ptr<ImgLoader> loader{std::make_shared<ImgLoader>()};
+
+    void Clear()
+    {
+        loader->DiscardQueuedItems();
+        cache->Clear();
+    }
+};
+
 class ImgBrowser final
 {
   public:
-    ImgBrowser()
+    ImgBrowser() : loadcontext_(std::make_shared<ImgBrowserLoadContext>())
     {
         readyevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
         if (!InitializeCriticalSectionAndSpinCount(&browsecriticalsection_, 0x00000400))
@@ -31,8 +44,7 @@ class ImgBrowser final
     }
     ~ImgBrowser()
     {
-        StopCollecting();
-        StopTargetQueueing();
+        StopBrowsing();
         DeleteCriticalSection(&browsecriticalsection_);
         CloseHandle(readyevent_);
         if (collectorthread_ != NULL)
@@ -42,7 +54,12 @@ class ImgBrowser final
     }
     ImgBrowser(const ImgBrowser&) = delete;
     ImgBrowser& operator=(const ImgBrowser&) = delete;
-    BOOL BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight);
+    void ShareLoadContext(const std::shared_ptr<ImgBrowserLoadContext>& context);
+    std::shared_ptr<ImgBrowserLoadContext> loadcontext() const
+    {
+        return loadcontext_;
+    }
+    BOOL BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight, BOOL clearloadcontext = FALSE);
     BOOL UpdateTargetSize(INT targetwidth, INT targetheight);
     BOOL BrowseSubFoldersAsync();
     BOOL IsCollectingComplete() const;
@@ -57,6 +74,7 @@ class ImgBrowser final
     BOOL MoveToItem(const std::wstring& filepath);
     BOOL MoveToOrAddItem(const std::wstring& filepath);
     void BeginRandomCycle();
+    void PreloadFrom(ImgBrowser& source);
     BOOL MoveToRandom();
     BOOL MoveToRandomExcluding(const std::vector<std::wstring>& excluded);
     void RemoveCurrentItem();
@@ -64,6 +82,7 @@ class ImgBrowser final
     BOOL PreloadTargetSize(INT targetwidth, INT targetheight);
     BOOL PreloadTargetSizes(const std::vector<SIZE>& target_sizes);
     ImgBrowserStats GetStats();
+    ImgFileListProgress GetSequentialProgress(const std::wstring& filepath);
 
   private:
     struct TargetSize
@@ -77,9 +96,15 @@ class ImgBrowser final
         std::vector<TargetSize> sizes;
         BOOL loadnext{};
     };
+    struct PathQueueRequest
+    {
+        ImgBrowser* browser{};
+        std::vector<std::wstring> paths;
+        INT targetwidth{};
+        INT targetheight{};
+    };
 
-    ImgCache cache_;
-    ImgLoader loader_;
+    std::shared_ptr<ImgBrowserLoadContext> loadcontext_;
     BOOL cancellationflag_{};
     BOOL recursive_{};
     std::wstring folderpath_;
@@ -91,7 +116,7 @@ class ImgBrowser final
     CRITICAL_SECTION browsecriticalsection_;
     INT targetwidth_{};
     INT targetheight_{};
-    std::vector<TargetSize> target_sizes_;
+    std::vector<TargetSize> preload_target_sizes_;
     HWND notificationhwnd_{nullptr};
     UINT notificationmessage_{};
 
@@ -105,12 +130,16 @@ class ImgBrowser final
     static DWORD WINAPI StaticThreadCollect(void* browserinstance);
     static DWORD WINAPI StaticThreadCollectSubFolders(void* browserinstance);
     static DWORD WINAPI StaticThreadQueueTargetSize(void* targetsizequeuerequest);
+    static DWORD WINAPI StaticThreadQueuePaths(void* pathqueuerequest);
     void Reset();
-    BOOL AddTargetSize(INT targetwidth, INT targetheight);
-    BOOL AddTargetSizes(const std::vector<SIZE>& target_sizes, std::vector<TargetSize>* added_sizes);
+    BOOL AddPreloadTargetSize(INT targetwidth, INT targetheight);
+    BOOL AddPreloadTargetSizes(const std::vector<SIZE>& target_sizes, std::vector<TargetSize>* added_sizes);
+    BOOL IsTargetSizeActiveLocked(INT targetwidth, INT targetheight) const;
     void QueueTargetSizeAsync(INT targetwidth, INT targetheight, BOOL loadnext);
     void QueueTargetSizesAsync(const std::vector<TargetSize>& target_sizes, BOOL loadnext);
     void QueueTargetSizes(const std::vector<TargetSize>& target_sizes, BOOL loadnext);
+    void QueuePathsAsync(std::vector<std::wstring> paths, INT targetwidth, INT targetheight);
+    void QueuePaths(const std::vector<std::wstring>& paths, INT targetwidth, INT targetheight);
     void QueueFileForTargetSizes(const std::wstring& filepath, ImgItem::Format imgformat, BOOL loadnext);
     void CleanupTargetQueueThreads();
     ImgItem::Format ResolveFileFormat(const std::wstring& filepath);

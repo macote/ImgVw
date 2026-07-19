@@ -58,6 +58,12 @@ class ImgVwWindow final : public Window
 
   private:
     struct MonitorCreateContext;
+    struct TargetLoadContext
+    {
+        INT width{};
+        INT height{};
+        std::shared_ptr<ImgBrowserLoadContext> context;
+    };
     struct EmptyStateLayout
     {
         INT panel_width{};
@@ -116,6 +122,7 @@ class ImgVwWindow final : public Window
     std::size_t multimonitorslideshowindex_{};
     std::wstring multimonitorslideshowcursorpath_;
     std::vector<ImgVwWindow*> slideshowwindows_;
+    std::vector<TargetLoadContext> targetloadcontexts_;
     BOOL firstimagepaint_{TRUE};
 
     BOOL filenameoverlayenabled_{FALSE};
@@ -134,7 +141,7 @@ class ImgVwWindow final : public Window
     static ImgVwWindow* CreateOnMonitor(HINSTANCE hInst, const std::wstring& path, HMONITOR monitor,
                                         ImgVwWindow* owner);
     static BOOL CALLBACK CreateSlideShowWindowForMonitor(HMONITOR monitor, HDC dc, LPRECT rect, LPARAM param);
-    BOOL InitializeBrowser(const std::wstring& path);
+    BOOL InitializeBrowser(const std::wstring& path, BOOL clearloadcontext = FALSE);
     BOOL OpenPath(const std::wstring& path);
     void OpenImage();
     void OpenFolder();
@@ -185,6 +192,8 @@ class ImgVwWindow final : public Window
     std::size_t MultiMonitorSlideShowWindowCount() const;
     void DestroySlideShowWindows();
     void OnSlideShowWindowDestroyed(ImgVwWindow* window);
+    std::shared_ptr<ImgBrowserLoadContext> FindTargetLoadContext(INT width, INT height) const;
+    void RememberTargetLoadContext(INT width, INT height, const std::shared_ptr<ImgBrowserLoadContext>& context);
     void CloseOwnedWindows();
     ImgVwWindow* CommandTarget();
     void RestartSlideShowTimer();
