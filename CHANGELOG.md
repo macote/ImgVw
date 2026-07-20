@@ -1,3 +1,18 @@
+## 1.11.0 (Unreleased)
+
+- Improve multi-monitor loading with shared caches and loader capacity per distinct target size, including asynchronous
+  secondary-size preloading without duplicate queue work
+- Reset cached and queued image work when opening a new image or folder while preserving warm caches across slideshow
+  starts and restarts
+- Expand diagnostics to aggregate every active monitor size correctly and report sequential as well as random slideshow
+  mode and cycle progress
+- Add an explicit searching-subfolders state and propagate subfolder discovery to active secondary monitor browsers
+- Present the welcome and no-images states as a standard resizable window with minimize/maximize controls, a
+  taskbar-visible work area, and an 80%-of-work-area minimum size
+- Disable navigation, deletion, slideshow, and slideshow-speed commands until at least one supported image is found
+- Move the persistent filename-overlay shortcut from Enter to Space while retaining Enter and Space activation for
+  focused empty-state buttons
+
 ## 1.10.0 (2026-07-17)
 
 - Add a safe launch screen for Microsoft Store and other no-argument launches, instead of browsing the process current
