@@ -16,6 +16,24 @@ typedef UINT(WINAPI* GetDpiForWindowProc)(HWND hwnd);
 
 constexpr UINT kDefaultDpi = 96;
 
+constexpr UINT kImageCommandIds[] = {
+    IDR_NEXT,   IDR_PREVIOUS, IDR_FIRST,          IDR_LAST,           IDR_RECYCLE,
+    IDR_DELETE, IDR_TOGGLESS, IDR_TOGGLESSR,      IDR_TOGGLESS_MULTI, IDR_TOGGLESS_MULTI_RANDOM,
+    IDR_INCSSS, IDR_DECSSS,   IDR_TOGGLE_FILENAME};
+
+bool IsImageCommand(UINT command)
+{
+    for (const auto imagecommand : kImageCommandIds)
+    {
+        if (imagecommand == command)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 struct OverlayColors
 {
     COLORREF background;
@@ -341,6 +359,7 @@ BOOL ImgVwWindow::OpenPath(const std::wstring& path)
         HideEmptyState();
     }
     StopMultiMonitorSlideShow();
+    StopSlideShow();
     if (!InitializeBrowser(path, TRUE))
     {
         if (was_empty)
@@ -430,6 +449,19 @@ void ImgVwWindow::RestoreEmptyStateButtonFocus(HWND button)
     }
 }
 
+void ImgVwWindow::ActivateEmptyStateButton()
+{
+    if (!IsEmptyStateVisible())
+    {
+        return;
+    }
+
+    const auto focusedwindow = GetFocus();
+    const auto focusedbutton = focusedwindow == openimagebutton_ || focusedwindow == openfolderbutton_ ||
+                               focusedwindow == searchsubfoldersbutton_ || focusedwindow == exitbutton_;
+    SendMessage(focusedbutton ? focusedwindow : openimagebutton_, BM_CLICK, 0, 0);
+}
+
 void ImgVwWindow::SelectPath(const PathPickerResult& result)
 {
     if (result.status == PathPickerStatus::Cancelled)
@@ -486,6 +518,13 @@ void ImgVwWindow::BrowseEmptyStateSubFolders()
     if (browser_.BrowseSubFoldersAsync())
     {
         browsesubfolders_ = TRUE;
+        for (const auto window : slideshowwindows_)
+        {
+            if (window != nullptr)
+            {
+                window->EnableBrowseSubFolders();
+            }
+        }
         ShowSearchingSubfoldersState();
     }
 }
@@ -577,6 +616,11 @@ BOOL ImgVwWindow::IsEmptyStateVisible() const
 BOOL ImgVwWindow::IsSearchingSubfolders() const
 {
     return browseuistate_ == BrowseUiState::SearchingSubfolders;
+}
+
+BOOL ImgVwWindow::HasImages()
+{
+    return browserinitialized_ && browser_.HasFiles();
 }
 
 void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders)
@@ -1873,6 +1917,11 @@ void ImgVwWindow::ToggleSlideShow(BOOL slideshowrandom)
         return;
     }
 
+    if (!HasImages())
+    {
+        return;
+    }
+
     StopMultiMonitorSlideShow();
     StopSlideShow();
     slideshowrandom_ = slideshowrandom;
@@ -1908,6 +1957,11 @@ void ImgVwWindow::ToggleMultiMonitorSlideShow(BOOL slideshowrandom)
     if (multimonitorslideshowrunning_ && slideshowrandom_ == slideshowrandom)
     {
         StopMultiMonitorSlideShow();
+        return;
+    }
+
+    if (!HasImages())
+    {
         return;
     }
 
@@ -2547,6 +2601,20 @@ void ImgVwWindow::UpdateContextMenuForMonitorCount(HMENU menu) const
     DeleteMenu(menu, IDR_TOGGLESS_MULTI_RANDOM, MF_BYCOMMAND);
 }
 
+void ImgVwWindow::UpdateContextMenuForImageAvailability(HMENU menu)
+{
+    const auto target = CommandTarget();
+    if (menu == nullptr || (target != nullptr && target->HasImages()))
+    {
+        return;
+    }
+
+    for (const auto command : kImageCommandIds)
+    {
+        EnableMenuItem(menu, command, MF_BYCOMMAND | MF_GRAYED);
+    }
+}
+
 void ImgVwWindow::HandleContextMenu(LPARAM lParam)
 {
     RECT rc;
@@ -2562,6 +2630,7 @@ void ImgVwWindow::HandleContextMenu(LPARAM lParam)
         const auto root = LoadMenu(hinst_, L"IMGPOPUP");
         const auto popup = GetSubMenu(root, 0);
         UpdateContextMenuForMonitorCount(popup);
+        UpdateContextMenuForImageAvailability(popup);
 
         const auto restore_viewer_cursor = !IsEmptyStateVisible();
         if (restore_viewer_cursor)
@@ -2670,6 +2739,12 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return SendMessage(CommandTarget()->hwnd(), uMsg, wParam, lParam);
         }
 
+        if (IsImageCommand(LOWORD(wParam)) && !HasImages() &&
+            !(LOWORD(wParam) == IDR_TOGGLE_FILENAME && HIWORD(wParam) == 1))
+        {
+            return FALSE;
+        }
+
         switch (LOWORD(wParam))
         {
         case IDM_OPEN_IMAGE:
@@ -2686,12 +2761,12 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, reinterpret_cast<DLGPROC>(AboutDialogProc));
             break;
         case IDR_ENTER:
+            ActivateEmptyStateButton();
+            break;
+        case IDR_TOGGLE_FILENAME:
             if (IsEmptyStateVisible())
             {
-                const auto focused_window = GetFocus();
-                const auto focused_button = focused_window == openimagebutton_ || focused_window == openfolderbutton_ ||
-                                            focused_window == searchsubfoldersbutton_ || focused_window == exitbutton_;
-                SendMessage(focused_button ? focused_window : openimagebutton_, BM_CLICK, 0, 0);
+                ActivateEmptyStateButton();
             }
             else
             {

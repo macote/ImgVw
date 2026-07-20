@@ -234,6 +234,14 @@ BOOL ImgBrowser::IsCollectingComplete() const
     return WaitForSingleObject(collectorthread_, 0) == WAIT_OBJECT_0 ? TRUE : FALSE;
 }
 
+BOOL ImgBrowser::HasFiles()
+{
+    EnterCriticalSection(&browsecriticalsection_);
+    const auto hasfiles = !files_.Empty();
+    LeaveCriticalSection(&browsecriticalsection_);
+    return hasfiles ? TRUE : FALSE;
+}
+
 BOOL ImgBrowser::StopCollecting()
 {
     if (collectorthread_ == nullptr || collectorthread_ == INVALID_HANDLE_VALUE)

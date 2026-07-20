@@ -146,6 +146,7 @@ class ImgVwWindow final : public Window
     void OpenImage();
     void OpenFolder();
     void RestoreEmptyStateButtonFocus(HWND button);
+    void ActivateEmptyStateButton();
     void SelectPath(const PathPickerResult& result);
     void HandleDroppedFiles(HDROP drop);
     void BrowseEmptyStateSubFolders();
@@ -156,6 +157,7 @@ class ImgVwWindow final : public Window
     void HideEmptyState();
     BOOL IsEmptyStateVisible() const;
     BOOL IsSearchingSubfolders() const;
+    BOOL HasImages();
     EmptyStateLayout CalculateEmptyStateLayout(const RECT& client_rect) const;
     void UpdateEmptyStateLayout();
     void PaintEmptyState(PAINTSTRUCT* pps);
@@ -213,6 +215,7 @@ class ImgVwWindow final : public Window
     BOOL SelectDefaultICCProfile();
     void UseBuiltInICCProfile();
     void UpdateContextMenuForMonitorCount(HMENU menu) const;
+    void UpdateContextMenuForImageAvailability(HMENU menu);
     void HandleContextMenu(LPARAM lParam);
     void InvalidateScreen();
     bool DisplayImage(HDC dc, const ImgItem* item);

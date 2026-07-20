@@ -63,6 +63,7 @@ class ImgBrowser final
     BOOL UpdateTargetSize(INT targetwidth, INT targetheight);
     BOOL BrowseSubFoldersAsync();
     BOOL IsCollectingComplete() const;
+    BOOL HasFiles();
     void StopBrowsing();
     void SetNotificationWindow(HWND hwnd, UINT message);
     std::wstring GetCurrentFilePath();
