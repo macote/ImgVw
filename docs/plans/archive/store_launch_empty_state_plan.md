@@ -1,5 +1,11 @@
 # Store Launch and Empty-State Experience Plan
 
+## Completion
+
+Implemented and archived. No-argument startup, empty-state recovery, image/folder pickers, command access,
+drag-and-drop, recursive search, and resizable welcome-window behaviour are present. Broader loader lifetime work is
+tracked by `docs/plans/runtime_safety_and_display_publication_plan.md`.
+
 Date: 2026-07-17
 
 ## Summary

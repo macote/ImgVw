@@ -1,5 +1,10 @@
 # Installation PowerShell Script Plan
 
+## Completion
+
+Implemented and archived. `scripts/install-imgvw.ps1`, release packaging, documentation, PATH registration,
+Open With registration, uninstall handling, and the installer release flow are present in the repository.
+
 ## Goal
 
 Make ImgVw available through a repository-provided PowerShell installer that can:
