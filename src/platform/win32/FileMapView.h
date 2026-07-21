@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Win32Handle.h"
 #include <Windows.h>
 #include <string>
 #include <iomanip>
@@ -38,12 +39,10 @@ class FileMapView final
 
             filepath_ = std::move(other.filepath_);
             mode_ = other.mode_;
-            file_ = other.file_;
-            other.file_ = INVALID_HANDLE_VALUE;
+            file_ = std::move(other.file_);
             filesize_.QuadPart = other.filesize_.QuadPart;
             other.filesize_.QuadPart = 0;
-            mapfile_ = other.mapfile_;
-            other.mapfile_ = INVALID_HANDLE_VALUE;
+            mapfile_ = std::move(other.mapfile_);
             data_ = other.data_;
             other.data_ = nullptr;
         }
@@ -64,9 +63,9 @@ class FileMapView final
   private:
     std::wstring filepath_;
     Mode mode_{Mode::Read};
-    HANDLE file_{INVALID_HANDLE_VALUE};
+    Win32Handle file_;
     LARGE_INTEGER filesize_{0};
-    HANDLE mapfile_{INVALID_HANDLE_VALUE};
+    Win32Handle mapfile_;
     PBYTE data_{nullptr};
 
   private:
@@ -79,7 +78,7 @@ class FileMapView final
 
 inline void FileMapView::Open(const std::wstring& filepath, Mode mode)
 {
-    if (file_ != INVALID_HANDLE_VALUE)
+    if (file_.valid())
     {
         Close();
     }
@@ -98,17 +97,8 @@ inline void FileMapView::Close()
         data_ = nullptr;
     }
 
-    if (mapfile_ != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle(mapfile_);
-        mapfile_ = INVALID_HANDLE_VALUE;
-    }
-
-    if (file_ != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle(file_);
-        file_ = INVALID_HANDLE_VALUE;
-    }
+    mapfile_.reset();
+    file_.reset();
 }
 
 inline void FileMapView::InitializeMapping()
@@ -130,16 +120,16 @@ inline void FileMapView::OpenFile()
 {
     if (mode_ == Mode::Read)
     {
-        file_ = CreateFile(filepath_.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                           NULL);
+        file_.reset(CreateFile(filepath_.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, NULL));
     }
     else if (mode_ == Mode::WriteNew)
     {
-        file_ = CreateFile(filepath_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL, NULL);
+        file_.reset(CreateFile(filepath_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL, NULL));
     }
 
-    if (file_ == INVALID_HANDLE_VALUE)
+    if (!file_.valid())
     {
         std::stringstream ss;
         ss << "FileMapView.OpenFile(CreateFile()) failed with error ";
@@ -151,14 +141,14 @@ inline void FileMapView::OpenFile()
 
 inline void FileMapView::GetFileSize()
 {
-    GetFileSizeEx(file_, &filesize_);
+    GetFileSizeEx(file_.get(), &filesize_);
 }
 
 inline void FileMapView::OpenMapping()
 {
     const auto flProtect = mode_ == Mode::Read ? PAGE_READONLY : PAGE_READWRITE;
-    mapfile_ = CreateFileMapping(file_, NULL, flProtect, 0, 0, NULL);
-    if (mapfile_ == NULL)
+    mapfile_.reset(CreateFileMapping(file_.get(), NULL, flProtect, 0, 0, NULL));
+    if (!mapfile_.valid())
     {
         std::stringstream ss;
         ss << "FileMapView.OpenMapping(CreateFileMapping()) failed with error ";
@@ -171,7 +161,7 @@ inline void FileMapView::OpenMapping()
 inline void FileMapView::MapView()
 {
     const auto desiredAccess = mode_ == Mode::Read ? FILE_MAP_READ : FILE_MAP_WRITE;
-    data_ = reinterpret_cast<PBYTE>(MapViewOfFile(mapfile_, desiredAccess, 0, 0, 0));
+    data_ = reinterpret_cast<PBYTE>(MapViewOfFile(mapfile_.get(), desiredAccess, 0, 0, 0));
     if (data_ == nullptr)
     {
         std::stringstream ss;

@@ -1,6 +1,8 @@
 #include "ColorProfile.h"
 #include "ColorTransform.h"
+#include "CriticalSection.h"
 #include "FileOperations.h"
+#include "FindHandle.h"
 #include "ImageFormatDetector.h"
 #include "ImageFormatResolver.h"
 #include "ImgResampler.h"
@@ -10,6 +12,7 @@
 #include "ImgJPEGDecoder.h"
 #include "ImgRenderer.h"
 #include "ImgLoader.h"
+#include "Win32Handle.h"
 
 #include <lcms2.h>
 
@@ -19,6 +22,7 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -28,6 +32,60 @@ SHFILEOPSTRUCTW captured_file_operation{};
 std::vector<wchar_t> captured_paths;
 int shell_result = 0;
 BOOL shell_aborted = FALSE;
+
+void Check(bool condition, const char* description);
+
+void TestWin32HandleOwnership()
+{
+    Win32Handle event(CreateEvent(nullptr, TRUE, FALSE, nullptr));
+    Check(event.valid(), "Win32 handle owns a created event");
+
+    const auto first_event = event.get();
+    Win32Handle moved(std::move(event));
+    Check(!event.valid() && moved.get() == first_event, "Win32 handle move transfers ownership");
+
+    const auto replacement_event = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+    Check(replacement_event != nullptr, "replacement event is created");
+    moved.reset(replacement_event);
+    SetLastError(ERROR_SUCCESS);
+    Check(!SetEvent(first_event) && GetLastError() == ERROR_INVALID_HANDLE,
+          "Win32 handle reset closes the previous handle");
+
+    const auto released_event = moved.release();
+    Check(!moved.valid() && SetEvent(released_event), "Win32 handle release returns ownership");
+    CloseHandle(released_event);
+}
+
+void TestFindHandleOwnership()
+{
+    WIN32_FIND_DATA find_data{};
+    FindHandle find(FindFirstFile(L".\\*", &find_data));
+    Check(find.valid(), "find handle owns an active enumeration");
+
+    FindHandle moved(std::move(find));
+    Check(!find.valid() && moved.valid(), "find handle move transfers ownership");
+
+    const auto released_find = moved.release();
+    Check(!moved.valid(), "find handle release clears ownership");
+    if (released_find != INVALID_HANDLE_VALUE)
+    {
+        FindClose(released_find);
+    }
+}
+
+void TestCriticalSectionOwnership()
+{
+    CriticalSection critical_section;
+    Check(critical_section.valid(), "critical section initializes");
+
+    int guarded_value = 0;
+    {
+        CriticalSectionLock lock(critical_section);
+        ++guarded_value;
+    }
+
+    Check(guarded_value == 1, "critical section lock guards a scope");
+}
 
 std::vector<unsigned char> CreateJpeg(bool cmyk, bool include_metadata)
 {
@@ -831,6 +889,9 @@ void TestBundledCmykProfile()
 
 int main()
 {
+    TestWin32HandleOwnership();
+    TestFindHandleOwnership();
+    TestCriticalSectionOwnership();
     TestEmptyList();
     TestOrderedNavigation();
     TestFolderGroupedNavigation();

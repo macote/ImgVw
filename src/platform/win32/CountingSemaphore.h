@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Win32Handle.h"
 #include <Windows.h>
 #include <utility>
 
@@ -26,8 +27,7 @@ class CountingSemaphore final
         {
             Close();
 
-            semaphore_ = other.semaphore_;
-            other.semaphore_ = INVALID_HANDLE_VALUE;
+            semaphore_ = std::move(other.semaphore_);
         }
 
         return *this;
@@ -37,16 +37,12 @@ class CountingSemaphore final
     void SetupSemaphore(LONG maximumcount);
 
   private:
-    HANDLE semaphore_{INVALID_HANDLE_VALUE};
+    Win32Handle semaphore_;
 
   private:
     void Close()
     {
-        if (semaphore_ != INVALID_HANDLE_VALUE)
-        {
-            CloseHandle(semaphore_);
-            semaphore_ = INVALID_HANDLE_VALUE;
-        }
+        semaphore_.reset();
     }
 };
 
@@ -54,8 +50,8 @@ inline void CountingSemaphore::SetupSemaphore(LONG maximumcount)
 {
     Close();
 
-    semaphore_ = CreateSemaphore(NULL, maximumcount, maximumcount, NULL);
-    if (semaphore_ == NULL)
+    semaphore_.reset(CreateSemaphore(NULL, maximumcount, maximumcount, NULL));
+    if (!semaphore_.valid())
     {
         // TODO: handle error
     }
@@ -63,7 +59,7 @@ inline void CountingSemaphore::SetupSemaphore(LONG maximumcount)
 
 inline void CountingSemaphore::Notify() const
 {
-    if (!ReleaseSemaphore(semaphore_, 1, NULL))
+    if (!ReleaseSemaphore(semaphore_.get(), 1, NULL))
     {
         // TODO: handle error
     }
@@ -71,7 +67,7 @@ inline void CountingSemaphore::Notify() const
 
 inline void CountingSemaphore::Wait() const
 {
-    switch (WaitForSingleObject(semaphore_, INFINITE))
+    switch (WaitForSingleObject(semaphore_.get(), INFINITE))
     {
     case WAIT_OBJECT_0:
         break;

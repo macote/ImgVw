@@ -195,12 +195,15 @@
     <ClInclude Include="src\image\ImgJPEGItem.h" />
     <ClInclude Include="src\image\ImgLoader.h" />
     <ClInclude Include="src\platform\win32\CountingSemaphore.h" />
+    <ClInclude Include="src\platform\win32\CriticalSection.h" />
     <ClInclude Include="src\platform\win32\FileOperations.h" />
     <ClInclude Include="src\platform\win32\FileMapView.h" />
+    <ClInclude Include="src\platform\win32\FindHandle.h" />
     <ClInclude Include="src\platform\win32\ImageHeaderProbe.h" />
     <ClInclude Include="src\platform\win32\ImgSettings.h" />
     <ClInclude Include="src\platform\win32\PathPicker.h" />
     <ClInclude Include="src\platform\win32\ProcessDpiAwareness.h" />
+    <ClInclude Include="src\platform\win32\Win32Handle.h" />
     <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
     <ClInclude Include="src\ui\win32\Window.h" />

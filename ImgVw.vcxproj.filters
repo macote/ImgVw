@@ -115,10 +115,16 @@
     <ClInclude Include="src\platform\win32\CountingSemaphore.h">
       <Filter>Platform</Filter>
     </ClInclude>
+    <ClInclude Include="src\platform\win32\CriticalSection.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
     <ClInclude Include="src\platform\win32\FileOperations.h">
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\FileMapView.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\FindHandle.h">
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\ImageHeaderProbe.h">
@@ -131,6 +137,9 @@
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\ProcessDpiAwareness.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\Win32Handle.h">
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\win32\ImgVwWindow.h">
