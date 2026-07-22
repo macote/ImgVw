@@ -2380,10 +2380,23 @@ void ImgVwWindow::DisplayCurrentSlideWithoutTimer()
 
 void ImgVwWindow::HandleStartupExitConditions()
 {
-    if (owner_ != nullptr || !browserinitialized_ || !browser_.IsCollectingComplete())
+    if (owner_ != nullptr || !browserinitialized_)
     {
         return;
     }
+
+    if (!browser_.IsCollectingComplete())
+    {
+        // The collector posts its final notification immediately before its thread handle becomes signaled. Retry the
+        // empty result after that narrow interval so completion cannot be lost.
+        if (!browser_.HasFiles())
+        {
+            SetTimer(hwnd_, kBrowserCompletionRetryTimer, kBrowserCompletionRetryIntervalInMilliseconds, nullptr);
+        }
+        return;
+    }
+
+    KillTimer(hwnd_, kBrowserCompletionRetryTimer);
 
     const auto stats = browser_.GetStats();
     if (stats.found_images == 0)
@@ -2682,6 +2695,7 @@ void ImgVwWindow::OnNCDestroy()
     StopSlideShow();
     KillTimer(hwnd_, kLoaderStatsOverlayTimer);
     KillTimer(hwnd_, kLoadingProgressOverlayTimer);
+    KillTimer(hwnd_, kBrowserCompletionRetryTimer);
     browser_.StopBrowsing();
     DeleteObject(backgroundbrush_);
     DeleteObject(captionfont_);
@@ -2893,6 +2907,10 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return 0;
         case kLoadingProgressOverlayTimer:
             UpdateLoadingProgressOverlayTimer();
+            return 0;
+        case kBrowserCompletionRetryTimer:
+            KillTimer(hwnd_, kBrowserCompletionRetryTimer);
+            HandleStartupExitConditions();
             return 0;
         }
 

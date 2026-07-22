@@ -154,7 +154,7 @@ BOOL ImgBrowser::BrowseAsync(const std::wstring& path, INT targetwidth, INT targ
     ResetEvent(readyevent_);
 
     collectorthread_ = CreateThread(nullptr, 0, StaticThreadCollect, reinterpret_cast<void*>(this), 0, nullptr);
-    return TRUE;
+    return collectorthread_ != nullptr ? TRUE : FALSE;
 }
 
 BOOL ImgBrowser::UpdateTargetSize(INT targetwidth, INT targetheight)

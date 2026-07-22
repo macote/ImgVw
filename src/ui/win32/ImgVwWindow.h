@@ -29,6 +29,8 @@ class ImgVwWindow final : public Window
     static const UINT kSlideShowIntervalIncrementStepInMilliseconds = 125;
     static const UINT kMouseHideIntervalInMilliseconds = 1000;
     static const UINT kBrowserChangedMessage = WM_APP + 1;
+    static const UINT kBrowserCompletionRetryTimer = 4;
+    static const UINT kBrowserCompletionRetryIntervalInMilliseconds = 10;
     static const UINT kLoaderStatsOverlayTimer = 2;
     static const UINT kLoaderStatsOverlayIntervalInMilliseconds = 250;
     static const UINT kLoadingProgressOverlayTimer = 3;
