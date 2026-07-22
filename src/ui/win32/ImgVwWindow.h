@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "FileOperations.h"
 #include "ImgRenderer.h"
 #include "Window.h"
