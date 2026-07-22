@@ -1,15 +1,10 @@
 #pragma once
 
 #include "ImgItem.h"
-#include "CountingSemaphore.h"
+#include "Win32Handle.h"
 #include <Windows.h>
 #include <cstddef>
-#include <list>
-#include <functional>
 #include <memory>
-#include <set>
-#include <string>
-#include <vector>
 
 struct ImgLoaderStats
 {
@@ -19,57 +14,45 @@ struct ImgLoaderStats
     std::size_t maximum_slots{};
 };
 
-struct ImgLoaderNotification
+enum class ImgLoaderStartStatus
 {
-    HWND hwnd{};
-    UINT message{};
+    Started,
+    CriticalSectionFailed,
+    CreateWorkEventFailed,
+    CreateCancelEventFailed,
+    CreateSemaphoreFailed,
+    CreateThreadFailed
 };
 
-class LoaderItem
+struct ImgLoaderStartResult
 {
-  public:
-    LoaderItem(std::shared_ptr<ImgItem> imgitem, std::function<void()> handler)
-        : imgitem_(std::move(imgitem)), loadcompleteevent_(handler)
-    {
-    }
-    ~LoaderItem()
-    {
-        CloseLoaderItemThread();
-    }
-    LoaderItem(const LoaderItem&) = delete;
-    LoaderItem& operator=(const LoaderItem&) = delete;
-    std::shared_ptr<ImgItem> imgitem() const
-    {
-        return imgitem_;
-    }
-    HANDLE loaderitemthread() const
-    {
-        return loaderitemthread_;
-    }
-    void set_loaderitemthread(HANDLE loaderitemthread)
-    {
-        loaderitemthread_ = loaderitemthread;
-    }
-    void CloseLoaderItemThread()
-    {
-        if (loaderitemthread_ != INVALID_HANDLE_VALUE)
-        {
-            CloseHandle(loaderitemthread_);
-            loaderitemthread_ = INVALID_HANDLE_VALUE;
-        }
-    }
-    void LoadComplete()
-    {
-        if (loadcompleteevent_ != nullptr)
-        {
-            loadcompleteevent_();
-        }
-    }
+    ImgLoaderStartStatus status{ImgLoaderStartStatus::CreateThreadFailed};
+    DWORD win32_error{ERROR_SUCCESS};
 
-  private:
-    std::shared_ptr<ImgItem> imgitem_;
-    HANDLE loaderitemthread_{INVALID_HANDLE_VALUE};
-    std::function<void()> loadcompleteevent_{nullptr};
+    bool Started() const
+    {
+        return status == ImgLoaderStartStatus::Started;
+    }
+};
+
+enum class ImgLoaderStopStatus
+{
+    AlreadyStopped,
+    Stopped,
+    SignalFailed,
+    TimedOut,
+    WaitFailed
+};
+
+struct ImgLoaderStopResult
+{
+    ImgLoaderStopStatus status{ImgLoaderStopStatus::AlreadyStopped};
+    DWORD win32_error{ERROR_SUCCESS};
+
+    bool Stopped() const
+    {
+        return status == ImgLoaderStopStatus::AlreadyStopped || status == ImgLoaderStopStatus::Stopped;
+    }
 };
 
 class ImgLoader
@@ -78,37 +61,11 @@ class ImgLoader
     static constexpr auto kMaximumLoaderCount =
         2; // TODO: adjust logic around this limit once GDI+ gets replaced completely
     static constexpr auto kCleanupCycleCountTrigger = 29;
+    static constexpr DWORD kDefaultStopTimeoutMilliseconds = 3000;
 
   public:
-    ImgLoader()
-    {
-        if (!InitializeCriticalSectionAndSpinCount(&queuecriticalsection_, 0x00000400))
-        {
-            // TODO: handle error
-        }
-
-        cancelevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
-        workevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
-        loadersemaphore_.SetupSemaphore(kMaximumLoaderCount);
-        LoadAsync();
-    }
-    ~ImgLoader()
-    {
-        StopLoading();
-        DeleteCriticalSection(&queuecriticalsection_);
-        if (cancelevent_ != NULL)
-        {
-            CloseHandle(cancelevent_);
-        }
-        if (workevent_ != NULL)
-        {
-            CloseHandle(workevent_);
-        }
-        if (loopthread_ != NULL && loopthread_ != INVALID_HANDLE_VALUE)
-        {
-            CloseHandle(loopthread_);
-        }
-    }
+    ImgLoader();
+    ~ImgLoader();
     ImgLoader(const ImgLoader&) = delete;
     ImgLoader& operator=(const ImgLoader&) = delete;
     void QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext = FALSE);
@@ -117,31 +74,27 @@ class ImgLoader
     void RemoveNotificationWindow(HWND hwnd);
     void DiscardQueuedItems();
     void DiscardQueuedItemsForTargetSize(INT targetwidth, INT targetheight);
-    void StopLoading();
+    ImgLoaderStopResult StopLoading(DWORD timeout_milliseconds = kDefaultStopTimeoutMilliseconds);
+    ImgLoaderStartResult start_result() const
+    {
+        return start_result_;
+    }
     ImgLoaderStats GetStats();
 
   private:
-    std::list<std::shared_ptr<ImgItem>> queue_;
-    std::set<ImgItem*> pendingitems_;
-    std::list<std::unique_ptr<LoaderItem>> loaderitems_;
-    HANDLE workevent_;
-    HANDLE cancelevent_;
-    HANDLE loopthread_{INVALID_HANDLE_VALUE};
-    BOOL cancellationflag_{};
-    BOOL preferredtargetsizeset_{FALSE};
-    INT preferredtargetwidth_{};
-    INT preferredtargetheight_{};
-    std::vector<ImgLoaderNotification> notifications_;
-    CountingSemaphore loadersemaphore_;
-    CRITICAL_SECTION queuecriticalsection_;
+    struct State;
+
+    std::shared_ptr<State> state_;
+    Win32Handle loopthread_;
+    ImgLoaderStartResult start_result_;
 
   private:
-    void LoadAsync();
-    DWORD Loop();
-    std::shared_ptr<ImgItem> GetNextItem();
-    void CompleteItem(const std::shared_ptr<ImgItem>& imgitem, BOOL notifysemaphore);
-    void NotifyLoadComplete();
-    void CleanupItemThreadObjects();
-    static DWORD WINAPI StaticThreadLoop(void* imgloaderinstance);
-    static DWORD WINAPI StaticThreadLoad(void* loaderiteminstance);
+    static DWORD Loop(const std::shared_ptr<State>& state);
+    static void CleanupItemThreadObjects(const std::shared_ptr<State>& state);
+    static std::shared_ptr<ImgItem> GetNextItem(const std::shared_ptr<State>& state);
+    static void CompleteItem(const std::shared_ptr<State>& state, const std::shared_ptr<ImgItem>& imgitem,
+                             BOOL notifysemaphore);
+    static void NotifyLoadComplete(const std::shared_ptr<State>& state);
+    static DWORD WINAPI StaticThreadLoop(void* context);
+    static DWORD WINAPI StaticThreadLoad(void* context);
 };

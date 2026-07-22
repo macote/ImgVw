@@ -1,3 +1,4 @@
+#include "BrowsePath.h"
 #include "ColorProfile.h"
 #include "ColorTransform.h"
 #include "CriticalSection.h"
@@ -34,6 +35,36 @@ int shell_result = 0;
 BOOL shell_aborted = FALSE;
 
 void Check(bool condition, const char* description);
+
+class BlockingImgItem final : public ImgItem
+{
+  public:
+    BlockingImgItem(std::wstring filepath, INT targetwidth, INT targetheight)
+        : ImgItem(std::move(filepath), targetwidth, targetheight), started_(CreateEvent(nullptr, TRUE, FALSE, nullptr)),
+          release_(CreateEvent(nullptr, TRUE, FALSE, nullptr))
+    {
+    }
+    void Load() override
+    {
+        status_ = Status::Loading;
+        SetEvent(started_.get());
+        WaitForSingleObject(release_.get(), INFINITE);
+        status_ = Status::Ready;
+        SetEvent(loadedevent_);
+    }
+    bool WaitUntilStarted(DWORD timeout_milliseconds = 2000) const
+    {
+        return WaitForSingleObject(started_.get(), timeout_milliseconds) == WAIT_OBJECT_0;
+    }
+    void Release()
+    {
+        SetEvent(release_.get());
+    }
+
+  private:
+    Win32Handle started_;
+    Win32Handle release_;
+};
 
 void TestWin32HandleOwnership()
 {
@@ -85,6 +116,50 @@ void TestCriticalSectionOwnership()
     }
 
     Check(guarded_value == 1, "critical section lock guards a scope");
+}
+
+void TestBrowsePathClassification()
+{
+    wchar_t temp_path[MAX_PATH]{};
+    Check(GetTempPath(MAX_PATH, temp_path) != 0, "temporary path is available");
+    const auto test_folder = std::wstring(temp_path) + L"ImgVwBrowsePath-" + std::to_wstring(GetCurrentProcessId());
+    CreateDirectory(test_folder.c_str(), nullptr);
+    const auto test_file = test_folder + L"\\sample.jpg";
+    Win32Handle file(
+        CreateFile(test_file.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+    Check(file.valid(), "browse path test file is created");
+    file.reset();
+
+    const auto folder = ClassifyBrowsePath(test_folder);
+    Check(folder.Succeeded() && folder.kind == BrowsePathKind::Folder && folder.folderpath.back() == L'\\',
+          "folder path is classified with a trailing separator");
+
+    const auto forced_folder = ClassifyBrowsePath(test_folder + L"\\");
+    Check(forced_folder.Succeeded() && forced_folder.folderpath == folder.folderpath,
+          "forced folder path is normalized without duplicate separators");
+
+    const auto absolute_file = ClassifyBrowsePath(test_file);
+    Check(absolute_file.Succeeded() && absolute_file.kind == BrowsePathKind::File &&
+              absolute_file.folderpath == folder.folderpath && absolute_file.filepath == test_file,
+          "absolute file path is split into its file and folder paths");
+
+    const auto file_as_folder = ClassifyBrowsePath(test_file + L"\\");
+    Check(!file_as_folder.Succeeded() && file_as_folder.win32_error == ERROR_DIRECTORY,
+          "file path with a trailing separator is rejected as a folder");
+
+    wchar_t previous_folder[MAX_PATH]{};
+    GetCurrentDirectory(MAX_PATH, previous_folder);
+    SetCurrentDirectory(test_folder.c_str());
+    const auto relative_file = ClassifyBrowsePath(L"sample.jpg");
+    SetCurrentDirectory(previous_folder);
+    Check(relative_file.Succeeded() && relative_file.filepath == L".\\sample.jpg" && relative_file.folderpath == L".\\",
+          "relative file path retains the browser's relative-path convention");
+
+    const auto missing = ClassifyBrowsePath(test_folder + L"\\missing.jpg");
+    Check(!missing.Succeeded() && missing.win32_error != ERROR_SUCCESS, "missing browse path reports a native error");
+
+    DeleteFile(test_file.c_str());
+    RemoveDirectory(test_folder.c_str());
 }
 
 std::vector<unsigned char> CreateJpeg(bool cmyk, bool include_metadata)
@@ -476,34 +551,90 @@ void TestLoaderShutdown()
     for (int iteration = 0; iteration < 10; ++iteration)
     {
         ImgLoader loader;
-        loader.StopLoading();
-        loader.StopLoading();
+        Check(loader.start_result().Started(), "loader starts its controller thread");
+        Check(loader.StopLoading().status == ImgLoaderStopStatus::Stopped, "idle loader stops");
+        Check(loader.StopLoading().status == ImgLoaderStopStatus::AlreadyStopped, "loader stop is idempotent");
+        auto rejected = std::make_shared<BlockingImgItem>(L"rejected.png", 800, 600);
+        loader.QueueItem(rejected);
+        Check(loader.GetStats().queued == 0 && !rejected->WaitUntilStarted(0), "stopped loader rejects new work");
     }
+}
+
+void TestLoaderActiveWorkerTimeout()
+{
+    ImgLoader loader;
+    auto item = std::make_shared<BlockingImgItem>(L"blocking.png", 800, 600);
+    loader.QueueItem(item);
+    Check(item->WaitUntilStarted(), "blocking loader item starts");
+
+    const auto timeout = loader.StopLoading(0);
+    Check(timeout.status == ImgLoaderStopStatus::TimedOut, "active loader reports a bounded stop timeout");
+
+    item->Release();
+    Check(WaitForSingleObject(item->loadedevent(), 2000) == WAIT_OBJECT_0,
+          "timed-out loader worker retains valid state through completion");
+    Check(loader.StopLoading(2000).Stopped(), "loader stop succeeds after active work completes");
 }
 
 void TestLoaderDiscardsQueuedItems()
 {
     ImgLoader loader;
-    loader.StopLoading();
+    auto first = std::make_shared<BlockingImgItem>(L"first.png", 800, 600);
+    auto second = std::make_shared<BlockingImgItem>(L"second.png", 800, 600);
+    auto queued_first = std::make_shared<BlockingImgItem>(L"queued-first.png", 800, 600);
+    auto queued_second = std::make_shared<BlockingImgItem>(L"queued-second.png", 800, 600);
 
-    loader.QueueItem(std::make_shared<ImgGDIItem>(L"queued.png", 800, 600));
-    Check(loader.GetStats().queued == 1, "stopped loader retains queued test item");
+    loader.QueueItem(first);
+    loader.QueueItem(second);
+    Check(first->WaitUntilStarted() && second->WaitUntilStarted(), "both loader slots become active");
+    loader.QueueItem(queued_first);
+    loader.QueueItem(queued_second);
+    Check(loader.GetStats().queued >= 1, "blocked loader retains queued test items");
 
     loader.DiscardQueuedItems();
     Check(loader.GetStats().queued == 0, "discard removes queued loader items");
+
+    Check(loader.StopLoading(0).status == ImgLoaderStopStatus::TimedOut, "blocked loader stop remains bounded");
+    Check(!queued_first->WaitUntilStarted(0) && !queued_second->WaitUntilStarted(0),
+          "loader cancellation does not dispatch queued work");
+    first->Release();
+    second->Release();
+    queued_first->Release();
+    queued_second->Release();
+    Check(loader.StopLoading(2000).Stopped(), "discard test loader stops after workers are released");
 }
 
 void TestLoaderDiscardsQueuedItemsForTargetSize()
 {
     ImgLoader loader;
-    loader.StopLoading();
+    auto active_first = std::make_shared<BlockingImgItem>(L"active-first.png", 800, 600);
+    auto active_second = std::make_shared<BlockingImgItem>(L"active-second.png", 800, 600);
+    auto first = std::make_shared<BlockingImgItem>(L"first.png", 800, 600);
+    auto second = std::make_shared<BlockingImgItem>(L"second.png", 800, 600);
+    auto other = std::make_shared<BlockingImgItem>(L"other.png", 1920, 1080);
 
-    loader.QueueItem(std::make_shared<ImgGDIItem>(L"first.png", 800, 600));
-    loader.QueueItem(std::make_shared<ImgGDIItem>(L"second.png", 800, 600));
-    loader.QueueItem(std::make_shared<ImgGDIItem>(L"other.png", 1920, 1080));
+    loader.QueueItem(active_first);
+    loader.QueueItem(active_second);
+    Check(active_first->WaitUntilStarted() && active_second->WaitUntilStarted(),
+          "target discard fills both loader slots");
+    loader.QueueItem(first);
+    loader.QueueItem(second);
+    loader.QueueItem(other);
+
     loader.DiscardQueuedItemsForTargetSize(800, 600);
+    Check(other->status() == ImgItem::Status::Queued && !other->WaitUntilStarted(0),
+          "target-size discard preserves undispatched work for other sizes");
 
-    Check(loader.GetStats().queued == 1, "target-size discard preserves queue work for other sizes");
+    Check(loader.StopLoading(0).status == ImgLoaderStopStatus::TimedOut,
+          "target discard loader reports active-worker timeout");
+    Check(!first->WaitUntilStarted(0) && !second->WaitUntilStarted(0) && !other->WaitUntilStarted(0),
+          "target discard cancellation leaves pending work undispatched");
+    active_first->Release();
+    active_second->Release();
+    first->Release();
+    second->Release();
+    other->Release();
+    Check(loader.StopLoading(2000).Stopped(), "target discard loader stops after workers are released");
 }
 
 void TestImageFormatDetectorSignatures()
@@ -892,6 +1023,7 @@ int main()
     TestWin32HandleOwnership();
     TestFindHandleOwnership();
     TestCriticalSectionOwnership();
+    TestBrowsePathClassification();
     TestEmptyList();
     TestOrderedNavigation();
     TestFolderGroupedNavigation();
@@ -909,6 +1041,7 @@ int main()
     TestClear();
     TestImgCacheKeyUsesViewport();
     TestLoaderShutdown();
+    TestLoaderActiveWorkerTimeout();
     TestLoaderDiscardsQueuedItems();
     TestLoaderDiscardsQueuedItemsForTargetSize();
     TestImageFormatDetectorSignatures();

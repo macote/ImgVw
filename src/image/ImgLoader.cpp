@@ -1,150 +1,271 @@
 #include "ImgLoader.h"
 
+#include "CountingSemaphore.h"
+#include "CriticalSection.h"
 #include <algorithm>
+#include <list>
+#include <set>
+#include <utility>
+#include <vector>
 
-void ImgLoader::StopLoading()
+struct ImgLoaderNotification
 {
-    if (loopthread_ == nullptr || loopthread_ == INVALID_HANDLE_VALUE)
+    HWND hwnd{};
+    UINT message{};
+};
+
+struct ImgLoader::State
+{
+    struct LoaderItem
+    {
+        explicit LoaderItem(std::shared_ptr<ImgItem> item) : imgitem(std::move(item)) {}
+
+        std::shared_ptr<ImgItem> imgitem;
+        Win32Handle thread;
+    };
+
+    struct LoopContext
+    {
+        std::shared_ptr<State> state;
+    };
+
+    struct WorkerContext
+    {
+        std::shared_ptr<State> state;
+        std::shared_ptr<LoaderItem> loaderitem;
+    };
+
+    State()
+    {
+        if (!queuecriticalsection.valid())
+        {
+            initialization_result = {ImgLoaderStartStatus::CriticalSectionFailed, GetLastError()};
+            return;
+        }
+
+        workevent.reset(CreateEvent(nullptr, TRUE, FALSE, nullptr));
+        if (!workevent.valid())
+        {
+            initialization_result = {ImgLoaderStartStatus::CreateWorkEventFailed, GetLastError()};
+            return;
+        }
+
+        cancelevent.reset(CreateEvent(nullptr, TRUE, FALSE, nullptr));
+        if (!cancelevent.valid())
+        {
+            initialization_result = {ImgLoaderStartStatus::CreateCancelEventFailed, GetLastError()};
+            return;
+        }
+
+        if (!loadersemaphore.SetupSemaphore(ImgLoader::kMaximumLoaderCount))
+        {
+            initialization_result = {ImgLoaderStartStatus::CreateSemaphoreFailed, GetLastError()};
+            return;
+        }
+
+        initialization_result = {ImgLoaderStartStatus::Started, ERROR_SUCCESS};
+    }
+
+    CriticalSection queuecriticalsection;
+    Win32Handle workevent;
+    Win32Handle cancelevent;
+    CountingSemaphore loadersemaphore;
+    std::list<std::shared_ptr<ImgItem>> queue;
+    std::set<ImgItem*> pendingitems;
+    std::list<std::shared_ptr<LoaderItem>> loaderitems;
+    BOOL preferredtargetsizeset{FALSE};
+    INT preferredtargetwidth{};
+    INT preferredtargetheight{};
+    std::vector<ImgLoaderNotification> notifications;
+    bool stopping{};
+    ImgLoaderStartResult initialization_result;
+};
+
+namespace
+{
+DWORD RemainingTimeout(DWORD started, DWORD timeout_milliseconds)
+{
+    if (timeout_milliseconds == INFINITE)
+    {
+        return INFINITE;
+    }
+
+    const auto elapsed = GetTickCount() - started;
+    return elapsed >= timeout_milliseconds ? 0 : timeout_milliseconds - elapsed;
+}
+} // namespace
+
+ImgLoader::ImgLoader() : state_(std::make_shared<State>())
+{
+    start_result_ = state_->initialization_result;
+    if (!start_result_.Started())
     {
         return;
     }
 
-    cancellationflag_ = TRUE;
-    SetEvent(cancelevent_);
-
-    const DWORD timeoutMs = 3000;
-    const DWORD loopWaitResult = WaitForSingleObject(loopthread_, timeoutMs);
-    if (loopWaitResult == WAIT_TIMEOUT)
+    const auto context = new State::LoopContext{state_};
+    loopthread_.reset(CreateThread(nullptr, 0, StaticThreadLoop, context, 0, nullptr));
+    if (!loopthread_.valid())
     {
-#if defined(IMGVW_DEBUG)
-        OutputDebugString(L"ImgLoader::StopLoading: Warning: loop thread did not terminate within timeout.\n");
-#endif
+        const auto error = GetLastError();
+        delete context;
+        start_result_ = {ImgLoaderStartStatus::CreateThreadFailed, error};
     }
-    else if (loopWaitResult == WAIT_FAILED)
-    {
-#if defined(IMGVW_DEBUG)
-        const DWORD error = GetLastError();
-        WCHAR buf[256];
-        swprintf_s(buf, L"ImgLoader::StopLoading: loop thread wait failed with error 0x%08lX\n",
-                   static_cast<unsigned long>(error));
-        OutputDebugString(buf);
-#endif
-    }
-
-    if (!loaderitems_.empty())
-    {
-        std::vector<HANDLE> threads;
-        for (const auto& loaderitem : loaderitems_)
-        {
-            const auto status = loaderitem->imgitem()->status();
-            if (!(status == ImgItem::Status::Error || status == ImgItem::Status::Ready))
-            {
-                HANDLE threadHandle = loaderitem->loaderitemthread();
-                if (threadHandle != nullptr && threadHandle != INVALID_HANDLE_VALUE)
-                {
-                    threads.push_back(threadHandle);
-                }
-            }
-        }
-
-        if (!threads.empty())
-        {
-            const DWORD workersWaitResult =
-                WaitForMultipleObjects(static_cast<DWORD>(threads.size()), &threads[0], TRUE, timeoutMs);
-            if (workersWaitResult == WAIT_TIMEOUT)
-            {
-#if defined(IMGVW_DEBUG)
-                OutputDebugString(
-                    L"ImgLoader::StopLoading: Warning: worker threads did not terminate within timeout.\n");
-#endif
-            }
-            else if (workersWaitResult == WAIT_FAILED)
-            {
-#if defined(IMGVW_DEBUG)
-                const DWORD error = GetLastError();
-                WCHAR buf[256];
-                swprintf_s(buf, L"ImgLoader::StopLoading: worker threads wait failed with error 0x%08lX\n",
-                           static_cast<unsigned long>(error));
-                OutputDebugString(buf);
-#endif
-            }
-        }
-
-        loaderitems_.clear();
-    }
-
-    queue_.clear();
-    pendingitems_.clear();
-
-    cancellationflag_ = FALSE;
 }
 
-void ImgLoader::LoadAsync()
+ImgLoader::~ImgLoader()
 {
-    loopthread_ = CreateThread(nullptr, 0, StaticThreadLoop, reinterpret_cast<void*>(this), 0, nullptr);
+    StopLoading();
 }
 
-DWORD ImgLoader::Loop()
+ImgLoaderStopResult ImgLoader::StopLoading(DWORD timeout_milliseconds)
 {
-    const HANDLE waitevents[2] = {workevent_, cancelevent_};
+    if (!loopthread_.valid())
+    {
+        return {ImgLoaderStopStatus::AlreadyStopped, ERROR_SUCCESS};
+    }
+
+    {
+        CriticalSectionLock lock(state_->queuecriticalsection);
+        state_->stopping = true;
+    }
+
+    if (!SetEvent(state_->cancelevent.get()))
+    {
+        return {ImgLoaderStopStatus::SignalFailed, GetLastError()};
+    }
+
+    const auto wait_started = GetTickCount();
+    const auto loop_wait = WaitForSingleObject(loopthread_.get(), timeout_milliseconds);
+    if (loop_wait == WAIT_TIMEOUT)
+    {
+        return {ImgLoaderStopStatus::TimedOut, ERROR_TIMEOUT};
+    }
+    if (loop_wait == WAIT_FAILED)
+    {
+        return {ImgLoaderStopStatus::WaitFailed, GetLastError()};
+    }
+
+    std::vector<HANDLE> worker_threads;
+    {
+        CriticalSectionLock lock(state_->queuecriticalsection);
+        for (const auto& loaderitem : state_->loaderitems)
+        {
+            if (loaderitem->thread.valid())
+            {
+                worker_threads.push_back(loaderitem->thread.get());
+            }
+        }
+    }
+
+    for (const auto worker_thread : worker_threads)
+    {
+        const auto worker_wait =
+            WaitForSingleObject(worker_thread, RemainingTimeout(wait_started, timeout_milliseconds));
+        if (worker_wait == WAIT_TIMEOUT)
+        {
+            return {ImgLoaderStopStatus::TimedOut, ERROR_TIMEOUT};
+        }
+        if (worker_wait == WAIT_FAILED)
+        {
+            return {ImgLoaderStopStatus::WaitFailed, GetLastError()};
+        }
+    }
+
+    {
+        CriticalSectionLock lock(state_->queuecriticalsection);
+        state_->loaderitems.clear();
+        state_->queue.clear();
+        state_->pendingitems.clear();
+    }
+    loopthread_.reset();
+
+    return {ImgLoaderStopStatus::Stopped, ERROR_SUCCESS};
+}
+
+DWORD ImgLoader::Loop(const std::shared_ptr<State>& state)
+{
+    const HANDLE wait_events[] = {state->cancelevent.get(), state->workevent.get()};
     INT cyclecount{};
 
-    while (!cancellationflag_)
+    while (true)
     {
         ++cyclecount;
-        if (WaitForMultipleObjects(2, waitevents, FALSE, INFINITE) == WAIT_FAILED)
-        {
-            // TODO: handle error
-            break;
-        }
-
-        if (cancellationflag_)
+        const auto wait_result = WaitForMultipleObjects(2, wait_events, FALSE, INFINITE);
+        if (wait_result == WAIT_OBJECT_0)
         {
             break;
         }
+        if (wait_result != WAIT_OBJECT_0 + 1)
+        {
+            break;
+        }
 
-        auto imgitem = GetNextItem();
+        auto imgitem = GetNextItem(state);
         if (imgitem != nullptr)
         {
             if (imgitem->status() == ImgItem::Status::Queued)
             {
-                loadersemaphore_.Wait();
-                auto loaderitem =
-                    std::make_unique<LoaderItem>(imgitem, [this, imgitem]() { CompleteItem(imgitem, TRUE); });
-                loaderitem->set_loaderitemthread(
-                    CreateThread(nullptr, 0, StaticThreadLoad, reinterpret_cast<void*>(loaderitem.get()), 0, nullptr));
-                loaderitems_.push_back(std::move(loaderitem));
+                const auto semaphore_wait = state->loadersemaphore.Wait(state->cancelevent.get());
+                if (semaphore_wait == CountingSemaphoreWaitStatus::Cancelled)
+                {
+                    break;
+                }
+                if (semaphore_wait == CountingSemaphoreWaitStatus::Failed)
+                {
+                    CompleteItem(state, imgitem, FALSE);
+                    break;
+                }
+                if (WaitForSingleObject(state->cancelevent.get(), 0) == WAIT_OBJECT_0)
+                {
+                    state->loadersemaphore.Notify();
+                    break;
+                }
+
+                auto loaderitem = std::make_shared<State::LoaderItem>(imgitem);
+                const auto context = new State::WorkerContext{state, loaderitem};
+                loaderitem->thread.reset(CreateThread(nullptr, 0, StaticThreadLoad, context, 0, nullptr));
+                if (!loaderitem->thread.valid())
+                {
+                    delete context;
+                    CompleteItem(state, imgitem, TRUE);
+                }
+                else
+                {
+                    CriticalSectionLock lock(state->queuecriticalsection);
+                    state->loaderitems.push_back(std::move(loaderitem));
+                }
             }
             else
             {
-                CompleteItem(imgitem, FALSE);
+                CompleteItem(state, imgitem, FALSE);
             }
         }
 
-        if (!loaderitems_.empty() && cyclecount % kCleanupCycleCountTrigger == 0)
+        if (cyclecount % kCleanupCycleCountTrigger == 0)
         {
-            CleanupItemThreadObjects();
+            CleanupItemThreadObjects(state);
         }
     }
 
     return 0;
 }
 
-void ImgLoader::CleanupItemThreadObjects()
+void ImgLoader::CleanupItemThreadObjects(const std::shared_ptr<State>& state)
 {
     INT closedthreads{};
-    auto it = loaderitems_.begin();
-    while (it != loaderitems_.end())
+    CriticalSectionLock lock(state->queuecriticalsection);
+    auto item = state->loaderitems.begin();
+    while (item != state->loaderitems.end())
     {
-        if (WaitForSingleObject((*it).get()->loaderitemthread(), 0) == WAIT_OBJECT_0)
+        if (WaitForSingleObject((*item)->thread.get(), 0) == WAIT_OBJECT_0)
         {
-            (*it).get()->CloseLoaderItemThread();
+            item = state->loaderitems.erase(item);
             ++closedthreads;
-            loaderitems_.erase(it++);
         }
         else
         {
-            it++;
+            ++item;
         }
 
         if (closedthreads == kCleanupCycleCountTrigger)
@@ -156,72 +277,75 @@ void ImgLoader::CleanupItemThreadObjects()
 
 void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext)
 {
-    if (imgitem == nullptr)
+    if (imgitem == nullptr || !start_result_.Started() || imgitem->status() != ImgItem::Status::Queued)
     {
         return;
     }
 
-    if (imgitem->status() != ImgItem::Status::Queued)
     {
-        return;
-    }
-
-    EnterCriticalSection(&queuecriticalsection_);
-    if (pendingitems_.find(imgitem.get()) != pendingitems_.end())
-    {
-        if (loadnext)
+        CriticalSectionLock lock(state_->queuecriticalsection);
+        if (state_->stopping)
         {
-            const auto queueditem =
-                std::find_if(queue_.begin(), queue_.end(),
-                             [&imgitem](const std::shared_ptr<ImgItem>& item) { return item.get() == imgitem.get(); });
-            if (queueditem != queue_.end() && queueditem != queue_.begin())
+            return;
+        }
+        if (state_->pendingitems.find(imgitem.get()) != state_->pendingitems.end())
+        {
+            if (loadnext)
             {
-                queue_.splice(queue_.begin(), queue_, queueditem);
+                const auto queueditem =
+                    std::find_if(state_->queue.begin(), state_->queue.end(),
+                                 [&imgitem](const auto& item) { return item.get() == imgitem.get(); });
+                if (queueditem != state_->queue.end() && queueditem != state_->queue.begin())
+                {
+                    state_->queue.splice(state_->queue.begin(), state_->queue, queueditem);
+                }
             }
+            return;
         }
 
-        LeaveCriticalSection(&queuecriticalsection_);
-        return;
+        state_->pendingitems.insert(imgitem.get());
+        if (loadnext)
+        {
+            state_->queue.push_front(imgitem);
+        }
+        else if (state_->preferredtargetsizeset && imgitem->targetwidth() == state_->preferredtargetwidth &&
+                 imgitem->targetheight() == state_->preferredtargetheight)
+        {
+            const auto staleitem =
+                std::find_if(state_->queue.begin(), state_->queue.end(), [&state = state_](const auto& item) {
+                    return item->targetwidth() != state->preferredtargetwidth ||
+                           item->targetheight() != state->preferredtargetheight;
+                });
+            state_->queue.insert(staleitem, imgitem);
+        }
+        else
+        {
+            state_->queue.push_back(imgitem);
+        }
     }
 
-    pendingitems_.insert(imgitem.get());
-    if (loadnext)
-    {
-        queue_.push_front(imgitem);
-    }
-    else if (preferredtargetsizeset_ && imgitem->targetwidth() == preferredtargetwidth_ &&
-             imgitem->targetheight() == preferredtargetheight_)
-    {
-        const auto staleitem = std::find_if(queue_.begin(), queue_.end(), [this](const std::shared_ptr<ImgItem>& item) {
-            return item->targetwidth() != preferredtargetwidth_ || item->targetheight() != preferredtargetheight_;
-        });
-        queue_.insert(staleitem, imgitem);
-    }
-    else
-    {
-        queue_.push_back(imgitem);
-    }
-
-    LeaveCriticalSection(&queuecriticalsection_);
-
-    SetEvent(workevent_);
+    SetEvent(state_->workevent.get());
 }
 
 void ImgLoader::PrioritizeTargetSize(INT targetwidth, INT targetheight)
 {
-    EnterCriticalSection(&queuecriticalsection_);
+    if (!start_result_.Started())
+    {
+        return;
+    }
 
-    preferredtargetsizeset_ = TRUE;
-    preferredtargetwidth_ = targetwidth;
-    preferredtargetheight_ = targetheight;
+    CriticalSectionLock lock(state_->queuecriticalsection);
+    state_->preferredtargetsizeset = TRUE;
+    state_->preferredtargetwidth = targetwidth;
+    state_->preferredtargetheight = targetheight;
 
     std::list<std::shared_ptr<ImgItem>> prioritized;
-    auto item = queue_.begin();
-    while (item != queue_.end())
+    auto item = state_->queue.begin();
+    while (item != state_->queue.end())
     {
         if ((*item)->targetwidth() == targetwidth && (*item)->targetheight() == targetheight)
         {
-            prioritized.splice(prioritized.end(), queue_, item++);
+            prioritized.splice(prioritized.end(), state_->queue, item++);
         }
         else
         {
@@ -231,154 +355,177 @@ void ImgLoader::PrioritizeTargetSize(INT targetwidth, INT targetheight)
 
     if (!prioritized.empty())
     {
-        queue_.splice(queue_.begin(), prioritized);
+        state_->queue.splice(state_->queue.begin(), prioritized);
     }
-
-    LeaveCriticalSection(&queuecriticalsection_);
 }
 
 void ImgLoader::SetNotificationWindow(HWND hwnd, UINT message)
 {
-    EnterCriticalSection(&queuecriticalsection_);
-    const auto existing = std::find_if(notifications_.begin(), notifications_.end(),
+    if (!start_result_.Started())
+    {
+        return;
+    }
+
+    CriticalSectionLock lock(state_->queuecriticalsection);
+    const auto existing = std::find_if(state_->notifications.begin(), state_->notifications.end(),
                                        [hwnd](const ImgLoaderNotification& item) { return item.hwnd == hwnd; });
-    if (existing != notifications_.end())
+    if (existing != state_->notifications.end())
     {
         existing->message = message;
     }
     else if (hwnd != nullptr && message != 0)
     {
-        notifications_.push_back({hwnd, message});
+        state_->notifications.push_back({hwnd, message});
     }
-    LeaveCriticalSection(&queuecriticalsection_);
 }
 
 void ImgLoader::RemoveNotificationWindow(HWND hwnd)
 {
-    EnterCriticalSection(&queuecriticalsection_);
-    notifications_.erase(std::remove_if(notifications_.begin(), notifications_.end(),
-                                        [hwnd](const ImgLoaderNotification& item) { return item.hwnd == hwnd; }),
-                         notifications_.end());
-    LeaveCriticalSection(&queuecriticalsection_);
+    if (!state_ || !state_->queuecriticalsection.valid())
+    {
+        return;
+    }
+
+    CriticalSectionLock lock(state_->queuecriticalsection);
+    state_->notifications.erase(std::remove_if(state_->notifications.begin(), state_->notifications.end(),
+                                               [hwnd](const ImgLoaderNotification& item) { return item.hwnd == hwnd; }),
+                                state_->notifications.end());
 }
 
 void ImgLoader::DiscardQueuedItems()
 {
-    EnterCriticalSection(&queuecriticalsection_);
-    for (const auto& imgitem : queue_)
+    if (!state_ || !state_->queuecriticalsection.valid())
     {
-        pendingitems_.erase(imgitem.get());
+        return;
     }
-    queue_.clear();
-    if (queue_.empty())
+
+    CriticalSectionLock lock(state_->queuecriticalsection);
+    for (const auto& imgitem : state_->queue)
     {
-        ResetEvent(workevent_);
+        state_->pendingitems.erase(imgitem.get());
     }
-    LeaveCriticalSection(&queuecriticalsection_);
+    state_->queue.clear();
+    ResetEvent(state_->workevent.get());
 }
 
 void ImgLoader::DiscardQueuedItemsForTargetSize(INT targetwidth, INT targetheight)
 {
-    EnterCriticalSection(&queuecriticalsection_);
-    auto item = queue_.begin();
-    while (item != queue_.end())
+    if (!state_ || !state_->queuecriticalsection.valid())
+    {
+        return;
+    }
+
+    CriticalSectionLock lock(state_->queuecriticalsection);
+    auto item = state_->queue.begin();
+    while (item != state_->queue.end())
     {
         if ((*item)->targetwidth() == targetwidth && (*item)->targetheight() == targetheight)
         {
-            pendingitems_.erase(item->get());
-            item = queue_.erase(item);
+            state_->pendingitems.erase(item->get());
+            item = state_->queue.erase(item);
         }
         else
         {
             ++item;
         }
     }
-    if (queue_.empty())
+    if (state_->queue.empty())
     {
-        ResetEvent(workevent_);
+        ResetEvent(state_->workevent.get());
     }
-    LeaveCriticalSection(&queuecriticalsection_);
 }
 
 ImgLoaderStats ImgLoader::GetStats()
 {
     ImgLoaderStats stats;
-    EnterCriticalSection(&queuecriticalsection_);
-    stats.queued = queue_.size();
-    for (const auto& loaderitem : loaderitems_)
+    stats.maximum_slots = kMaximumLoaderCount;
+    if (!state_ || !state_->queuecriticalsection.valid())
     {
-        const auto status = loaderitem->imgitem()->status();
+        stats.free_slots = stats.maximum_slots;
+        return stats;
+    }
+
+    CriticalSectionLock lock(state_->queuecriticalsection);
+    stats.queued = state_->queue.size();
+    for (const auto& loaderitem : state_->loaderitems)
+    {
+        const auto status = loaderitem->imgitem->status();
         if (status != ImgItem::Status::Ready && status != ImgItem::Status::Error)
         {
             ++stats.loading;
         }
     }
-    stats.maximum_slots = kMaximumLoaderCount;
     stats.free_slots = stats.loading >= stats.maximum_slots ? 0 : stats.maximum_slots - stats.loading;
-    LeaveCriticalSection(&queuecriticalsection_);
-
     return stats;
 }
 
-std::shared_ptr<ImgItem> ImgLoader::GetNextItem()
+std::shared_ptr<ImgItem> ImgLoader::GetNextItem(const std::shared_ptr<State>& state)
 {
     std::shared_ptr<ImgItem> imgitem;
-    EnterCriticalSection(&queuecriticalsection_);
-    if (!queue_.empty())
+    CriticalSectionLock lock(state->queuecriticalsection);
+    if (!state->queue.empty())
     {
-        imgitem = queue_.front();
-        queue_.pop_front();
+        imgitem = state->queue.front();
+        state->queue.pop_front();
     }
     else
     {
-        ResetEvent(workevent_);
+        ResetEvent(state->workevent.get());
     }
-
-    LeaveCriticalSection(&queuecriticalsection_);
 
     return imgitem;
 }
 
-void ImgLoader::CompleteItem(const std::shared_ptr<ImgItem>& imgitem, BOOL notifysemaphore)
+void ImgLoader::CompleteItem(const std::shared_ptr<State>& state, const std::shared_ptr<ImgItem>& imgitem,
+                             BOOL notifysemaphore)
 {
-    EnterCriticalSection(&queuecriticalsection_);
-    pendingitems_.erase(imgitem.get());
-    LeaveCriticalSection(&queuecriticalsection_);
+    {
+        CriticalSectionLock lock(state->queuecriticalsection);
+        state->pendingitems.erase(imgitem.get());
+    }
 
     if (notifysemaphore)
     {
-        loadersemaphore_.Notify();
+        state->loadersemaphore.Notify();
     }
 
-    NotifyLoadComplete();
+    NotifyLoadComplete(state);
 }
 
-void ImgLoader::NotifyLoadComplete()
+void ImgLoader::NotifyLoadComplete(const std::shared_ptr<State>& state)
 {
-    EnterCriticalSection(&queuecriticalsection_);
-    for (const auto& notification : notifications_)
+    std::vector<ImgLoaderNotification> notifications;
+    {
+        CriticalSectionLock lock(state->queuecriticalsection);
+        notifications = state->notifications;
+    }
+
+    for (const auto& notification : notifications)
     {
         if (notification.hwnd != nullptr && notification.message != 0)
         {
             PostMessage(notification.hwnd, notification.message, 0, 0);
         }
     }
-    LeaveCriticalSection(&queuecriticalsection_);
 }
 
-DWORD WINAPI ImgLoader::StaticThreadLoop(void* imgloaderinstance)
+DWORD WINAPI ImgLoader::StaticThreadLoop(void* context)
 {
-    auto imgloader = reinterpret_cast<ImgLoader*>(imgloaderinstance);
-    imgloader->Loop();
-
-    return 0;
+    std::unique_ptr<State::LoopContext> loop_context(reinterpret_cast<State::LoopContext*>(context));
+    return loop_context == nullptr ? 0 : Loop(loop_context->state);
 }
 
-DWORD WINAPI ImgLoader::StaticThreadLoad(void* loaderiteminstance)
+DWORD WINAPI ImgLoader::StaticThreadLoad(void* context)
 {
-    auto loaderitem = reinterpret_cast<LoaderItem*>(loaderiteminstance);
-    loaderitem->imgitem()->Load();
-    loaderitem->LoadComplete();
+    std::unique_ptr<State::WorkerContext> worker_context(reinterpret_cast<State::WorkerContext*>(context));
+    if (worker_context == nullptr)
+    {
+        return 0;
+    }
 
+    const auto state = worker_context->state;
+    const auto loaderitem = worker_context->loaderitem;
+    loaderitem->imgitem->Load();
+    CompleteItem(state, loaderitem->imgitem, TRUE);
     return 0;
 }

@@ -11,7 +11,7 @@ class SemaphoreGuard
     {
         if (acquired_)
         {
-            semaphore_.Wait();
+            acquired_ = semaphore_.Wait() == CountingSemaphoreWaitStatus::Acquired;
         }
     }
 

@@ -4,7 +4,7 @@ CXXFLAGS ?= -std=c++17 -Wall -Wextra -Werror -Wno-missing-field-initializers -DU
 	-I../src/browse -I../src/image -I../src/platform/win32 -I../src/ui/win32 -I../resources \
 	-isystem ../3rd-party/libjpeg-turbo -isystem ../3rd-party/Little-CMS
 TARGET = ImgVwTests.exe
-SOURCES = ImgVwTests.cpp ../src/browse/ImgFileList.cpp ../src/image/ColorProfile.cpp \
+SOURCES = ImgVwTests.cpp ../src/browse/BrowsePath.cpp ../src/browse/ImgFileList.cpp ../src/image/ColorProfile.cpp \
 	../src/image/ColorTransform.cpp ../src/image/ExifOrientation.cpp ../src/image/ImgResampler.cpp \
 	../src/image/ImgLoader.cpp ../src/image/ImageFormatDetector.cpp ../src/image/ImageFormatResolver.cpp ../src/image/ImgBuffer.cpp \
 	../src/image/ImgGDIItem.cpp ../src/image/ImgItem.cpp ../src/image/ImgItemHelper.cpp \
