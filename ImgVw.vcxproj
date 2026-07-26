@@ -209,13 +209,22 @@
     <ClInclude Include="src\platform\win32\SelectedGdiObject.h" />
     <ClInclude Include="src\platform\win32\Win32Handle.h" />
     <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
+    <ClInclude Include="src\ui\win32\BrowseWindowState.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
     <ClInclude Include="src\ui\win32\EmptyStateLayout.h" />
     <ClInclude Include="src\ui\win32\EmptyStateView.h" />
     <ClInclude Include="src\ui\win32\DisplayPresenter.h" />
+    <ClInclude Include="src\ui\win32\DisplaySession.h" />
+    <ClInclude Include="src\ui\win32\CursorController.h" />
     <ClInclude Include="src\ui\win32\InfoOverlay.h" />
+    <ClInclude Include="src\ui\win32\InfoOverlayStatsBuilder.h" />
+    <ClInclude Include="src\ui\win32\InfoOverlayVisibility.h" />
+    <ClInclude Include="src\ui\win32\MonitorPlacement.h" />
+    <ClInclude Include="src\ui\win32\MultiMonitorSlideShowCoordinator.h" />
+    <ClInclude Include="src\ui\win32\SlideShowStateMachine.h" />
     <ClInclude Include="src\ui\win32\OverlayText.h" />
     <ClInclude Include="src\ui\win32\WindowGeometry.h" />
+    <ClInclude Include="src\ui\win32\WindowDragController.h" />
     <ClInclude Include="src\ui\win32\Window.h" />
   </ItemGroup>
   <ItemGroup>

@@ -3,10 +3,9 @@
 ## Status
 
 **Active.** The ownership, immutable-display, notification-generation, buffer-boundary, and focused-test prerequisites
-are complete. Track 3 (test division) is complete. The remaining work is the production modularity portion: extract
-cohesive UI policy and presentation helpers from `ImgVwWindow`, finish separating `ImgBrowser` responsibilities, close
-the remaining explicit-error and static-analysis gaps, and reduce `ImgVwWindow` to a message adapter and composition
-root.
+are complete. Track 1 (`ImgVwWindow` modularity) and Track 3 (test division) are complete. The remaining work is Track
+2 production hardening: separate `ImgBrowser` responsibilities, finish lower-risk RAII and arithmetic work, and close
+the remaining explicit-error and static-analysis gaps.
 
 ## Progress Checklist
 
@@ -26,11 +25,16 @@ with checked children is in progress.
   - [x] Move overlay font lifetime, layout, and composited drawing into `InfoOverlay`.
   - [x] Return timer and invalidation actions to `ImgVwWindow` instead of performing those side effects internally.
   - [x] Add focused loading, error, first-paint, partial-paint, and overlay tests.
-- [ ] Phase 5: extract `CursorController`, `WindowDragController`, and `MonitorPlacement`.
-- [ ] Phase 6: extract slideshow policy.
-  - [ ] Extract and test `SlideShowStateMachine`.
-  - [ ] Extract multi-monitor coordination with safe registration and teardown.
-- [ ] Phase 7: reduce `ImgVwWindow` to a composition root and Win32 adapter.
+- [x] Phase 5: extract and test `CursorController`, `WindowDragController`, and `MonitorPlacement`.
+- [x] Phase 6: extract slideshow policy.
+  - [x] Extract and test `SlideShowStateMachine`.
+  - [x] Extract multi-monitor coordination with safe registration and teardown.
+- [x] Phase 7: reduce `ImgVwWindow` to a composition root and Win32 adapter.
+  - [x] Extract loader-stat snapshot aggregation from the window.
+  - [x] Extract display-selection and first-paint session state.
+  - [x] Consolidate browse/view-session state and remove dead window fields.
+  - [x] Extract filename-versus-stats overlay visibility policy.
+  - [x] Audit the remaining methods as Win32 adaptation or explicit subsystem orchestration.
 
 ### Track 2: Remaining Production Hardening
 
@@ -51,16 +55,16 @@ with checked children is in progress.
 - [ ] Add tests alongside each remaining production component extraction.
 - [ ] Complete final x86/x64 MSYS and Visual Studio builds, formatting/static analysis, and manual regression checks.
 
-Current next item: begin Phase 5 with pure drag calculations and a `WindowDragController`, while keeping `SetCapture`,
-`ReleaseCapture`, and `SetWindowPos` calls in `ImgVwWindow`.
+Current next item: begin Track 2 browser decomposition with `FolderScanner`, preserving the completed cancellation,
+generation, notification-target, and navigation contracts.
 
 ## Review Update (2026-07-26)
 
 The plan was reviewed against the current source tree and history after the completed safety and test-split work. The
 remaining work is correctly concentrated in production modularity, not in redoing the already-completed prerequisites.
 
-- `ImgVwWindow.cpp` is approximately 2,300 lines. Drag/cursor behavior, monitor placement, slideshow policy, and
-  browser-stat collection are still owned directly by the window.
+- `ImgVwWindow.cpp` is approximately 2,300 lines. Browser-stat collection and several platform/application
+  orchestration responsibilities are still owned directly by the window.
 - `ImgBrowser` is a small lifetime-safe facade, but its approximately 1,500-line `ImgBrowserCore` still combines folder
   collection, session/cancellation state, navigation, preload scheduling, cache access, and notifications.
 - `WindowGeometry`, `EmptyStateLayout`, and `OverlayText` now provide the first pure helper boundaries and core tests.
@@ -68,14 +72,16 @@ remaining work is correctly concentrated in production modularity, not in redoin
   control windows, layout, painting, and focus/dialog behavior. `DisplayPresenter` consumes an immutable display
   snapshot and owns ready/loading/error paint decisions plus renderer invocation. `InfoOverlay` owns item and statistics
   presentation, cached layout/content, font lifetime, composited drawing, and loading-progress policy. It returns timer
-  and invalidation requests for `ImgVwWindow` to execute. Interaction helpers and slideshow-policy components remain
-  unextracted.
+  and invalidation requests for `ImgVwWindow` to execute. `CursorController`, `WindowDragController`, and
+  `MonitorPlacement` own interaction state and calculations while the window retains Win32 side effects.
+  `SlideShowStateMachine` owns single-window timing/navigation state, and `MultiMonitorSlideShowCoordinator` owns
+  stable secondary-window registrations, deterministic target rotation, shared sequential cursor/preload state, and
+  target-size load-context reuse.
 - The working-branch Phase 1 change routes `WM_COMMAND`, `WM_TIMER`, and mouse messages through dedicated helpers while
   retaining the top-level Win32 message switch and preserving the original message parameters for forwarded commands.
 
-The next implementation slice should begin Phase 5 with pure drag calculations and `WindowDragController`, while
-keeping capture and placement side effects in `ImgVwWindow`. Do not begin slideshow or `ImgBrowserCore` work in the
-same change.
+Phases 6 and 7 are complete. The next implementation slice should begin the separately scoped `ImgBrowserCore`
+decomposition with `FolderScanner`; do not combine that ownership change with unrelated window cleanup.
 
 ## Summary
 
@@ -284,6 +290,12 @@ Secondary `Window` objects may continue to follow the current self-destruction c
 retain an unverified raw pointer. Use explicit registration/unregistration and a stable identifier or validated window
 reference. Document the teardown order between owner, secondary windows, browsers, loaders, and notification targets.
 
+Implemented teardown order: the owner first releases all stable secondary-window registrations, then synchronously
+destroys each registered `HWND`. Each secondary handles `WM_NCDESTROY` by stopping its browser/load notification target
+before self-destruction and attempts an idempotent unregister. Only after every owned secondary has completed teardown
+does the owner stop its own browser/load notification target. No coordinator entry retains a raw `ImgVwWindow*`;
+registered identifiers are validated and resolved through the live Win32 window immediately before use.
+
 Acceptance criteria:
 
 - Slideshow timer and interval policy is fully unit tested without a window.
@@ -303,6 +315,14 @@ After the extractions, `ImgVwWindow` should primarily contain:
 
 Line count is not the primary criterion, but a cohesive implementation in the approximate range of 400 to 700 lines is
 a reasonable outcome. Avoid replacing the current large class with a single equally broad `Controller` class.
+
+Completion audit: `ImgVwWindow` now composes dedicated browser-window, display-session, empty-state, display,
+information-overlay, overlay-visibility, cursor, drag, monitor-placement, single-slideshow, and multi-monitor
+slideshow components. Loader-stat snapshot aggregation is also outside the window. Remaining window fields are Win32
+runtime state or composed subsystem objects; remaining methods adapt messages, execute Win32 side effects, or make
+explicit calls across UI, browse, image, and platform boundaries. The implementation remains longer than the
+non-binding line-count guide because those explicit XP-compatible adapter paths were kept visible instead of being
+hidden in a broad replacement controller.
 
 ## Track 2: Improve the Remaining Code
 

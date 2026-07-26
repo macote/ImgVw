@@ -1,8 +1,17 @@
 #include "EmptyStateLayout.h"
+#include "BrowseWindowState.h"
 #include "DisplayPresenter.h"
+#include "DisplaySession.h"
+#include "CursorController.h"
 #include "InfoOverlay.h"
+#include "InfoOverlayStatsBuilder.h"
+#include "InfoOverlayVisibility.h"
+#include "MonitorPlacement.h"
+#include "MultiMonitorSlideShowCoordinator.h"
+#include "SlideShowStateMachine.h"
 #include "OverlayText.h"
 #include "WindowGeometry.h"
+#include "WindowDragController.h"
 #include "../support/TestHarness.h"
 
 namespace
@@ -17,6 +26,212 @@ void TestWindowGeometry()
           "rectangle containment accepts an inner rectangle");
     Check(!WindowGeometry::ContainsRect(outer, RECT{-1, 20, 80, 80}),
           "rectangle containment rejects a rectangle outside the left edge");
+}
+
+void TestDisplaySession()
+{
+    DisplaySession session;
+    Check(session.first_paint() && session.restore_path().empty(), "display session starts with no selected image");
+
+    session.Select(L"first.jpg");
+    Check(session.restore_path() == L"first.jpg", "display session restores the selection before its first paint");
+    session.MarkPainted(L"first.jpg");
+    session.CompleteFirstPaint();
+    session.Select(L"second.jpg");
+    Check(!session.first_paint() && session.selected_path() == L"second.jpg" && session.restore_path() == L"first.jpg",
+          "display session preserves the last painted image while a newer selection loads");
+
+    session.MarkPainted(L"second.jpg");
+    Check(session.restore_path() == L"second.jpg", "display session advances its restore path after painting");
+    session.Clear();
+    Check(session.selected_path().empty() && session.painted_path().empty(),
+          "display session clears selected and painted paths together");
+}
+
+void TestBrowseWindowState()
+{
+    BrowseWindowState state(L"first");
+    Check(state.path() == L"first" && !state.browser_initialized() && !state.CanStartSubfolderSearch(),
+          "browse window state retains its startup path without assuming browser initialization");
+
+    state.MarkBrowserInitialized();
+    Check(state.CanStartSubfolderSearch(), "initialized browse state permits its first recursive search");
+    state.EnableSubfolderSearch();
+    Check(state.browse_subfolders() && !state.CanStartSubfolderSearch(),
+          "browse window state prevents duplicate recursive searches");
+
+    state.OpenPath(L"second");
+    Check(state.path() == L"second" && state.browser_initialized() && !state.browse_subfolders() &&
+              state.CanStartSubfolderSearch(),
+          "opening another path preserves browser initialization and resets recursive browsing");
+}
+
+void TestWindowDragController()
+{
+    WindowDragController controller;
+    Check(controller.Begin(POINT{-1500, 100}, RECT{-1600, 0, -600, 800}),
+          "window drag begins on a negative-coordinate monitor");
+    const auto position = controller.CalculatePosition(POINT{-1400, 250});
+    Check(position.x == -1500 && position.y == 150, "window drag preserves the pointer offset across monitors");
+    Check(controller.End() && !controller.active(), "window drag ends deterministically");
+    Check(!controller.Begin(POINT{}, RECT{10, 10, 10, 20}), "window drag rejects an empty window rectangle");
+}
+
+void TestCursorController()
+{
+    CursorController controller;
+    Check(controller.SetVisible(false) == CursorVisibilityAction::Hide,
+          "cursor controller requests its initial hidden state");
+    Check(controller.SetVisible(false) == CursorVisibilityAction::None,
+          "cursor controller does not unbalance repeated hide requests");
+    Check(controller.SetCaptured(true) && !controller.SetCaptured(true),
+          "cursor controller changes capture state only once");
+
+    controller.OnMouseMove(POINTS{10, 10}, 100);
+    const auto moved = controller.OnMouseMove(POINTS{11, 10}, 100);
+    Check(moved.visibility == CursorVisibilityAction::Show && moved.arm_idle_timer,
+          "mouse activity shows the cursor and arms idle tracking");
+    controller.SetVisible(false);
+    const auto moved_while_armed = controller.OnMouseMove(POINTS{12, 10}, 125);
+    Check(moved_while_armed.visibility == CursorVisibilityAction::Show && !moved_while_armed.arm_idle_timer,
+          "mouse activity restores a cursor hidden while idle tracking remains armed");
+    const auto early = controller.OnIdleTimer(175, 1000, 100);
+    Check(early.arm_idle_timer && early.idle_timer_delay == 50, "cursor idle policy preserves the remaining timeout");
+    const auto idle = controller.OnIdleTimer(225, 1000, 100);
+    Check(idle.visibility == CursorVisibilityAction::Hide && idle.cancel_idle_timer,
+          "cursor idle policy hides once after the timeout");
+}
+
+void TestMonitorPlacement()
+{
+    const auto bounds = MonitorPlacement::FromRectangle(RECT{-1920, -200, 0, 880});
+    Check(bounds.valid && bounds.x == -1920 && bounds.y == -200 && bounds.width == 1920 && bounds.height == 1080,
+          "monitor placement preserves negative-coordinate bounds");
+    Check(!MonitorPlacement::FromRectangle(RECT{0, 0, 0, 100}).valid, "monitor placement rejects empty bounds");
+
+    MonitorPlacement placement;
+    const auto first_monitor = reinterpret_cast<HMONITOR>(static_cast<ULONG_PTR>(1));
+    const auto second_monitor = reinterpret_cast<HMONITOR>(static_cast<ULONG_PTR>(2));
+    placement.SetCurrent(first_monitor);
+    Check(!placement.OnMonitorChanged(first_monitor, false).changed,
+          "monitor placement ignores duplicate monitor notifications");
+    const auto dragging_transition = placement.OnMonitorChanged(second_monitor, true);
+    Check(dragging_transition.changed && !dragging_transition.apply_bounds,
+          "monitor placement defers bounds while dragging");
+}
+
+void TestSlideShowStateMachine()
+{
+    SlideShowStateMachine slideshow(1750, 125, 10000, 125);
+    Check(slideshow.Start(SlideShowMode::Sequential) && slideshow.OnTimer() == SlideShowNavigation::Sequential,
+          "sequential slideshow requests sequential navigation");
+    slideshow.OnDisplaySelection(true, false);
+    Check(slideshow.waiting_for_image() && slideshow.OnTimer() == SlideShowNavigation::None,
+          "slideshow pauses navigation while an image loads");
+    Check(slideshow.OnImageReady() && slideshow.OnTimer() == SlideShowNavigation::Sequential,
+          "ready notification resumes slideshow navigation");
+
+    slideshow.Stop();
+    slideshow.Start(SlideShowMode::Random);
+    slideshow.OnDisplaySelection(false, false);
+    Check(slideshow.needs_initial_advance(), "empty random selection requests an initial advance");
+    Check(slideshow.IncreaseSpeed() && slideshow.interval() == 1625, "slideshow speed increase reduces the interval");
+    slideshow.SetInterval(125);
+    Check(!slideshow.IncreaseSpeed() && slideshow.interval() == 125, "slideshow interval respects its minimum");
+    slideshow.SetInterval(10000);
+    Check(!slideshow.DecreaseSpeed() && slideshow.interval() == 10000, "slideshow interval respects its maximum");
+    Check(slideshow.Stop() && !slideshow.waiting_for_image() && !slideshow.needs_initial_advance(),
+          "stopping slideshow clears transient state");
+}
+
+void TestMultiMonitorSlideShowCoordinator()
+{
+    MultiMonitorSlideShowCoordinator coordinator;
+    const MultiMonitorWindowId owner = 1;
+    const MultiMonitorWindowId first_secondary = 2;
+    const MultiMonitorWindowId second_secondary = 3;
+
+    Check(!coordinator.RegisterSecondaryWindow(0), "multi-monitor slideshow rejects an empty registration");
+    Check(coordinator.RegisterSecondaryWindow(first_secondary) &&
+              coordinator.RegisterSecondaryWindow(second_secondary) &&
+              !coordinator.RegisterSecondaryWindow(first_secondary),
+          "multi-monitor slideshow keeps unique stable registrations");
+
+    coordinator.Start();
+    Check(coordinator.running() && coordinator.NextTarget(owner) == owner &&
+              coordinator.NextTarget(owner) == first_secondary && coordinator.NextTarget(owner) == second_secondary &&
+              coordinator.NextTarget(owner) == owner,
+          "multi-monitor slideshow advances targets in a deterministic cycle");
+
+    Check(coordinator.UnregisterSecondaryWindow(first_secondary) &&
+              !coordinator.UnregisterSecondaryWindow(first_secondary) && coordinator.target_count() == 2,
+          "destroyed secondary windows are explicitly unregistered");
+    Check(coordinator.NextTarget(owner) == second_secondary && coordinator.NextTarget(owner) == owner,
+          "target rotation remains deterministic after a secondary window closes");
+
+    coordinator.SetSequentialCursorPath(L"next.jpg");
+    coordinator.SetPreloadedPathCount(42);
+    coordinator.Stop();
+    Check(!coordinator.running() && coordinator.sequential_cursor_path().empty() &&
+              coordinator.preloaded_path_count() == 0,
+          "stopping multi-monitor slideshow clears transient navigation state");
+
+    const auto released = coordinator.ReleaseSecondaryWindows();
+    Check(released.size() == 1 && released.front() == second_secondary && coordinator.target_count() == 1,
+          "owner teardown releases every secondary registration before destruction");
+}
+
+void TestInfoOverlayStatsBuilder()
+{
+    ImgBrowserStats shared_stats;
+    shared_stats.found_images = 12;
+
+    ImgBrowserStats first_target;
+    first_target.targetwidth = 800;
+    first_target.targetheight = 600;
+    first_target.loader.queued = 2;
+    first_target.sizes.push_back({800, 600, 3, 1, 5, 1, 4096});
+
+    auto duplicate_target = first_target;
+    duplicate_target.loader.queued = 99;
+
+    ImgBrowserStats second_target;
+    second_target.targetwidth = 1920;
+    second_target.targetheight = 1080;
+    second_target.loader.free_slots = 4;
+
+    InfoOverlayStatsContext context;
+    context.has_free_bytes = true;
+    context.free_bytes = 8192;
+    context.slideshow_running = true;
+    context.random_slideshow = true;
+    context.cycle = {3, 12};
+    context.current_item_text = L"photo.jpg";
+
+    const auto snapshot =
+        InfoOverlayStatsBuilder::Build(shared_stats, {first_target, duplicate_target, second_target}, context);
+    Check(snapshot.found_images == 12 && snapshot.targets.size() == 2,
+          "overlay stats aggregation preserves shared totals and deduplicates target sizes");
+    Check(snapshot.targets[0].queued == 3 && snapshot.targets[0].loader_queued == 2 &&
+              snapshot.targets[0].used_bytes == 4096,
+          "overlay stats aggregation selects cache and loader data for the active target size");
+    Check(snapshot.targets[1].width == 1920 && snapshot.targets[1].free_slots == 4,
+          "overlay stats aggregation retains targets without a cache-size entry");
+    Check(snapshot.has_free_bytes && snapshot.free_bytes == 8192 && snapshot.slideshow_running &&
+              snapshot.random_slideshow && snapshot.cycle_position == 3 && snapshot.cycle_total == 12 &&
+              snapshot.current_item_text == L"photo.jpg",
+          "overlay stats aggregation copies presentation context");
+}
+
+void TestInfoOverlayVisibility()
+{
+    InfoOverlayVisibility visibility;
+    Check(visibility.ToggleFilename(false) && visibility.filename_visible(false),
+          "filename overlay can be enabled without the stats chord");
+    Check(!visibility.filename_visible(true), "loader stats temporarily suppress the filename overlay");
+    visibility.OnStatsRequested(true);
+    Check(!visibility.filename_visible(false), "requesting loader stats disables the persistent filename overlay");
+    Check(!visibility.ToggleFilename(true), "filename overlay cannot be enabled while loader stats are requested");
 }
 
 void TestEmptyStateLayout()
@@ -110,6 +325,15 @@ void TestDisplayPresentationDecisions()
 void RunWindowPresentationTests()
 {
     TestWindowGeometry();
+    TestDisplaySession();
+    TestBrowseWindowState();
+    TestWindowDragController();
+    TestCursorController();
+    TestMonitorPlacement();
+    TestSlideShowStateMachine();
+    TestMultiMonitorSlideShowCoordinator();
+    TestInfoOverlayStatsBuilder();
+    TestInfoOverlayVisibility();
     TestEmptyStateLayout();
     TestOverlayText();
     TestInfoOverlayProgressActions();

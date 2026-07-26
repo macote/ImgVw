@@ -14,6 +14,10 @@ class Window
     }
 
   protected:
+    static Window* FromHandle(HWND hwnd)
+    {
+        return reinterpret_cast<Window*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    }
     HINSTANCE hinst_;
     HWND hwnd_{NULL};
     HBRUSH backgroundbrush_{nullptr};

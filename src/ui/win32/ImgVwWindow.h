@@ -5,22 +5,25 @@
 #endif
 
 #include "FileOperations.h"
+#include "BrowseWindowState.h"
 #include "EmptyStateView.h"
 #include "DisplayPresenter.h"
+#include "DisplaySession.h"
+#include "CursorController.h"
 #include "InfoOverlay.h"
-#include "ImgRenderer.h"
-#include "OverlayText.h"
+#include "InfoOverlayStatsBuilder.h"
+#include "InfoOverlayVisibility.h"
+#include "MonitorPlacement.h"
+#include "MultiMonitorSlideShowCoordinator.h"
+#include "SlideShowStateMachine.h"
 #include "WindowGeometry.h"
+#include "WindowDragController.h"
 #include "Window.h"
 #include "ImgBrowser.h"
 #include "ImgItem.h"
 #include "ImgSettings.h"
 #include "PathPicker.h"
 #include <Windows.h>
-#include <Windowsx.h>
-#include <Gdiplus.h>
-#include <commctrl.h>
-#include <objidl.h>
 #include <shellapi.h>
 #include <cstddef>
 #include <memory>
@@ -47,15 +50,12 @@ class ImgVwWindow final : public Window
     static const DWORD kLoadingProgressOverlayDebounceInMilliseconds = 666;
 
   public:
-    ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args) : Window(hinst)
+    ImgVwWindow(HINSTANCE hinst, const std::vector<std::wstring> args)
+        : Window(hinst), browse_state_(args.size() > 1 ? args[1] : std::wstring())
     {
-        if (args.size() > 1)
-        {
-            path_ = args[1];
-        }
     }
     ImgVwWindow(HINSTANCE hinst, const std::wstring& path, ImgVwWindow* owner, BOOL primary)
-        : Window(hinst), path_(path), owner_(owner), primarywindow_(primary)
+        : Window(hinst), browse_state_(path), owner_(owner), primarywindow_(primary)
     {
     }
     ImgVwWindow(const ImgVwWindow&) = delete;
@@ -69,57 +69,27 @@ class ImgVwWindow final : public Window
 
   private:
     struct MonitorCreateContext;
-    struct TargetLoadContext
-    {
-        INT width{};
-        INT height{};
-        std::shared_ptr<ImgBrowserLoadContext> context;
-    };
-    enum class BrowseUiState
-    {
-        Collecting,
-        Viewing,
-    };
-
     ImgBrowser browser_;
+    BrowseWindowState browse_state_;
     PathPicker path_picker_;
     FileOperations file_operations_;
     DisplayPresenter display_presenter_;
-    std::wstring path_;
-    std::wstring displayslidepath_;
-    std::wstring paintedslidepath_;
-    WORD activeparam_{};
-    HCURSOR arrowcursor_{nullptr};
     LARGE_INTEGER qpcfrequency_{};
-    BOOL slideshowrunning_{};
-    BOOL slideshowrandom_{};
-    BOOL slideshowwaitingforimage_{};
-    BOOL slideshowneedsinitialadvance_{};
-    UINT slideshowinterval_{kInitialSlideShowIntervalInMilliseconds};
-    POINTS mousemovelastpoints_{};
-    LARGE_INTEGER mousemovelastcounter_{};
-    BOOL mousehidetimerstarted_{FALSE};
+    SlideShowStateMachine slideshow_{kInitialSlideShowIntervalInMilliseconds, kMinimumSlideShowIntervalInMilliseconds,
+                                     kMaximumSlideShowIntervalInMilliseconds,
+                                     kSlideShowIntervalIncrementStepInMilliseconds};
+    CursorController cursor_controller_;
     INT clientwidth_{};
     INT clientheight_{};
-    BOOL browsesubfolders_{FALSE};
-    BOOL browserinitialized_{FALSE};
-    BrowseUiState browseuistate_{BrowseUiState::Collecting};
     EmptyStateView empty_state_view_;
-    HMONITOR currentmonitor_{nullptr};
-    BOOL draggingwindow_{FALSE};
-    POINT dragstartpoint_{};
-    RECT dragstartwindowrect_{};
+    MonitorPlacement monitor_placement_;
+    WindowDragController window_drag_controller_;
     ImgVwWindow* owner_{nullptr};
     BOOL primarywindow_{TRUE};
-    BOOL multimonitorslideshowrunning_{FALSE};
-    std::size_t multimonitorslideshowindex_{};
-    std::size_t multimonitorslideshowpreloadcount_{};
-    std::wstring multimonitorslideshowcursorpath_;
-    std::vector<ImgVwWindow*> slideshowwindows_;
-    std::vector<TargetLoadContext> targetloadcontexts_;
-    BOOL firstimagepaint_{TRUE};
+    MultiMonitorSlideShowCoordinator multi_monitor_slideshow_;
+    DisplaySession display_session_;
 
-    BOOL filenameoverlayenabled_{FALSE};
+    InfoOverlayVisibility info_overlay_visibility_;
     BOOL systemlighttheme_{FALSE};
     InfoOverlay info_overlay_;
 
@@ -171,6 +141,9 @@ class ImgVwWindow final : public Window
     void RestartMultiMonitorSlideShowTimer();
     void HandleMultiMonitorSlideShow();
     std::size_t PreloadMultiMonitorSlideShowContexts();
+    static MultiMonitorWindowId WindowId(HWND window);
+    static HWND WindowHandle(MultiMonitorWindowId window);
+    static ImgVwWindow* ResolveSlideShowWindow(MultiMonitorWindowId window);
     ImgVwWindow* MultiMonitorSlideShowWindowAt(std::size_t index);
     std::size_t MultiMonitorSlideShowWindowCount() const;
     void DestroySlideShowWindows();
@@ -211,7 +184,6 @@ class ImgVwWindow final : public Window
     void ClearInfoOverlay();
     std::wstring BuildLoaderStatsOverlayText();
     UINT GetWindowDpi() const;
-    INT ScaleForWindowDpi(INT value) const;
     void ResetLoaderStatsOverlayLayout();
     void RefreshLoaderStatsOverlay();
     void DrawLoaderStatsOverlay(HDC dc, const ImgItem* item);
@@ -225,6 +197,8 @@ class ImgVwWindow final : public Window
     void CloseWindow();
     BOOL HandleMouseMove(WPARAM wParam, LPARAM lParam);
     void HandleHideMouseCursor();
+    void ApplyCursorVisibility(CursorVisibilityAction action);
+    void ApplyCursorCapture(bool captured);
     void OnNCDestroy();
     static BOOL CALLBACK AboutDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 };

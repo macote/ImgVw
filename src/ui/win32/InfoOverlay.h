@@ -117,7 +117,7 @@ class InfoOverlay final
     {
         const auto ready = item != nullptr && item->status() == ImgItem::Status::Ready;
         const auto loading = item != nullptr && item->status() == ImgItem::Status::Loading;
-        const auto percent = loading ? std::max(item->loadingprogresspercent(), 0) : 0;
+        const auto percent = loading ? (std::max)(item->loadingprogresspercent(), 0) : 0;
         return OverlayText::BuildItemInfo(filepath, ready, loading, percent);
     }
 

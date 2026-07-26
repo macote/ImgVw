@@ -157,6 +157,9 @@
     <ClInclude Include="src\ui\win32\ImgVwWindow.h">
       <Filter>UI</Filter>
     </ClInclude>
+    <ClInclude Include="src\ui\win32\BrowseWindowState.h">
+      <Filter>UI</Filter>
+    </ClInclude>
     <ClInclude Include="src\ui\win32\ImgRenderer.h">
       <Filter>UI</Filter>
     </ClInclude>
@@ -169,13 +172,37 @@
     <ClInclude Include="src\ui\win32\InfoOverlay.h">
       <Filter>UI</Filter>
     </ClInclude>
+    <ClInclude Include="src\ui\win32\InfoOverlayStatsBuilder.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\InfoOverlayVisibility.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\MonitorPlacement.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\MultiMonitorSlideShowCoordinator.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\SlideShowStateMachine.h">
+      <Filter>UI</Filter>
+    </ClInclude>
     <ClInclude Include="src\ui\win32\DisplayPresenter.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\DisplaySession.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\CursorController.h">
       <Filter>UI</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\win32\OverlayText.h">
       <Filter>UI</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\win32\WindowGeometry.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\WindowDragController.h">
       <Filter>UI</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\win32\Window.h">

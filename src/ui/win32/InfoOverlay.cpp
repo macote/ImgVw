@@ -104,9 +104,9 @@ RECT InfoOverlay::CalculateRectangle(HDC dc, const std::wstring& text, UINT dpi,
     const auto fallback_width = WindowGeometry::ScaleForDpi(800, dpi);
     const auto fallback_height = WindowGeometry::ScaleForDpi(600, dpi);
     const auto available_width =
-        std::max(1, (client_width > 0 ? client_width : fallback_width) - inset * 2 - horizontal_padding * 2);
+        (std::max)(1, (client_width > 0 ? client_width : fallback_width) - inset * 2 - horizontal_padding * 2);
     const auto available_height =
-        std::max(1, (client_height > 0 ? client_height : fallback_height) - inset * 2 - vertical_padding * 2);
+        (std::max)(1, (client_height > 0 ? client_height : fallback_height) - inset * 2 - vertical_padding * 2);
     RECT text_rectangle{0, 0, available_width, available_height};
     const auto font = GetFont(dpi);
     const auto previous_font = font == nullptr ? nullptr : SelectObject(dc, font);
@@ -116,8 +116,8 @@ RECT InfoOverlay::CalculateRectangle(HDC dc, const std::wstring& text, UINT dpi,
         SelectObject(dc, previous_font);
     }
 
-    const auto text_width = std::min(available_width, static_cast<INT>(text_rectangle.right - text_rectangle.left));
-    const auto text_height = std::min(available_height, static_cast<INT>(text_rectangle.bottom - text_rectangle.top));
+    const auto text_width = (std::min)(available_width, static_cast<INT>(text_rectangle.right - text_rectangle.left));
+    const auto text_height = (std::min)(available_height, static_cast<INT>(text_rectangle.bottom - text_rectangle.top));
     return {inset, inset, inset + text_width + horizontal_padding * 2, inset + text_height + vertical_padding * 2};
 }
 
