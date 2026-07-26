@@ -13,6 +13,8 @@ struct ImgLoaderStats
     std::size_t free_slots{};
     std::size_t maximum_slots{};
     std::size_t notifications{};
+    std::size_t notification_failures{};
+    DWORD notification_error{ERROR_SUCCESS};
 };
 
 enum class ImgNotificationKind
@@ -73,9 +75,35 @@ struct ImgLoaderStopResult
     }
 };
 
+enum class ImgLoaderQueueStatus
+{
+    Queued,
+    AlreadyPending,
+    Reprioritized,
+    InvalidItem,
+    LoaderUnavailable,
+    Stopping,
+    SignalFailed
+};
+
+struct ImgLoaderQueueResult
+{
+    ImgLoaderQueueStatus status{ImgLoaderQueueStatus::InvalidItem};
+    DWORD win32_error{ERROR_SUCCESS};
+
+    bool Accepted() const
+    {
+        return status == ImgLoaderQueueStatus::Queued || status == ImgLoaderQueueStatus::AlreadyPending ||
+               status == ImgLoaderQueueStatus::Reprioritized;
+    }
+};
+
 class ImgLoader
 {
   public:
+    using WorkEventSignal = BOOL(WINAPI*)(HANDLE);
+    using NotificationPost = BOOL(WINAPI*)(HWND, UINT, WPARAM, LPARAM);
+
     static constexpr auto kMaximumLoaderCount =
         2; // TODO: adjust logic around this limit once GDI+ gets replaced completely
     static constexpr auto kCleanupCycleCountTrigger = 29;
@@ -83,10 +111,15 @@ class ImgLoader
 
   public:
     ImgLoader();
+#if defined(IMGVW_TESTING)
+    explicit ImgLoader(WorkEventSignal workeventsignal);
+    ImgLoader(WorkEventSignal workeventsignal, NotificationPost notificationpost);
+#endif
     ~ImgLoader();
     ImgLoader(const ImgLoader&) = delete;
     ImgLoader& operator=(const ImgLoader&) = delete;
-    void QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext = FALSE, ULONG generation = 0);
+    ImgLoaderQueueResult QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext = FALSE,
+                                   ULONG generation = 0);
     void PrioritizeTargetSize(INT targetwidth, INT targetheight);
     void SetNotificationWindow(HWND hwnd, UINT message);
     void RemoveNotificationWindow(HWND hwnd);
@@ -108,6 +141,7 @@ class ImgLoader
     ImgLoaderStartResult start_result_;
 
   private:
+    ImgLoader(WorkEventSignal workeventsignal, NotificationPost notificationpost, int);
     static DWORD Loop(const std::shared_ptr<State>& state);
     static void CleanupItemThreadObjects(const std::shared_ptr<State>& state);
     static QueuedItem GetNextItem(const std::shared_ptr<State>& state);

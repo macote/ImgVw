@@ -44,6 +44,59 @@ class ImgItem
         UserDefault,
         BundledFallback
     };
+    enum class CmykProfileValidationStatus
+    {
+        Valid,
+        FileAccessFailed,
+        FileSizeUnsupported,
+        InvalidProfile,
+        WrongColorSpace
+    };
+    enum class LoadCompletionStatus
+    {
+        Pending,
+        Signaled,
+        EventCreationFailed,
+        ResetFailed,
+        SignalFailed
+    };
+    struct LoadCompletionResult
+    {
+        LoadCompletionStatus status{LoadCompletionStatus::Pending};
+        DWORD win32_error{ERROR_SUCCESS};
+
+        bool Succeeded() const
+        {
+            return status == LoadCompletionStatus::Signaled;
+        }
+    };
+    struct CmykProfileValidationResult
+    {
+        CmykProfileValidationStatus status{CmykProfileValidationStatus::InvalidProfile};
+        DWORD win32_error{ERROR_SUCCESS};
+
+        bool Succeeded() const
+        {
+            return status == CmykProfileValidationStatus::Valid;
+        }
+    };
+    enum class DefaultICCProfileResetStatus
+    {
+        Succeeded,
+        AppDataPathFailed,
+        PathConstructionFailed,
+        DeleteFailed
+    };
+    struct DefaultICCProfileResetResult
+    {
+        DefaultICCProfileResetStatus status{DefaultICCProfileResetStatus::PathConstructionFailed};
+        HRESULT system_error{E_FAIL};
+
+        bool Succeeded() const
+        {
+            return status == DefaultICCProfileResetStatus::Succeeded;
+        }
+    };
 
     class DisplayFrame final
     {
@@ -88,12 +141,7 @@ class ImgItem
     };
 
   public:
-    ImgItem(std::wstring filepath, INT targetwidth, INT targetheight)
-        : filepath_(filepath), targetwidth_(targetwidth), targetheight_(targetheight),
-          loadedevent_(CreateEvent(nullptr, TRUE, FALSE, nullptr))
-    {
-        heap_ = GetProcessHeap();
-    }
+    ImgItem(std::wstring filepath, INT targetwidth, INT targetheight);
     virtual ~ImgItem()
     {
         CloseICCProfile();
@@ -176,18 +224,43 @@ class ImgItem
     {
         return loadedevent_.get();
     }
+    LoadCompletionResult loadcompletionresult() const;
     DisplayState GetDisplayState() const;
     ImgBitmap GetDisplayBitmap() const;
     static void LoadDefaultICCProfile();
     static void UnloadDefaultICCProfile();
-    static BOOL ResetDefaultICCProfile();
-    static BOOL IsCMYKICCProfile(const std::wstring& filepath);
+    static DefaultICCProfileResetResult ResetDefaultICCProfile();
+    static CmykProfileValidationResult ValidateCMYKICCProfile(const std::wstring& filepath);
     CmykProfileSource cmykprofilesource() const
     {
         return cmykprofilesource_;
     }
 
   protected:
+    using LoadedEventCreate = HANDLE(WINAPI*)(LPSECURITY_ATTRIBUTES, BOOL, BOOL, LPCWSTR);
+    using LoadedEventSignal = BOOL(WINAPI*)(HANDLE);
+    using LoadedEventReset = BOOL(WINAPI*)(HANDLE);
+
+#if defined(IMGVW_TESTING)
+    ImgItem(std::wstring filepath, INT targetwidth, INT targetheight, LoadedEventCreate createevent,
+            LoadedEventSignal signalevent, LoadedEventReset resetevent);
+#endif
+
+    class LoadCompletion final
+    {
+      public:
+        explicit LoadCompletion(ImgItem& item) : item_(item) {}
+        ~LoadCompletion()
+        {
+            item_.SignalLoadComplete();
+        }
+        LoadCompletion(const LoadCompletion&) = delete;
+        LoadCompletion& operator=(const LoadCompletion&) = delete;
+
+      private:
+        ImgItem& item_;
+    };
+
     std::wstring filepath_;
     INT targetwidth_;
     INT targetheight_;
@@ -196,6 +269,7 @@ class ImgItem
     ImgBuffer pending_displaybuffer_;
     volatile LONG loadingprogresspercent_{-1};
     Win32Handle loadedevent_;
+    DWORD loadedeventcreationerror_{ERROR_SUCCESS};
     HANDLE heap_{INVALID_HANDLE_VALUE};
 
   protected:
@@ -206,6 +280,7 @@ class ImgItem
     void SetupDisplayParameters(BOOL topdownbitmap);
     void SetStatus(Status status);
     void SetError(std::wstring errormessage = {});
+    bool SignalLoadComplete();
     void OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabytecount);
     BOOL IsICCProfileLoaded() const
     {
@@ -219,6 +294,9 @@ class ImgItem
     }
 
   private:
+    ImgItem(std::wstring filepath, INT targetwidth, INT targetheight, LoadedEventCreate createevent,
+            LoadedEventSignal signalevent, LoadedEventReset resetevent, int);
+    bool ResetLoadCompletion();
     static ColorProfile DefaultICCProfile;
     static CmykProfileSource DefaultICCProfileSource;
     static CriticalSection DefaultICCProfileCriticalSection;
@@ -232,4 +310,7 @@ class ImgItem
     BOOL iccprofileloadfailed_{};
     CmykProfileSource cmykprofilesource_{CmykProfileSource::None};
     BOOL supportsloadingprogress_{FALSE};
+    LoadedEventSignal signalloadedevent_{SetEvent};
+    LoadedEventReset resetloadedevent_{ResetEvent};
+    LoadCompletionResult loadcompletionresult_;
 };

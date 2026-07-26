@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstddef>
+#include <limits>
 
 namespace
 {
@@ -45,6 +46,10 @@ std::size_t GetScalingFactorIndex(int width, int height, int target_width, int t
 
 int PaddedStride(int width, int component_count)
 {
+    if (width <= 0 || component_count <= 0 || width > ((std::numeric_limits<int>::max)() - 3) / component_count)
+    {
+        return 0;
+    }
     return ((width * component_count) + 3) & ~3;
 }
 } // namespace
@@ -160,6 +165,14 @@ void ImgJPEGItem::Load()
         const auto decompresswidth = decoder.output_width();
         const auto decompressheight = decoder.output_height();
         auto stride = PaddedStride(decompresswidth, decoder.is_cmyk() ? 4 : 3);
+        if (stride == 0 || decompressheight <= 0 ||
+            static_cast<std::size_t>(stride) >
+                (std::numeric_limits<std::size_t>::max)() / static_cast<std::size_t>(decompressheight))
+        {
+            errorstring_ = "JPEG output dimensions exceed the supported buffer size.";
+            SetError();
+            goto done;
+        }
         const auto buffersize = static_cast<std::size_t>(stride) * decompressheight;
         buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, buffersize));
         if (buffer == nullptr)
@@ -179,6 +192,12 @@ void ImgJPEGItem::Load()
         if (decoder.is_cmyk())
         {
             const auto newstride = PaddedStride(decompresswidth, 3);
+            if (newstride == 0)
+            {
+                errorstring_ = "JPEG color-conversion stride exceeds the supported range.";
+                SetError();
+                goto done;
+            }
             if (!TranformCMYK8ColorsToBGR8(decompresswidth, decompressheight, stride, newstride, &buffer))
             {
                 SetError();
@@ -217,5 +236,5 @@ done:
     }
 
     CloseICCProfile();
-    SetEvent(loadedevent_.get());
+    SignalLoadComplete();
 }

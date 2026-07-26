@@ -7,6 +7,62 @@
 #include <sstream>
 #include <stdexcept>
 
+enum class FileMapStatus
+{
+    OpenFailed,
+    SizeFailed,
+    MappingFailed,
+    ViewFailed
+};
+
+class FileMapError final : public std::runtime_error
+{
+  public:
+    FileMapError(FileMapStatus status, DWORD win32_error)
+        : std::runtime_error(BuildMessage(status, win32_error)), status_(status), win32_error_(win32_error)
+    {
+    }
+
+    FileMapStatus status() const
+    {
+        return status_;
+    }
+
+    DWORD win32_error() const
+    {
+        return win32_error_;
+    }
+
+  private:
+    static std::string BuildMessage(FileMapStatus status, DWORD win32_error)
+    {
+        const char* operation = "Unknown";
+        switch (status)
+        {
+        case FileMapStatus::OpenFailed:
+            operation = "CreateFile";
+            break;
+        case FileMapStatus::SizeFailed:
+            operation = "GetFileSizeEx";
+            break;
+        case FileMapStatus::MappingFailed:
+            operation = "CreateFileMapping";
+            break;
+        case FileMapStatus::ViewFailed:
+            operation = "MapViewOfFile";
+            break;
+        }
+
+        std::stringstream message;
+        message << "FileMapView." << operation << "() failed with error 0x" << std::hex << std::setw(8)
+                << std::setfill('0') << std::uppercase << win32_error;
+        return message.str();
+    }
+
+    FileMapStatus status_;
+    DWORD win32_error_;
+};
+
 class FileMapView final
 {
   public:
@@ -131,17 +187,18 @@ inline void FileMapView::OpenFile()
 
     if (!file_.valid())
     {
-        std::stringstream ss;
-        ss << "FileMapView.OpenFile(CreateFile()) failed with error ";
-        ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase;
-        ss << GetLastError();
-        throw std::runtime_error(ss.str());
+        const auto error = GetLastError();
+        throw FileMapError(FileMapStatus::OpenFailed, error);
     }
 }
 
 inline void FileMapView::GetFileSize()
 {
-    GetFileSizeEx(file_.get(), &filesize_);
+    if (!GetFileSizeEx(file_.get(), &filesize_))
+    {
+        const auto error = GetLastError();
+        throw FileMapError(FileMapStatus::SizeFailed, error);
+    }
 }
 
 inline void FileMapView::OpenMapping()
@@ -150,11 +207,8 @@ inline void FileMapView::OpenMapping()
     mapfile_.reset(CreateFileMapping(file_.get(), NULL, flProtect, 0, 0, NULL));
     if (!mapfile_.valid())
     {
-        std::stringstream ss;
-        ss << "FileMapView.OpenMapping(CreateFileMapping()) failed with error ";
-        ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase;
-        ss << GetLastError();
-        throw std::runtime_error(ss.str());
+        const auto error = GetLastError();
+        throw FileMapError(FileMapStatus::MappingFailed, error);
     }
 }
 
@@ -164,10 +218,7 @@ inline void FileMapView::MapView()
     data_ = reinterpret_cast<PBYTE>(MapViewOfFile(mapfile_.get(), desiredAccess, 0, 0, 0));
     if (data_ == nullptr)
     {
-        std::stringstream ss;
-        ss << "FileMapView.MapView(MapViewOfFile()) failed with error ";
-        ss << "0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase;
-        ss << GetLastError();
-        throw std::runtime_error(ss.str());
+        const auto error = GetLastError();
+        throw FileMapError(FileMapStatus::ViewFailed, error);
     }
 }

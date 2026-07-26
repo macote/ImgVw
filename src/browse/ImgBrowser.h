@@ -68,6 +68,33 @@ struct ImgBrowserStopResult
     }
 };
 
+enum class ImgBrowserStartStatus
+{
+    Started,
+    JoinedActiveCollection,
+    InvalidTargetSize,
+    ReadyEventUnavailable,
+    InvalidPath,
+    StopFailed,
+    AlreadyRecursive,
+    WaitFailed,
+    NoSubfolders,
+    CreateCancellationEventFailed,
+    ResetReadyEventFailed,
+    CreateThreadFailed
+};
+
+struct ImgBrowserStartResult
+{
+    ImgBrowserStartStatus status{ImgBrowserStartStatus::InvalidPath};
+    DWORD win32_error{ERROR_SUCCESS};
+
+    bool Started() const
+    {
+        return status == ImgBrowserStartStatus::Started || status == ImgBrowserStartStatus::JoinedActiveCollection;
+    }
+};
+
 class ImgBrowserCore;
 
 #if defined(IMGVW_TESTING)
@@ -76,6 +103,10 @@ struct ImgBrowserTestHooks
     HANDLE path_queue_entered{};
     HANDLE path_queue_continue{};
     HANDLE path_queue_resumed{};
+    bool fail_ready_reset{};
+    bool fail_collector_thread_create{};
+    bool fail_collector_wait{};
+    bool fail_notification_post{};
 };
 #endif
 
@@ -91,8 +122,11 @@ class ImgBrowser final
     ImgBrowser& operator=(const ImgBrowser&) = delete;
     void ShareLoadContext(const std::shared_ptr<ImgBrowserLoadContext>& context);
     std::shared_ptr<ImgBrowserLoadContext> loadcontext() const;
+    ImgBrowserStartResult StartBrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight,
+                                           BOOL clearloadcontext = FALSE);
     BOOL BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight, BOOL clearloadcontext = FALSE);
     BOOL UpdateTargetSize(INT targetwidth, INT targetheight);
+    ImgBrowserStartResult StartBrowseSubFoldersAsync();
     BOOL BrowseSubFoldersAsync();
     BOOL IsCollectingComplete() const;
     ULONG generation() const;

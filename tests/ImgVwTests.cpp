@@ -8,6 +8,8 @@
 #include "GdiObject.h"
 #include "ImageFormatDetector.h"
 #include "ImageFormatResolver.h"
+#include "ImgBitmap.h"
+#include "ImgBuffer.h"
 #include "ImgBrowser.h"
 #include "ImgCache.h"
 #include "ImgFileList.h"
@@ -17,6 +19,7 @@
 #include "ImgLoader.h"
 #include "ImgRenderer.h"
 #include "ImgResampler.h"
+#include "ImgSettings.h"
 #include "SelectedGdiObject.h"
 #include "Win32Handle.h"
 
@@ -26,6 +29,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <set>
 #include <string>
 #include <utility>
@@ -40,6 +44,52 @@ int shell_result = 0;
 BOOL shell_aborted = FALSE;
 
 void Check(bool condition, const char* description);
+std::wstring TempPath(const wchar_t* filename);
+
+BOOL WINAPI FailWorkEventSignal(HANDLE)
+{
+    SetLastError(ERROR_WRITE_FAULT);
+    return FALSE;
+}
+
+BOOL WINAPI FailNotificationPost(HWND, UINT, WPARAM, LPARAM)
+{
+    SetLastError(ERROR_INVALID_WINDOW_HANDLE);
+    return FALSE;
+}
+
+HANDLE WINAPI FailLoadedEventCreate(LPSECURITY_ATTRIBUTES, BOOL, BOOL, LPCWSTR)
+{
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return nullptr;
+}
+
+BOOL WINAPI FailLoadedEventSignal(HANDLE)
+{
+    SetLastError(ERROR_WRITE_FAULT);
+    return FALSE;
+}
+
+BOOL WINAPI FailLoadedEventReset(HANDLE)
+{
+    SetLastError(ERROR_INVALID_HANDLE);
+    return FALSE;
+}
+
+class CompletionTestImgItem final : public ImgItem
+{
+  public:
+    CompletionTestImgItem(LoadedEventCreate createevent, LoadedEventSignal signalevent, LoadedEventReset resetevent)
+        : ImgItem(L"completion-test.png", 800, 600, createevent, signalevent, resetevent)
+    {
+    }
+
+    void Load() override
+    {
+        SetStatus(Status::Loading);
+        SignalLoadComplete();
+    }
+};
 
 class BlockingImgItem final : public ImgItem
 {
@@ -55,7 +105,7 @@ class BlockingImgItem final : public ImgItem
         SetEvent(started_.get());
         WaitForSingleObject(release_.get(), INFINITE);
         SetStatus(Status::Ready);
-        SetEvent(loadedevent_.get());
+        SignalLoadComplete();
     }
     bool WaitUntilStarted(DWORD timeout_milliseconds = 2000) const
     {
@@ -153,6 +203,15 @@ void TestGdiOwnership()
           "selected GDI object guard restores the previous bitmap");
 }
 
+void TestImgSettingsTempDirectory()
+{
+    const auto temp_path = ImgSettings::GetInstance().temppath();
+    Check(!temp_path.empty(), "image settings creates a temporary path");
+    const auto attributes = GetFileAttributesW(temp_path.c_str());
+    Check(attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0,
+          "image settings temporary path is an existing directory");
+}
+
 void TestBrowsePathClassification()
 {
     wchar_t temp_path[MAX_PATH]{};
@@ -195,6 +254,52 @@ void TestBrowsePathClassification()
 
     DeleteFile(test_file.c_str());
     RemoveDirectory(test_folder.c_str());
+}
+
+void TestBrowserStartResults()
+{
+    const auto invalid_target = ImgBrowser().StartBrowseAsync(L".", 0, 480);
+    Check(invalid_target.status == ImgBrowserStartStatus::InvalidTargetSize &&
+              invalid_target.win32_error == ERROR_INVALID_PARAMETER,
+          "browser start reports an invalid target size");
+
+    const auto missing_path = TempPath(L"ImgVwMissingBrowseFolder");
+    RemoveDirectoryW(missing_path.c_str());
+    const auto classified_missing_path = ClassifyBrowsePath(missing_path);
+    const auto invalid_path = ImgBrowser().StartBrowseAsync(missing_path, 640, 480);
+    Check(invalid_path.status == ImgBrowserStartStatus::InvalidPath &&
+              invalid_path.win32_error == classified_missing_path.win32_error &&
+              invalid_path.win32_error != ERROR_SUCCESS,
+          "browser start preserves path classification failures");
+
+    const auto folder = TempPath(L"ImgVwBrowserStartResults");
+    CreateDirectoryW(folder.c_str(), nullptr);
+
+    auto reset_hooks = std::make_shared<ImgBrowserTestHooks>();
+    reset_hooks->fail_ready_reset = true;
+    ImgBrowser reset_browser(reset_hooks);
+    const auto reset_failure = reset_browser.StartBrowseAsync(folder, 640, 480);
+    Check(reset_failure.status == ImgBrowserStartStatus::ResetReadyEventFailed &&
+              reset_failure.win32_error == ERROR_WRITE_FAULT,
+          "browser start preserves ready-event reset failures");
+
+    auto thread_hooks = std::make_shared<ImgBrowserTestHooks>();
+    thread_hooks->fail_collector_thread_create = true;
+    ImgBrowser thread_browser(thread_hooks);
+    const auto thread_failure = thread_browser.StartBrowseAsync(folder, 640, 480);
+    Check(thread_failure.status == ImgBrowserStartStatus::CreateThreadFailed &&
+              thread_failure.win32_error == ERROR_NOT_ENOUGH_MEMORY,
+          "browser start preserves collector thread creation failures");
+
+    auto wait_hooks = std::make_shared<ImgBrowserTestHooks>();
+    wait_hooks->fail_collector_wait = true;
+    ImgBrowser wait_browser(wait_hooks);
+    const auto wait_failure = wait_browser.StartBrowseSubFoldersAsync();
+    Check(wait_failure.status == ImgBrowserStartStatus::WaitFailed &&
+              wait_failure.win32_error == ERROR_INVALID_HANDLE,
+          "recursive browser start preserves collector wait failures");
+
+    RemoveDirectoryW(folder.c_str());
 }
 
 std::vector<unsigned char> CreateJpeg(bool cmyk, bool include_metadata)
@@ -581,6 +686,41 @@ void TestImgCacheKeyUsesViewport()
     Check(first < other_path || other_path < first, "cache key includes filepath");
 }
 
+void TestImgItemLoadCompletionResults()
+{
+    CompletionTestImgItem creation_failure(FailLoadedEventCreate, SetEvent, ResetEvent);
+    const auto creation_result = creation_failure.loadcompletionresult();
+    Check(creation_result.status == ImgItem::LoadCompletionStatus::EventCreationFailed &&
+              creation_result.win32_error == ERROR_NOT_ENOUGH_MEMORY,
+          "image item preserves loaded-event creation failures");
+    creation_failure.Load();
+    Check(creation_failure.loadcompletionresult().status == ImgItem::LoadCompletionStatus::EventCreationFailed,
+          "signaling an unavailable loaded event preserves its creation failure");
+
+    CompletionTestImgItem signal_failure(CreateEventW, FailLoadedEventSignal, ResetEvent);
+    signal_failure.Load();
+    const auto signal_result = signal_failure.loadcompletionresult();
+    Check(signal_result.status == ImgItem::LoadCompletionStatus::SignalFailed &&
+              signal_result.win32_error == ERROR_WRITE_FAULT,
+          "image item preserves loaded-event signal failures");
+
+    CompletionTestImgItem reset_failure(CreateEventW, SetEvent, FailLoadedEventReset);
+    reset_failure.Load();
+    Check(reset_failure.loadcompletionresult().Succeeded(), "image item reports a successful load signal");
+    reset_failure.Unload();
+    const auto reset_result = reset_failure.loadcompletionresult();
+    Check(reset_result.status == ImgItem::LoadCompletionStatus::ResetFailed &&
+              reset_result.win32_error == ERROR_INVALID_HANDLE,
+          "image item preserves loaded-event reset failures");
+
+    CompletionTestImgItem success(CreateEventW, SetEvent, ResetEvent);
+    success.Load();
+    Check(success.loadcompletionresult().Succeeded(), "image item exposes successful load completion");
+    success.Unload();
+    Check(success.loadcompletionresult().status == ImgItem::LoadCompletionStatus::Pending,
+          "image item returns to pending completion after unload");
+}
+
 void TestLoaderShutdown()
 {
     for (int iteration = 0; iteration < 10; ++iteration)
@@ -590,9 +730,45 @@ void TestLoaderShutdown()
         Check(loader.StopLoading().status == ImgLoaderStopStatus::Stopped, "idle loader stops");
         Check(loader.StopLoading().status == ImgLoaderStopStatus::AlreadyStopped, "loader stop is idempotent");
         auto rejected = std::make_shared<BlockingImgItem>(L"rejected.png", 800, 600);
-        loader.QueueItem(rejected);
+        const auto queue_result = loader.QueueItem(rejected);
+        Check(queue_result.status == ImgLoaderQueueStatus::Stopping,
+              "stopped loader reports that queueing is no longer available");
         Check(loader.GetStats().queued == 0 && !rejected->WaitUntilStarted(0), "stopped loader rejects new work");
     }
+}
+
+void TestLoaderQueueSignalFailure()
+{
+    ImgLoader loader(FailWorkEventSignal);
+    auto item = std::make_shared<BlockingImgItem>(L"signal-failure.png", 800, 600);
+    const auto result = loader.QueueItem(item);
+    Check(result.status == ImgLoaderQueueStatus::SignalFailed && result.win32_error == ERROR_WRITE_FAULT,
+          "loader queue preserves a work-event signal failure");
+    Check(loader.GetStats().queued == 0 && !item->WaitUntilStarted(0),
+          "loader rolls back queue bookkeeping after a signal failure");
+    item->Release();
+    Check(loader.StopLoading(2000).Stopped(), "loader stops after a queue signal failure");
+}
+
+void TestLoaderNotificationFailure()
+{
+    ImgLoader loader(SetEvent, FailNotificationPost);
+    loader.SetNotificationWindow(GetDesktopWindow(), WM_APP + 2);
+    auto item = std::make_shared<BlockingImgItem>(L"notification-failure.png", 800, 600);
+    Check(loader.QueueItem(item).Accepted(), "notification failure test item is queued");
+    Check(item->WaitUntilStarted(), "notification failure test item starts");
+    item->Release();
+
+    const auto started = GetTickCount();
+    auto stats = loader.GetStats();
+    while (stats.notification_failures == 0 && GetTickCount() - started < 2000)
+    {
+        Sleep(1);
+        stats = loader.GetStats();
+    }
+    Check(stats.notification_failures == 1 && stats.notification_error == ERROR_INVALID_WINDOW_HANDLE,
+          "loader stats preserve an asynchronous notification failure");
+    Check(loader.StopLoading(2000).Stopped(), "loader stops after a notification failure");
 }
 
 void TestLoaderActiveWorkerTimeout()
@@ -622,7 +798,12 @@ void TestLoaderDiscardsQueuedItems()
     loader.QueueItem(first);
     loader.QueueItem(second);
     Check(first->WaitUntilStarted() && second->WaitUntilStarted(), "both loader slots become active");
-    loader.QueueItem(queued_first);
+    const auto queued_result = loader.QueueItem(queued_first);
+    Check(queued_result.status == ImgLoaderQueueStatus::Queued, "loader reports newly queued work");
+    Check(loader.QueueItem(queued_first).status == ImgLoaderQueueStatus::AlreadyPending,
+          "loader reports duplicate pending work");
+    Check(loader.QueueItem(queued_first, TRUE).status == ImgLoaderQueueStatus::Reprioritized,
+          "loader reports queued work reprioritization");
     loader.QueueItem(queued_second);
     Check(loader.GetStats().queued >= 1, "blocked loader retains queued test items");
 
@@ -672,6 +853,45 @@ void TestLoaderDiscardsQueuedItemsForTargetSize()
     Check(loader.StopLoading(2000).Stopped(), "target discard loader stops after workers are released");
 }
 
+void TestLoaderDispatchesTargetSizesRoundRobin()
+{
+    ImgLoader loader;
+    auto active_first = std::make_shared<BlockingImgItem>(L"active-first.png", 800, 600);
+    auto active_second = std::make_shared<BlockingImgItem>(L"active-second.png", 800, 600);
+    loader.QueueItem(active_first);
+    loader.QueueItem(active_second);
+    Check(active_first->WaitUntilStarted() && active_second->WaitUntilStarted(),
+          "round-robin test fills both loader slots");
+
+    loader.PrioritizeTargetSize(800, 600);
+    auto primary_first = std::make_shared<BlockingImgItem>(L"primary-first.png", 800, 600);
+    auto primary_second = std::make_shared<BlockingImgItem>(L"primary-second.png", 800, 600);
+    auto secondary_first = std::make_shared<BlockingImgItem>(L"secondary-first.png", 1920, 1080);
+    auto secondary_second = std::make_shared<BlockingImgItem>(L"secondary-second.png", 1920, 1080);
+    loader.QueueItem(primary_first);
+    loader.QueueItem(primary_second);
+    loader.QueueItem(secondary_first);
+    loader.QueueItem(secondary_second);
+    Check(loader.GetStats().queued == 4, "loader does not reserve queued work before a slot is available");
+
+    active_first->Release();
+    Check(secondary_first->WaitUntilStarted(), "new secondary resolution receives the next available slot");
+    Check(!primary_first->WaitUntilStarted(0), "primary resolution waits for its round-robin turn");
+
+    active_second->Release();
+    Check(primary_first->WaitUntilStarted(), "primary resolution receives the following slot");
+
+    secondary_first->Release();
+    Check(secondary_second->WaitUntilStarted(), "secondary resolution receives its second round-robin turn");
+
+    primary_first->Release();
+    Check(primary_second->WaitUntilStarted(), "primary resolution receives its second round-robin turn");
+
+    secondary_second->Release();
+    primary_second->Release();
+    Check(loader.StopLoading(2000).Stopped(), "round-robin loader stops after all workers are released");
+}
+
 bool WaitForBrowserCollection(ImgBrowser& browser, DWORD timeout_milliseconds = 3000)
 {
     const auto started = GetTickCount();
@@ -680,6 +900,16 @@ bool WaitForBrowserCollection(ImgBrowser& browser, DWORD timeout_milliseconds = 
         Sleep(1);
     }
     return browser.IsCollectingComplete() != FALSE;
+}
+
+bool WaitForBrowserError(ImgBrowser& browser, DWORD expected_error, DWORD timeout_milliseconds = 3000)
+{
+    const auto started = GetTickCount();
+    while (browser.GetCollectionError() != expected_error && GetTickCount() - started < timeout_milliseconds)
+    {
+        Sleep(1);
+    }
+    return browser.GetCollectionError() == expected_error;
 }
 
 bool WaitForCachedImages(const std::shared_ptr<ImgBrowserLoadContext>& context,
@@ -788,6 +1018,23 @@ void TestBrowserNotificationGenerations()
           "browser rejects a completion from the cleared load context");
 
     DestroyWindow(notification_window);
+    RemoveDirectoryW(folder.c_str());
+}
+
+void TestBrowserNotificationFailure()
+{
+    const auto folder = TempPath(L"ImgVwBrowserNotificationFailure");
+    CreateDirectoryW(folder.c_str(), nullptr);
+    auto hooks = std::make_shared<ImgBrowserTestHooks>();
+    hooks->fail_notification_post = true;
+    ImgBrowser browser(hooks);
+    browser.SetNotificationWindow(GetDesktopWindow(), WM_APP + 4);
+
+    Check(browser.BrowseAsync(folder, 640, 480), "notification failure browser starts");
+    Check(WaitForBrowserCollection(browser), "notification failure browser collection completes");
+    Check(WaitForBrowserError(browser, ERROR_INVALID_WINDOW_HANDLE),
+          "browser preserves the current generation's notification failure");
+
     RemoveDirectoryW(folder.c_str());
 }
 
@@ -1028,6 +1275,7 @@ void TestGdiItemPreservesTopRowOrientation()
     ImgGDIItem item(bmp_path, 1, 2);
     item.Load();
     Check(item.status() == ImgItem::Status::Ready, "GDI item loads orientation test BMP");
+    Check(item.loadcompletionresult().Succeeded(), "GDI item publishes load completion through ImgItem");
 
     const auto display_state = item.GetDisplayState();
     Check(display_state.status == ImgItem::Status::Ready && display_state.frame != nullptr,
@@ -1058,6 +1306,86 @@ void TestGdiItemPreservesTopRowOrientation()
         Gdiplus::GdiplusShutdown(gdiplus_token);
     }
     DeleteFileW(bmp_path.c_str());
+}
+
+void TestImgBufferValidationAndMapping()
+{
+    const BYTE pixels[] = {1, 2, 3, 4, 5, 6, 0, 0};
+    ImgBuffer buffer;
+    buffer.WriteData(2, 1, 8, pixels);
+    Check(buffer.width() == 2 && buffer.height() == 1 && buffer.stride() == 8 && buffer.buffersize() == sizeof(pixels),
+          "image buffer records validated geometry");
+    const auto mapping = buffer.GetFileMapView();
+    Check(mapping.filesize().HighPart == 0 && mapping.filesize().LowPart == sizeof(pixels),
+          "image buffer writes the complete expected file");
+    Check(std::memcmp(mapping.data(), pixels, sizeof(pixels)) == 0, "image buffer mapping preserves pixel data");
+
+    bool rejected = false;
+    try
+    {
+        ImgBuffer invalid;
+        invalid.WriteData(0, 1, 4, pixels);
+    }
+    catch (const std::invalid_argument&)
+    {
+        rejected = true;
+    }
+    Check(rejected, "image buffer rejects invalid dimensions");
+
+    rejected = false;
+    try
+    {
+        ImgBuffer invalid;
+        invalid.WriteData(2, 1, 4, pixels);
+    }
+    catch (const std::invalid_argument&)
+    {
+        rejected = true;
+    }
+    Check(rejected, "image buffer rejects a short 24-bpp stride");
+
+    rejected = false;
+    try
+    {
+        ImgBuffer invalid;
+        invalid.WriteData(1, (std::numeric_limits<INT>::max)(), 4, pixels);
+    }
+    catch (const std::overflow_error&)
+    {
+        rejected = true;
+    }
+    Check(rejected, "image buffer rejects a file size above the Win32 limit");
+
+    BITMAPINFO bitmapinfo{};
+    bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmapinfo.bmiHeader.biWidth = 2;
+    bitmapinfo.bmiHeader.biHeight = 1;
+    bitmapinfo.bmiHeader.biPlanes = 1;
+    bitmapinfo.bmiHeader.biBitCount = 24;
+    bitmapinfo.bmiHeader.biCompression = BI_RGB;
+    rejected = false;
+    try
+    {
+        ImgBitmap invalid(&bitmapinfo, pixels, 4);
+    }
+    catch (const std::invalid_argument&)
+    {
+        rejected = true;
+    }
+    Check(rejected, "display bitmap rejects a buffer smaller than its geometry");
+
+    const auto missing_path = TempPath(L"imgvw-missing-map.bin");
+    DeleteFileW(missing_path.c_str());
+    rejected = false;
+    try
+    {
+        FileMapView missing(missing_path, FileMapView::Mode::Read);
+    }
+    catch (const FileMapError& error)
+    {
+        rejected = error.status() == FileMapStatus::OpenFailed && error.win32_error() == ERROR_FILE_NOT_FOUND;
+    }
+    Check(rejected, "file mapping preserves its open status and native error");
 }
 
 void TestFileOperationPathList()
@@ -1281,6 +1609,9 @@ void TestDisplaySizeCalculation()
 
 void TestBundledCmykProfile()
 {
+    const auto profile_path = GetFileAttributesW(L"resources/color/CGATS21_CRPC5.icc") != INVALID_FILE_ATTRIBUTES
+                                  ? L"resources/color/CGATS21_CRPC5.icc"
+                                  : L"../resources/color/CGATS21_CRPC5.icc";
     std::ifstream stream("resources/color/CGATS21_CRPC5.icc", std::ios::binary | std::ios::ate);
     if (!stream.is_open())
     {
@@ -1325,6 +1656,25 @@ void TestBundledCmykProfile()
     Check(color_profile.IsValid(), "ColorProfile opens the bundled CMYK profile");
     Check(color_profile.IsCmyk(), "ColorProfile validates the bundled CMYK color space");
 
+    const auto validation = ImgItem::ValidateCMYKICCProfile(profile_path);
+    Check(validation.status == ImgItem::CmykProfileValidationStatus::Valid && validation.Succeeded(),
+          "CMYK profile validation reports a valid profile explicitly");
+
+    const auto missing_profile_path = TempPath(L"imgvw-missing-profile.icc");
+    DeleteFileW(missing_profile_path.c_str());
+    const auto missing_validation = ImgItem::ValidateCMYKICCProfile(missing_profile_path);
+    Check(missing_validation.status == ImgItem::CmykProfileValidationStatus::FileAccessFailed &&
+              missing_validation.win32_error == ERROR_FILE_NOT_FOUND,
+          "CMYK profile validation preserves file-access failures");
+
+    const auto invalid_profile_path = TempPath(L"imgvw-invalid-profile.icc");
+    WriteBytes(invalid_profile_path, {0x01, 0x02, 0x03, 0x04});
+    const auto invalid_validation = ImgItem::ValidateCMYKICCProfile(invalid_profile_path);
+    Check(invalid_validation.status == ImgItem::CmykProfileValidationStatus::InvalidProfile &&
+              invalid_validation.win32_error == ERROR_SUCCESS,
+          "CMYK profile validation distinguishes invalid profile data");
+    DeleteFileW(invalid_profile_path.c_str());
+
     auto heap = GetProcessHeap();
     constexpr INT source_stride = 4;
     constexpr INT destination_stride = 4;
@@ -1343,6 +1693,23 @@ void TestBundledCmykProfile()
     }
 
     const auto srgb_profile = cmsCreate_sRGBProfile();
+    Check(srgb_profile != nullptr, "Little CMS creates an sRGB profile for validation");
+    if (srgb_profile != nullptr)
+    {
+        cmsUInt32Number srgb_size{};
+        Check(cmsSaveProfileToMem(srgb_profile, nullptr, &srgb_size) != FALSE && srgb_size > 0,
+              "Little CMS reports the serialized sRGB profile size");
+        std::vector<unsigned char> srgb_data(srgb_size);
+        Check(cmsSaveProfileToMem(srgb_profile, srgb_data.data(), &srgb_size) != FALSE,
+              "Little CMS serializes an sRGB profile");
+        const auto srgb_profile_path = TempPath(L"imgvw-srgb-profile.icc");
+        WriteBytes(srgb_profile_path, srgb_data);
+        const auto srgb_validation = ImgItem::ValidateCMYKICCProfile(srgb_profile_path);
+        Check(srgb_validation.status == ImgItem::CmykProfileValidationStatus::WrongColorSpace,
+              "CMYK profile validation distinguishes a non-CMYK profile");
+        DeleteFileW(srgb_profile_path.c_str());
+    }
+
     const auto transform =
         cmsCreateTransform(profile, TYPE_CMYK_8_REV, srgb_profile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
     Check(transform != nullptr, "bundled profile creates the required CMYK-to-BGR transform");
@@ -1365,7 +1732,9 @@ int main()
     TestFindHandleOwnership();
     TestCriticalSectionOwnership();
     TestGdiOwnership();
+    TestImgSettingsTempDirectory();
     TestBrowsePathClassification();
+    TestBrowserStartResults();
     TestEmptyList();
     TestOrderedNavigation();
     TestFolderGroupedNavigation();
@@ -1382,16 +1751,22 @@ int main()
     TestRandomNavigationDoesNotConsumeExcludedFiles();
     TestClear();
     TestImgCacheKeyUsesViewport();
+    TestImgItemLoadCompletionResults();
     TestLoaderShutdown();
+    TestLoaderQueueSignalFailure();
+    TestLoaderNotificationFailure();
     TestLoaderActiveWorkerTimeout();
     TestLoaderDiscardsQueuedItems();
     TestLoaderDiscardsQueuedItemsForTargetSize();
+    TestLoaderDispatchesTargetSizesRoundRobin();
     TestBrowserNotificationGenerations();
+    TestBrowserNotificationFailure();
     TestRandomToSequentialMultiMonitorPreloadContextReuse();
     TestMultiMonitorPreloadResynchronizesNewSourcePaths();
     TestImageFormatDetectorSignatures();
     TestImageFormatResolverUsesSupportedExtensionsOnly();
     TestGdiItemPreservesTopRowOrientation();
+    TestImgBufferValidationAndMapping();
     TestFileOperationPathList();
     TestFileOperationFlags();
     TestFileOperationResults();

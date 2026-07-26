@@ -84,23 +84,6 @@ class HeifInitialization final
     bool initialized_{};
 };
 
-class LoadCompletion final
-{
-  public:
-    explicit LoadCompletion(HANDLE event) : event_(event) {}
-
-    ~LoadCompletion()
-    {
-        SetEvent(event_);
-    }
-
-    LoadCompletion(const LoadCompletion&) = delete;
-    LoadCompletion& operator=(const LoadCompletion&) = delete;
-
-  private:
-    HANDLE event_;
-};
-
 struct HeifProgressContext
 {
     ImgItem* item{};
@@ -368,7 +351,7 @@ void ImgHEIFItem::Load()
 {
     SetStatus(Status::Loading);
     ResetLoadingProgress();
-    const LoadCompletion completion(loadedevent_.get());
+    const LoadCompletion completion(*this);
 
     try
     {

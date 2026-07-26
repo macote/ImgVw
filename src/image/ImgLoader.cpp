@@ -3,6 +3,7 @@
 #include "CountingSemaphore.h"
 #include "CriticalSection.h"
 #include <algorithm>
+#include <deque>
 #include <list>
 #include <set>
 #include <utility>
@@ -18,6 +19,12 @@ struct ImgLoader::QueuedItem
 {
     std::shared_ptr<ImgItem> imgitem;
     ULONG generation{};
+};
+
+struct ImgLoaderTargetSize
+{
+    INT width{};
+    INT height{};
 };
 
 struct ImgLoader::State
@@ -45,7 +52,9 @@ struct ImgLoader::State
         std::shared_ptr<LoaderItem> loaderitem;
     };
 
-    State()
+    State(ImgLoader::WorkEventSignal signalworkevent, ImgLoader::NotificationPost postnotification)
+        : workeventsignal(signalworkevent == nullptr ? SetEvent : signalworkevent),
+          postnotification(postnotification == nullptr ? PostMessage : postnotification)
     {
         if (!queuecriticalsection.valid())
         {
@@ -81,12 +90,16 @@ struct ImgLoader::State
     Win32Handle cancelevent;
     CountingSemaphore loadersemaphore;
     std::list<QueuedItem> queue;
+    std::deque<ImgLoaderTargetSize> dispatchtargets;
+    ImgLoaderTargetSize lastdispatchedtarget;
+    bool haslastdispatchedtarget{};
     std::set<ImgItem*> pendingitems;
     std::list<std::shared_ptr<LoaderItem>> loaderitems;
-    BOOL preferredtargetsizeset{FALSE};
-    INT preferredtargetwidth{};
-    INT preferredtargetheight{};
     std::vector<ImgLoaderNotification> notifications;
+    ImgLoader::WorkEventSignal workeventsignal;
+    ImgLoader::NotificationPost postnotification;
+    std::size_t notificationfailures{};
+    DWORD notificationerror{ERROR_SUCCESS};
     bool stopping{};
     ImgLoaderStartResult initialization_result;
 };
@@ -103,9 +116,67 @@ DWORD RemainingTimeout(DWORD started, DWORD timeout_milliseconds)
     const auto elapsed = GetTickCount() - started;
     return elapsed >= timeout_milliseconds ? 0 : timeout_milliseconds - elapsed;
 }
+
+bool SameTargetSize(const ImgLoaderTargetSize& left, const ImgLoaderTargetSize& right)
+{
+    return left.width == right.width && left.height == right.height;
+}
+
+ImgLoaderTargetSize TargetSizeOf(const std::shared_ptr<ImgItem>& item)
+{
+    return {item->targetwidth(), item->targetheight()};
+}
+
+template <typename StateType> void PrioritizeDispatchTarget(StateType& state, const ImgLoaderTargetSize& target)
+{
+    const auto existing = std::find_if(state.dispatchtargets.begin(), state.dispatchtargets.end(),
+                                       [&target](const auto& item) { return SameTargetSize(item, target); });
+    if (existing != state.dispatchtargets.end())
+    {
+        state.dispatchtargets.erase(existing);
+    }
+    state.dispatchtargets.push_front(target);
+}
+
+template <typename StateType> void RegisterDispatchTarget(StateType& state, const ImgLoaderTargetSize& target)
+{
+    const auto existing = std::find_if(state.dispatchtargets.begin(), state.dispatchtargets.end(),
+                                       [&target](const auto& item) { return SameTargetSize(item, target); });
+    if (existing != state.dispatchtargets.end())
+    {
+        return;
+    }
+
+    if (state.haslastdispatchedtarget)
+    {
+        const auto last =
+            std::find_if(state.dispatchtargets.begin(), state.dispatchtargets.end(),
+                         [&state](const auto& item) { return SameTargetSize(item, state.lastdispatchedtarget); });
+        if (last != state.dispatchtargets.end())
+        {
+            state.dispatchtargets.insert(last, target);
+            return;
+        }
+    }
+
+    state.dispatchtargets.push_back(target);
+}
+
 } // namespace
 
-ImgLoader::ImgLoader() : state_(std::make_shared<State>())
+ImgLoader::ImgLoader() : ImgLoader(SetEvent, PostMessage, 0) {}
+
+#if defined(IMGVW_TESTING)
+ImgLoader::ImgLoader(WorkEventSignal workeventsignal) : ImgLoader(workeventsignal, PostMessage, 0) {}
+
+ImgLoader::ImgLoader(WorkEventSignal workeventsignal, NotificationPost notificationpost)
+    : ImgLoader(workeventsignal, notificationpost, 0)
+{
+}
+#endif
+
+ImgLoader::ImgLoader(WorkEventSignal workeventsignal, NotificationPost notificationpost, int)
+    : state_(std::make_shared<State>(workeventsignal, notificationpost))
 {
     start_result_ = state_->initialization_result;
     if (!start_result_.Started())
@@ -186,6 +257,8 @@ ImgLoaderStopResult ImgLoader::StopLoading(DWORD timeout_milliseconds)
         CriticalSectionLock lock(state_->queuecriticalsection);
         state_->loaderitems.clear();
         state_->queue.clear();
+        state_->dispatchtargets.clear();
+        state_->haslastdispatchedtarget = false;
         state_->pendingitems.clear();
     }
     loopthread_.reset();
@@ -211,46 +284,47 @@ DWORD ImgLoader::Loop(const std::shared_ptr<State>& state)
             break;
         }
 
-        auto queueditem = GetNextItem(state);
-        if (queueditem.imgitem != nullptr)
+        const auto semaphore_wait = state->loadersemaphore.Wait(state->cancelevent.get());
+        if (semaphore_wait == CountingSemaphoreWaitStatus::Cancelled)
         {
-            const auto& imgitem = queueditem.imgitem;
-            if (imgitem->status() == ImgItem::Status::Queued)
-            {
-                const auto semaphore_wait = state->loadersemaphore.Wait(state->cancelevent.get());
-                if (semaphore_wait == CountingSemaphoreWaitStatus::Cancelled)
-                {
-                    break;
-                }
-                if (semaphore_wait == CountingSemaphoreWaitStatus::Failed)
-                {
-                    CompleteItem(state, imgitem, queueditem.generation, FALSE);
-                    break;
-                }
-                if (WaitForSingleObject(state->cancelevent.get(), 0) == WAIT_OBJECT_0)
-                {
-                    state->loadersemaphore.Notify();
-                    break;
-                }
+            break;
+        }
+        if (semaphore_wait == CountingSemaphoreWaitStatus::Failed)
+        {
+            break;
+        }
+        if (WaitForSingleObject(state->cancelevent.get(), 0) == WAIT_OBJECT_0)
+        {
+            state->loadersemaphore.Notify();
+            break;
+        }
 
-                auto loaderitem = std::make_shared<State::LoaderItem>(imgitem, queueditem.generation);
-                const auto context = new State::WorkerContext{state, loaderitem};
-                loaderitem->thread.reset(CreateThread(nullptr, 0, StaticThreadLoad, context, 0, nullptr));
-                if (!loaderitem->thread.valid())
-                {
-                    delete context;
-                    CompleteItem(state, imgitem, queueditem.generation, TRUE);
-                }
-                else
-                {
-                    CriticalSectionLock lock(state->queuecriticalsection);
-                    state->loaderitems.push_back(std::move(loaderitem));
-                }
-            }
-            else
-            {
-                CompleteItem(state, imgitem, queueditem.generation, FALSE);
-            }
+        auto queueditem = GetNextItem(state);
+        if (queueditem.imgitem == nullptr)
+        {
+            state->loadersemaphore.Notify();
+            continue;
+        }
+
+        const auto& imgitem = queueditem.imgitem;
+        if (imgitem->status() != ImgItem::Status::Queued)
+        {
+            CompleteItem(state, imgitem, queueditem.generation, TRUE);
+            continue;
+        }
+
+        auto loaderitem = std::make_shared<State::LoaderItem>(imgitem, queueditem.generation);
+        const auto context = new State::WorkerContext{state, loaderitem};
+        loaderitem->thread.reset(CreateThread(nullptr, 0, StaticThreadLoad, context, 0, nullptr));
+        if (!loaderitem->thread.valid())
+        {
+            delete context;
+            CompleteItem(state, imgitem, queueditem.generation, TRUE);
+        }
+        else
+        {
+            CriticalSectionLock lock(state->queuecriticalsection);
+            state->loaderitems.push_back(std::move(loaderitem));
         }
 
         if (cyclecount % kCleanupCycleCountTrigger == 0)
@@ -286,56 +360,72 @@ void ImgLoader::CleanupItemThreadObjects(const std::shared_ptr<State>& state)
     }
 }
 
-void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext, ULONG generation)
+ImgLoaderQueueResult ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext, ULONG generation)
 {
-    if (imgitem == nullptr || !start_result_.Started() || imgitem->status() != ImgItem::Status::Queued)
+    if (imgitem == nullptr || imgitem->status() != ImgItem::Status::Queued)
     {
-        return;
+        return {ImgLoaderQueueStatus::InvalidItem, ERROR_SUCCESS};
+    }
+    if (!start_result_.Started())
+    {
+        return {ImgLoaderQueueStatus::LoaderUnavailable, start_result_.win32_error};
     }
 
+    CriticalSectionLock lock(state_->queuecriticalsection);
+    if (state_->stopping)
     {
-        CriticalSectionLock lock(state_->queuecriticalsection);
-        if (state_->stopping)
+        return {ImgLoaderQueueStatus::Stopping, ERROR_SUCCESS};
+    }
+    if (state_->pendingitems.find(imgitem.get()) != state_->pendingitems.end())
+    {
+        if (loadnext)
         {
-            return;
-        }
-        if (state_->pendingitems.find(imgitem.get()) != state_->pendingitems.end())
-        {
-            if (loadnext)
+            const auto queueditem =
+                std::find_if(state_->queue.begin(), state_->queue.end(),
+                             [&imgitem](const auto& item) { return item.imgitem.get() == imgitem.get(); });
+            if (queueditem != state_->queue.end())
             {
-                const auto queueditem =
-                    std::find_if(state_->queue.begin(), state_->queue.end(),
-                                 [&imgitem](const auto& item) { return item.imgitem.get() == imgitem.get(); });
                 if (queueditem != state_->queue.end() && queueditem != state_->queue.begin())
                 {
                     state_->queue.splice(state_->queue.begin(), state_->queue, queueditem);
                 }
+                PrioritizeDispatchTarget(*state_, TargetSizeOf(imgitem));
+                return {ImgLoaderQueueStatus::Reprioritized, ERROR_SUCCESS};
             }
-            return;
         }
-
-        state_->pendingitems.insert(imgitem.get());
-        if (loadnext)
-        {
-            state_->queue.push_front({imgitem, generation});
-        }
-        else if (state_->preferredtargetsizeset && imgitem->targetwidth() == state_->preferredtargetwidth &&
-                 imgitem->targetheight() == state_->preferredtargetheight)
-        {
-            const auto staleitem =
-                std::find_if(state_->queue.begin(), state_->queue.end(), [&state = state_](const auto& item) {
-                    return item.imgitem->targetwidth() != state->preferredtargetwidth ||
-                           item.imgitem->targetheight() != state->preferredtargetheight;
-                });
-            state_->queue.insert(staleitem, {imgitem, generation});
-        }
-        else
-        {
-            state_->queue.push_back({imgitem, generation});
-        }
+        return {ImgLoaderQueueStatus::AlreadyPending, ERROR_SUCCESS};
     }
 
-    SetEvent(state_->workevent.get());
+    const auto target = TargetSizeOf(imgitem);
+    const auto previousdispatchtargets = state_->dispatchtargets;
+    state_->pendingitems.insert(imgitem.get());
+    if (loadnext)
+    {
+        state_->queue.push_front({imgitem, generation});
+        PrioritizeDispatchTarget(*state_, target);
+    }
+    else
+    {
+        state_->queue.push_back({imgitem, generation});
+        RegisterDispatchTarget(*state_, target);
+    }
+
+    if (!state_->workeventsignal(state_->workevent.get()))
+    {
+        const auto error = GetLastError();
+        const auto queueditem = std::find_if(state_->queue.begin(), state_->queue.end(), [&imgitem](const auto& item) {
+            return item.imgitem.get() == imgitem.get();
+        });
+        if (queueditem != state_->queue.end())
+        {
+            state_->queue.erase(queueditem);
+        }
+        state_->pendingitems.erase(imgitem.get());
+        state_->dispatchtargets = previousdispatchtargets;
+        return {ImgLoaderQueueStatus::SignalFailed, error};
+    }
+
+    return {ImgLoaderQueueStatus::Queued, ERROR_SUCCESS};
 }
 
 void ImgLoader::PrioritizeTargetSize(INT targetwidth, INT targetheight)
@@ -346,28 +436,7 @@ void ImgLoader::PrioritizeTargetSize(INT targetwidth, INT targetheight)
     }
 
     CriticalSectionLock lock(state_->queuecriticalsection);
-    state_->preferredtargetsizeset = TRUE;
-    state_->preferredtargetwidth = targetwidth;
-    state_->preferredtargetheight = targetheight;
-
-    std::list<QueuedItem> prioritized;
-    auto item = state_->queue.begin();
-    while (item != state_->queue.end())
-    {
-        if (item->imgitem->targetwidth() == targetwidth && item->imgitem->targetheight() == targetheight)
-        {
-            prioritized.splice(prioritized.end(), state_->queue, item++);
-        }
-        else
-        {
-            ++item;
-        }
-    }
-
-    if (!prioritized.empty())
-    {
-        state_->queue.splice(state_->queue.begin(), prioritized);
-    }
+    PrioritizeDispatchTarget(*state_, {targetwidth, targetheight});
 }
 
 void ImgLoader::SetNotificationWindow(HWND hwnd, UINT message)
@@ -416,6 +485,8 @@ void ImgLoader::DiscardQueuedItems()
         state_->pendingitems.erase(item.imgitem.get());
     }
     state_->queue.clear();
+    state_->dispatchtargets.clear();
+    state_->haslastdispatchedtarget = false;
     ResetEvent(state_->workevent.get());
 }
 
@@ -442,7 +513,17 @@ void ImgLoader::DiscardQueuedItemsForTargetSize(INT targetwidth, INT targetheigh
     }
     if (state_->queue.empty())
     {
+        state_->dispatchtargets.clear();
         ResetEvent(state_->workevent.get());
+    }
+    else
+    {
+        state_->dispatchtargets.erase(std::remove_if(state_->dispatchtargets.begin(), state_->dispatchtargets.end(),
+                                                     [targetwidth, targetheight](const auto& target) {
+                                                         return target.width == targetwidth &&
+                                                                target.height == targetheight;
+                                                     }),
+                                      state_->dispatchtargets.end());
     }
 }
 
@@ -459,6 +540,8 @@ ImgLoaderStats ImgLoader::GetStats()
     CriticalSectionLock lock(state_->queuecriticalsection);
     stats.queued = state_->queue.size();
     stats.notifications = state_->notifications.size();
+    stats.notification_failures = state_->notificationfailures;
+    stats.notification_error = state_->notificationerror;
     for (const auto& loaderitem : state_->loaderitems)
     {
         const auto status = loaderitem->imgitem->status();
@@ -477,8 +560,41 @@ ImgLoader::QueuedItem ImgLoader::GetNextItem(const std::shared_ptr<State>& state
     CriticalSectionLock lock(state->queuecriticalsection);
     if (!state->queue.empty())
     {
-        item = state->queue.front();
-        state->queue.pop_front();
+        while (!state->dispatchtargets.empty())
+        {
+            const auto target = state->dispatchtargets.front();
+            state->dispatchtargets.pop_front();
+            const auto queueditem =
+                std::find_if(state->queue.begin(), state->queue.end(), [&target](const auto& candidate) {
+                    return SameTargetSize(TargetSizeOf(candidate.imgitem), target);
+                });
+            if (queueditem == state->queue.end())
+            {
+                continue;
+            }
+
+            item = *queueditem;
+            state->queue.erase(queueditem);
+            state->lastdispatchedtarget = target;
+            state->haslastdispatchedtarget = true;
+            const auto targetstillqueued =
+                std::find_if(state->queue.begin(), state->queue.end(), [&target](const auto& candidate) {
+                    return SameTargetSize(TargetSizeOf(candidate.imgitem), target);
+                });
+            if (targetstillqueued != state->queue.end())
+            {
+                state->dispatchtargets.push_back(target);
+            }
+            break;
+        }
+
+        if (item.imgitem == nullptr)
+        {
+            item = state->queue.front();
+            state->queue.pop_front();
+            state->lastdispatchedtarget = TargetSizeOf(item.imgitem);
+            state->haslastdispatchedtarget = true;
+        }
     }
     else
     {
@@ -516,8 +632,14 @@ void ImgLoader::NotifyLoadComplete(const std::shared_ptr<State>& state, ULONG ge
     {
         if (notification.hwnd != nullptr && notification.message != 0)
         {
-            PostMessage(notification.hwnd, notification.message, generation,
-                        static_cast<LPARAM>(ImgNotificationKind::LoadComplete));
+            if (!state->postnotification(notification.hwnd, notification.message, generation,
+                                         static_cast<LPARAM>(ImgNotificationKind::LoadComplete)))
+            {
+                const auto error = GetLastError();
+                CriticalSectionLock lock(state->queuecriticalsection);
+                ++state->notificationfailures;
+                state->notificationerror = error;
+            }
         }
     }
 }

@@ -1831,7 +1831,8 @@ void ImgVwWindow::ToggleFilenameOverlay()
 
 void ImgVwWindow::UseBuiltInICCProfile()
 {
-    if (!ImgItem::ResetDefaultICCProfile())
+    const auto result = ImgItem::ResetDefaultICCProfile();
+    if (!result.Succeeded())
     {
         MessageBox(hwnd_, L"Could not remove the stored CMYK ICC profile.", L"CMYK profile error",
                    MB_OK | MB_ICONERROR);
@@ -2608,7 +2609,8 @@ BOOL ImgVwWindow::SelectDefaultICCProfile()
     ShowCursor(TRUE);
     if (GetOpenFileName(&ofn))
     {
-        if (!ImgItem::IsCMYKICCProfile(ofn.lpstrFile))
+        const auto validation = ImgItem::ValidateCMYKICCProfile(ofn.lpstrFile);
+        if (!validation.Succeeded())
         {
             MessageBox(hwnd_, L"The selected file is not a valid CMYK ICC profile.", L"Invalid CMYK ICC profile",
                        MB_OK | MB_ICONERROR);

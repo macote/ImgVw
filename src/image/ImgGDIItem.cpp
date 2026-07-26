@@ -28,7 +28,7 @@ void ImgGDIItem::Load()
 
 done:
 
-    SetEvent(loadedevent_.get());
+    SignalLoadComplete();
 }
 
 void ImgGDIItem::Unload()

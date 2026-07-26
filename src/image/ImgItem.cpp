@@ -9,6 +9,34 @@ ImgItem::CmykProfileSource ImgItem::DefaultICCProfileSource = ImgItem::CmykProfi
 
 CriticalSection ImgItem::DefaultICCProfileCriticalSection;
 
+ImgItem::ImgItem(std::wstring filepath, INT targetwidth, INT targetheight)
+    : ImgItem(std::move(filepath), targetwidth, targetheight, CreateEventW, SetEvent, ResetEvent, 0)
+{
+}
+
+#if defined(IMGVW_TESTING)
+ImgItem::ImgItem(std::wstring filepath, INT targetwidth, INT targetheight, LoadedEventCreate createevent,
+                 LoadedEventSignal signalevent, LoadedEventReset resetevent)
+    : ImgItem(std::move(filepath), targetwidth, targetheight, createevent, signalevent, resetevent, 0)
+{
+}
+#endif
+
+ImgItem::ImgItem(std::wstring filepath, INT targetwidth, INT targetheight, LoadedEventCreate createevent,
+                 LoadedEventSignal signalevent, LoadedEventReset resetevent, int)
+    : filepath_(std::move(filepath)), targetwidth_(targetwidth), targetheight_(targetheight),
+      loadedevent_((createevent == nullptr ? CreateEventW : createevent)(nullptr, TRUE, FALSE, nullptr)),
+      loadedeventcreationerror_(loadedevent_.valid() ? ERROR_SUCCESS : GetLastError()),
+      signalloadedevent_(signalevent == nullptr ? SetEvent : signalevent),
+      resetloadedevent_(resetevent == nullptr ? ResetEvent : resetevent)
+{
+    heap_ = GetProcessHeap();
+    if (!loadedevent_.valid())
+    {
+        loadcompletionresult_ = {LoadCompletionStatus::EventCreationFailed, loadedeventcreationerror_};
+    }
+}
+
 ImgItem::DisplayFrame::DisplayFrame(ImgBuffer buffer, INT targetwidth, INT targetheight, BOOL topdownbitmap)
     : buffer_(std::move(buffer))
 {
@@ -25,7 +53,7 @@ ImgItem::DisplayFrame::DisplayFrame(ImgBuffer buffer, INT targetwidth, INT targe
 ImgBitmap ImgItem::DisplayFrame::GetBitmap() const
 {
     const auto filemap = buffer_.GetFileMapView();
-    return ImgBitmap(const_cast<PBITMAPINFO>(&bitmapinfo_), filemap.data(), buffer_.buffersize());
+    return ImgBitmap(&bitmapinfo_, filemap.data(), buffer_.buffersize());
 }
 
 void ImgItem::Unload()
@@ -40,13 +68,60 @@ void ImgItem::Unload()
     iccprofileloadfailed_ = FALSE;
     cmykprofilesource_ = CmykProfileSource::None;
     CloseICCProfile();
-    ResetEvent(loadedevent_.get());
+    ResetLoadCompletion();
+}
+
+ImgItem::LoadCompletionResult ImgItem::loadcompletionresult() const
+{
+    CriticalSectionLock lock(displaystatecriticalsection_);
+    return loadcompletionresult_;
+}
+
+bool ImgItem::SignalLoadComplete()
+{
+    if (!loadedevent_.valid())
+    {
+        return false;
+    }
+
+    {
+        CriticalSectionLock lock(displaystatecriticalsection_);
+        loadcompletionresult_ = {LoadCompletionStatus::Signaled, ERROR_SUCCESS};
+    }
+    if (!signalloadedevent_(loadedevent_.get()))
+    {
+        const auto error = GetLastError();
+        CriticalSectionLock lock(displaystatecriticalsection_);
+        loadcompletionresult_ = {LoadCompletionStatus::SignalFailed, error};
+        return false;
+    }
+
+    return true;
+}
+
+bool ImgItem::ResetLoadCompletion()
+{
+    if (!loadedevent_.valid())
+    {
+        return false;
+    }
+    if (!resetloadedevent_(loadedevent_.get()))
+    {
+        const auto error = GetLastError();
+        CriticalSectionLock lock(displaystatecriticalsection_);
+        loadcompletionresult_ = {LoadCompletionStatus::ResetFailed, error};
+        return false;
+    }
+
+    CriticalSectionLock lock(displaystatecriticalsection_);
+    loadcompletionresult_ = {LoadCompletionStatus::Pending, ERROR_SUCCESS};
+    return true;
 }
 
 void ImgItem::SetupDisplayParameters(BOOL topdownbitmap)
 {
-    auto frame =
-        std::make_shared<const DisplayFrame>(std::move(pending_displaybuffer_), targetwidth_, targetheight_, topdownbitmap);
+    auto frame = std::make_shared<const DisplayFrame>(std::move(pending_displaybuffer_), targetwidth_, targetheight_,
+                                                      topdownbitmap);
     CriticalSectionLock lock(displaystatecriticalsection_);
     displayframe_ = std::move(frame);
     errormessage_.clear();
@@ -173,57 +248,66 @@ void ImgItem::UnloadDefaultICCProfile()
     DefaultICCProfileSource = CmykProfileSource::None;
 }
 
-BOOL ImgItem::ResetDefaultICCProfile()
+ImgItem::DefaultICCProfileResetResult ImgItem::ResetDefaultICCProfile()
 {
-    TCHAR appdatapath[MAX_PATH];
-    if (FAILED(SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath)))
+    TCHAR appdatapath[MAX_PATH]{};
+    const auto appdataresult = SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath);
+    if (FAILED(appdataresult))
     {
-        return FALSE;
+        return {DefaultICCProfileResetStatus::AppDataPathFailed, appdataresult};
     }
 
-    TCHAR imgvwappdatapath[MAX_PATH];
+    TCHAR imgvwappdatapath[MAX_PATH]{};
     if (PathCombine(imgvwappdatapath, appdatapath, ImgSettings::kAppDataPath) == nullptr)
     {
-        return FALSE;
+        return {DefaultICCProfileResetStatus::PathConstructionFailed, HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER)};
     }
 
-    TCHAR iccpath[MAX_PATH];
+    TCHAR iccpath[MAX_PATH]{};
     if (PathCombine(iccpath, imgvwappdatapath, kDefaultICCProfileFilename) == nullptr)
     {
-        return FALSE;
-    }
-
-    if (!PathFileExists(iccpath))
-    {
-        UnloadDefaultICCProfile();
-        return TRUE;
+        return {DefaultICCProfileResetStatus::PathConstructionFailed, HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER)};
     }
 
     if (!DeleteFile(iccpath))
     {
-        return FALSE;
+        const auto error = GetLastError();
+        if (error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND)
+        {
+            return {DefaultICCProfileResetStatus::DeleteFailed, HRESULT_FROM_WIN32(error)};
+        }
     }
 
     UnloadDefaultICCProfile();
-    return TRUE;
+    return {DefaultICCProfileResetStatus::Succeeded, S_OK};
 }
 
-BOOL ImgItem::IsCMYKICCProfile(const std::wstring& filepath)
+ImgItem::CmykProfileValidationResult ImgItem::ValidateCMYKICCProfile(const std::wstring& filepath)
 {
     try
     {
         FileMapView iccfilemap(filepath, FileMapView::Mode::Read);
+        if (iccfilemap.filesize().HighPart != 0)
+        {
+            return {CmykProfileValidationStatus::FileSizeUnsupported, ERROR_FILE_TOO_LARGE};
+        }
+
         const auto profile = ColorProfile::OpenFromMemory(iccfilemap.data(), iccfilemap.filesize().LowPart);
         if (!profile.IsValid())
         {
-            return FALSE;
+            return {CmykProfileValidationStatus::InvalidProfile, ERROR_SUCCESS};
         }
 
-        return profile.IsCmyk();
+        if (!profile.IsCmyk())
+        {
+            return {CmykProfileValidationStatus::WrongColorSpace, ERROR_SUCCESS};
+        }
+
+        return {CmykProfileValidationStatus::Valid, ERROR_SUCCESS};
     }
-    catch (...)
+    catch (const FileMapError& error)
     {
-        return FALSE;
+        return {CmykProfileValidationStatus::FileAccessFailed, error.win32_error()};
     }
 }
 

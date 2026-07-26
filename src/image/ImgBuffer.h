@@ -31,8 +31,6 @@ class ImgBuffer
             width_ = other.width_;
             height_ = other.height_;
             stride_ = other.stride_;
-            buffer_ = other.buffer_;
-            other.buffer_ = nullptr;
             buffersize_ = other.buffersize_;
             other.buffersize_ = 0;
             tempfilename_ = std::move(other.tempfilename_);
@@ -41,7 +39,7 @@ class ImgBuffer
 
         return *this;
     }
-    void WriteData(INT width, INT height, INT stride, const PBYTE buffer);
+    void WriteData(INT width, INT height, INT stride, const BYTE* buffer);
     FileMapView GetFileMapView() const;
     INT width() const
     {
@@ -64,7 +62,6 @@ class ImgBuffer
     INT width_{};
     INT height_{};
     INT stride_{};
-    PBYTE buffer_{nullptr};
     DWORD buffersize_{};
     std::wstring tempfilename_;
     Win32Handle tempfile_;
