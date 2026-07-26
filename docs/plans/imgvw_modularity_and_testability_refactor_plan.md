@@ -15,6 +15,28 @@ This plan complements `imgvw_stability_refactor_plan.md` and `windowing_display_
 authoritative for worker lifetime and display-publication correctness. Complete their relevant safety work before
 extracting the most coupled slideshow and presentation code.
 
+## Test Refactor Status
+
+The test-refactor portion of this plan is complete:
+
+- shared harness, temporary-file support, and JPEG fixtures live under `tests/support/`;
+- tests are split into `core`, `platform`, `image`, `concurrency`, and `ui` suites;
+- both MSYS and Visual Studio can build and run one suite without compiling the other test translation units;
+- the complete suite remains the default for release validation.
+
+For a quick MSYS iteration, select a suite through the repository script:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-msys.ps1 -Arch x86 -Suite ui
+```
+
+The corresponding direct Make targets are `test-core`, `test-platform`, `test-image`, `test-concurrency`, and `test-ui`.
+Visual Studio builds select the same suites with `/p:TestSuite=Core`, `Platform`, `Image`, `Concurrency`, or `Ui`.
+Omitting the selector runs all tests.
+
+The remaining phases in this document concern production modularity and UI ownership; they are separate from the
+completed test split.
+
 ## Goals
 
 - Keep `ImgVwWindow` focused on Win32 message handling, command dispatch, and component composition.
@@ -43,8 +65,9 @@ extracting the most coupled slideshow and presentation code.
 - `ImgBrowser`, `ImgLoader`, `ImgRenderer`, `PathPicker`, and `FileOperations` already provide useful subsystem seams.
 - `ImgBrowser` remains the next major concentration of responsibilities: enumeration, cancellation, navigation,
   preloading, cache coordination, and notifications.
-- `tests/ImgVwTests.cpp` contains the harness, mocks, fixtures, generated image data, and all test cases in one
-  translation unit and one executable.
+- `tests/ImgVwTests.cpp` is now a small all-suite aggregator. Shared support is under `tests/support/`, and focused test
+  translation units are grouped by subsystem under `tests/unit/`, `tests/platform/`, `tests/image/`,
+  `tests/concurrency/`, and `tests/ui/`.
 - Existing stability plans identify unresolved cancellation, thread-input lifetime, raw handle ownership, and bounded
   shutdown risks. These are prerequisites for safely moving ownership between components.
 

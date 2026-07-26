@@ -3,6 +3,9 @@ param(
     [ValidateSet("x86", "x64")]
     [string] $Arch = "x86",
 
+    [ValidateSet("all", "core", "platform", "image", "concurrency", "ui")]
+    [string] $Suite = "all",
+
     [string] $MsysRoot = $(
         if ($env:MSYS2_ROOT) {
             $env:MSYS2_ROOT
@@ -74,12 +77,13 @@ $commandLines = @(
 if ($Clean) {
     $commandLines += "make -C tests clean"
 }
-$commandLines += "make -C tests test"
+$testTarget = if ($Suite -eq "all") { "test" } else { "test-$Suite" }
+$commandLines += "make -C tests $testTarget"
 
 $command = $commandLines -join "; "
 $escapedCommand = $command.Replace('"', '\"')
 
-Write-Host "Running ImgVw tests ($Arch)"
+Write-Host "Running ImgVw tests ($Arch, $Suite)"
 
 $startInfo = New-Object System.Diagnostics.ProcessStartInfo
 $startInfo.FileName = $msysShell
@@ -92,5 +96,5 @@ $process.StartInfo = $startInfo
 $process.WaitForExit()
 
 if ($process.ExitCode -ne 0) {
-    throw "MSYS test run failed for ImgVw ($Arch)."
+    throw "MSYS test run failed for ImgVw ($Arch, $Suite)."
 }
