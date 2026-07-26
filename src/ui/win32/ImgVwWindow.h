@@ -5,7 +5,12 @@
 #endif
 
 #include "FileOperations.h"
+#include "EmptyStateView.h"
+#include "DisplayPresenter.h"
+#include "InfoOverlay.h"
 #include "ImgRenderer.h"
+#include "OverlayText.h"
+#include "WindowGeometry.h"
 #include "Window.h"
 #include "ImgBrowser.h"
 #include "ImgItem.h"
@@ -70,34 +75,20 @@ class ImgVwWindow final : public Window
         INT height{};
         std::shared_ptr<ImgBrowserLoadContext> context;
     };
-    struct EmptyStateLayout
-    {
-        INT panel_width{};
-        INT panel_height{};
-        INT logo_width{};
-        INT logo_height{};
-        INT buttons_top{};
-    };
     enum class BrowseUiState
     {
         Collecting,
         Viewing,
-        Empty,
-        NoImages,
-        SearchingSubfolders,
     };
 
     ImgBrowser browser_;
     PathPicker path_picker_;
     FileOperations file_operations_;
-    ImgRenderer image_renderer_;
+    DisplayPresenter display_presenter_;
     std::wstring path_;
     std::wstring displayslidepath_;
     std::wstring paintedslidepath_;
     WORD activeparam_{};
-    HFONT captionfont_{nullptr};
-    std::unique_ptr<Gdiplus::Image> emptystatelogo_;
-    IStream* emptystatelogostream_{nullptr};
     HCURSOR arrowcursor_{nullptr};
     LARGE_INTEGER qpcfrequency_{};
     BOOL slideshowrunning_{};
@@ -113,11 +104,7 @@ class ImgVwWindow final : public Window
     BOOL browsesubfolders_{FALSE};
     BOOL browserinitialized_{FALSE};
     BrowseUiState browseuistate_{BrowseUiState::Collecting};
-    std::wstring emptystatemessage_;
-    HWND openimagebutton_{nullptr};
-    HWND openfolderbutton_{nullptr};
-    HWND searchsubfoldersbutton_{nullptr};
-    HWND exitbutton_{nullptr};
+    EmptyStateView empty_state_view_;
     HMONITOR currentmonitor_{nullptr};
     BOOL draggingwindow_{FALSE};
     POINT dragstartpoint_{};
@@ -133,16 +120,8 @@ class ImgVwWindow final : public Window
     BOOL firstimagepaint_{TRUE};
 
     BOOL filenameoverlayenabled_{FALSE};
-    BOOL loaderstatsoverlayvisible_{FALSE};
     BOOL systemlighttheme_{FALSE};
-    std::wstring loaderstatsoverlaytext_;
-    RECT loaderstatsoverlayrect_{};
-    HFONT loaderstatsoverlayfont_{nullptr};
-    UINT loaderstatsoverlayfontdpi_{};
-    INT lastloadingprogresspercent_{-2};
-    DWORD loadingprogresswaitstarttick_{};
-    BOOL loadingprogressoverlayvisible_{FALSE};
-    std::wstring loadingprogresspath_;
+    InfoOverlay info_overlay_;
 
   private:
     static ImgVwWindow* CreateOnMonitor(HINSTANCE hInst, const std::wstring& path, HMONITOR monitor,
@@ -152,22 +131,16 @@ class ImgVwWindow final : public Window
     BOOL OpenPath(const std::wstring& path);
     void OpenImage();
     void OpenFolder();
-    void RestoreEmptyStateButtonFocus(HWND button);
     void ActivateEmptyStateButton();
     void SelectPath(const PathPickerResult& result);
     void HandleDroppedFiles(HDROP drop);
     void BrowseEmptyStateSubFolders();
-    void LoadEmptyStateLogo();
-    void CreateEmptyStateControls();
     void ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders);
     void ShowSearchingSubfoldersState();
     void HideEmptyState();
     BOOL IsEmptyStateVisible() const;
     BOOL IsSearchingSubfolders() const;
     BOOL HasImages();
-    EmptyStateLayout CalculateEmptyStateLayout(const RECT& client_rect) const;
-    void UpdateEmptyStateLayout();
-    void PaintEmptyState(PAINTSTRUCT* pps);
     BOOL UpdateClientSize(INT width, INT height);
     void HandleSize(WPARAM wParam, LPARAM lParam);
     void HandleDpiChanged(LPARAM lParam);
@@ -226,11 +199,8 @@ class ImgVwWindow final : public Window
     void UpdateContextMenuForImageAvailability(HMENU menu);
     void HandleContextMenu(LPARAM lParam);
     void InvalidateScreen();
-    bool DisplayImage(HDC dc, const ImgItem* item);
     bool DisplayFileInformation(HDC dc, const RECT& paintrect, const ImgItem* item, const std::wstring& filepath);
     bool DisplayLoadingProgress(HDC dc, const RECT& paintrect, const ImgItem* item, const std::wstring& filepath);
-    std::wstring BuildItemInfoOverlayText(const ImgItem* item, const std::wstring& filepath) const;
-    BOOL IsLoadingProgressOverlayVisible(const ImgItem* item) const;
     void UpdateLoadingProgressOverlayTimer();
     BOOL IsLoaderStatsOverlayKeyDown() const;
     BOOL IsFilenameOverlayVisible() const;
@@ -242,18 +212,15 @@ class ImgVwWindow final : public Window
     std::wstring BuildLoaderStatsOverlayText();
     UINT GetWindowDpi() const;
     INT ScaleForWindowDpi(INT value) const;
-    HFONT GetLoaderStatsOverlayFont();
     void ResetLoaderStatsOverlayLayout();
-    RECT CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& text) const;
     void RefreshLoaderStatsOverlay();
-    void DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item,
-                         UINT textformat = DT_LEFT | DT_NOPREFIX, COLORREF fallbackbackground = RGB(0, 0, 0),
-                         BOOL vertically_center_text = FALSE);
-    void DrawEmptyStateButton(const DRAWITEMSTRUCT* drawitem);
     void DrawLoaderStatsOverlay(HDC dc, const ImgItem* item);
     void PaintContent(PAINTSTRUCT* pps);
     void DeleteCurrentItem(BOOL allowundo);
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    LRESULT HandleCommand(UINT command, UINT notification, LPARAM lparam);
+    LRESULT HandleTimer(UINT_PTR timer, LPARAM callback);
+    LRESULT HandleMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT OnCreate();
     void CloseWindow();
     BOOL HandleMouseMove(WPARAM wParam, LPARAM lParam);

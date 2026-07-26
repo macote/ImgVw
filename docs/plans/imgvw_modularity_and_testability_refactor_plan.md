@@ -8,6 +8,75 @@ cohesive UI policy and presentation helpers from `ImgVwWindow`, finish separatin
 the remaining explicit-error and static-analysis gaps, and reduce `ImgVwWindow` to a message adapter and composition
 root.
 
+## Progress Checklist
+
+This checklist is the concise source of truth for plan progress. A checked parent item is complete; an unchecked parent
+with checked children is in progress.
+
+### Track 1: `ImgVwWindow` Modularity
+
+- [x] Phase 1: characterize behavior and split command, timer, and mouse dispatch.
+- [x] Phase 2: extract and test `WindowGeometry`, `EmptyStateLayout`, and `OverlayText`.
+- [x] Phase 3: extract `EmptyStateView`, including controls, resources, layout, painting, and focus behavior.
+- [x] Phase 4: extract display and overlay presentation.
+  - [x] Introduce immutable `DisplaySnapshot` input.
+  - [x] Extract ready/loading/error decisions and renderer invocation into `DisplayPresenter`.
+  - [x] Introduce `InfoOverlay` and move item-text and loading-progress debounce policy into it.
+  - [x] Move cached overlay text and rectangles into `InfoOverlay`.
+  - [x] Move overlay font lifetime, layout, and composited drawing into `InfoOverlay`.
+  - [x] Return timer and invalidation actions to `ImgVwWindow` instead of performing those side effects internally.
+  - [x] Add focused loading, error, first-paint, partial-paint, and overlay tests.
+- [ ] Phase 5: extract `CursorController`, `WindowDragController`, and `MonitorPlacement`.
+- [ ] Phase 6: extract slideshow policy.
+  - [ ] Extract and test `SlideShowStateMachine`.
+  - [ ] Extract multi-monitor coordination with safe registration and teardown.
+- [ ] Phase 7: reduce `ImgVwWindow` to a composition root and Win32 adapter.
+
+### Track 2: Remaining Production Hardening
+
+- [x] Preserve completed loader/browser cancellation, worker-lifetime, generation, and notification-target contracts.
+- [ ] Finish lower-risk Win32 RAII conversions beyond the completed high-risk prerequisites.
+- [ ] Split `ImgBrowserCore`.
+  - [ ] Extract `FolderScanner`.
+  - [ ] Extract `BrowseSession`.
+  - [ ] Extract `PreloadScheduler`.
+- [ ] Finish buffer and decode-boundary hardening beyond the completed foundational checks.
+- [ ] Extend explicit result/error boundaries for enumeration, ICC handling, mappings, settings, and temporary paths.
+- [ ] Run focused layering and static-analysis cleanup.
+
+### Track 3: Tests and Final Validation
+
+- [x] Split shared test support and subsystem test sources.
+- [x] Add independently runnable core, platform, image, concurrency, and UI shards to MSYS and Visual Studio builds.
+- [ ] Add tests alongside each remaining production component extraction.
+- [ ] Complete final x86/x64 MSYS and Visual Studio builds, formatting/static analysis, and manual regression checks.
+
+Current next item: begin Phase 5 with pure drag calculations and a `WindowDragController`, while keeping `SetCapture`,
+`ReleaseCapture`, and `SetWindowPos` calls in `ImgVwWindow`.
+
+## Review Update (2026-07-26)
+
+The plan was reviewed against the current source tree and history after the completed safety and test-split work. The
+remaining work is correctly concentrated in production modularity, not in redoing the already-completed prerequisites.
+
+- `ImgVwWindow.cpp` is approximately 2,300 lines. Drag/cursor behavior, monitor placement, slideshow policy, and
+  browser-stat collection are still owned directly by the window.
+- `ImgBrowser` is a small lifetime-safe facade, but its approximately 1,500-line `ImgBrowserCore` still combines folder
+  collection, session/cancellation state, navigation, preload scheduling, cache access, and notifications.
+- `WindowGeometry`, `EmptyStateLayout`, and `OverlayText` now provide the first pure helper boundaries and core tests.
+  `EmptyStateView` owns empty/searching state, its message, logo image and backing stream, caption and text fonts,
+  control windows, layout, painting, and focus/dialog behavior. `DisplayPresenter` consumes an immutable display
+  snapshot and owns ready/loading/error paint decisions plus renderer invocation. `InfoOverlay` owns item and statistics
+  presentation, cached layout/content, font lifetime, composited drawing, and loading-progress policy. It returns timer
+  and invalidation requests for `ImgVwWindow` to execute. Interaction helpers and slideshow-policy components remain
+  unextracted.
+- The working-branch Phase 1 change routes `WM_COMMAND`, `WM_TIMER`, and mouse messages through dedicated helpers while
+  retaining the top-level Win32 message switch and preserving the original message parameters for forwarded commands.
+
+The next implementation slice should begin Phase 5 with pure drag calculations and `WindowDragController`, while
+keeping capture and placement side effects in `ImgVwWindow`. Do not begin slideshow or `ImgBrowserCore` work in the
+same change.
+
 ## Summary
 
 `ImgVwWindow.cpp` has grown into the main concentration of application behavior. It currently combines Win32 message
@@ -77,8 +146,8 @@ completed test split.
 - `tests/ImgVwTests.cpp` is now a small all-suite aggregator. Shared support is under `tests/support/`, and focused test
   translation units are grouped by subsystem under `tests/unit/`, `tests/platform/`, `tests/image/`,
   `tests/concurrency/`, and `tests/ui/`.
-- Existing stability plans identify unresolved cancellation, thread-input lifetime, raw handle ownership, and bounded
-  shutdown risks. These are prerequisites for safely moving ownership between components.
+- The completed safety plans define cancellation, thread-input lifetime, notification-generation, RAII, and immutable
+  display-publication contracts that must be retained while components are moved.
 
 ## Design Principles
 
@@ -192,7 +261,8 @@ Acceptance criteria:
 
 ### Phase 6: Extract Slideshow Policy
 
-Perform this phase only after loader/browser shutdown and late-notification safety have been addressed.
+The completed loader/browser shutdown and late-notification contracts permit this phase, but every extraction must
+preserve those contracts.
 
 First introduce a Win32-independent `SlideShowStateMachine` responsible for:
 
@@ -239,14 +309,14 @@ a reasonable outcome. Avoid replacing the current large class with a single equa
 ### Priority 1: Loader and Browser Lifetime Safety
 
 Follow the completed prerequisites in `archive/runtime_safety_and_display_publication_plan.md` and the detailed
-history in `archive/imgvw_stability_refactor_plan.md`:
+history in `archive/imgvw_stability_refactor_plan.md`. These requirements are complete for the current loader and
+browser implementation. Preserve them during further work:
 
-- replace unsynchronized cancellation flags with event-backed or otherwise synchronized state;
-- ensure worker input outlives each worker, including after bounded wait timeouts;
-- make stop operations idempotent and report completed, timed-out, and failed outcomes;
-- invalidate notification targets before window destruction;
-- use browse/load generations so late completion cannot update a newer session;
-- separate cancellation from state reset and storage destruction.
+- cancellation remains synchronized and independent from state reset/storage destruction;
+- worker input outlives workers, including after bounded waits;
+- stop outcomes remain explicit and idempotent;
+- notification targets are removed before window destruction; and
+- browse/load generations keep late completion from updating a newer session.
 
 This priority blocks slideshow ownership extraction and any change that moves browser or loader ownership.
 

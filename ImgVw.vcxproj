@@ -210,6 +210,12 @@
     <ClInclude Include="src\platform\win32\Win32Handle.h" />
     <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
+    <ClInclude Include="src\ui\win32\EmptyStateLayout.h" />
+    <ClInclude Include="src\ui\win32\EmptyStateView.h" />
+    <ClInclude Include="src\ui\win32\DisplayPresenter.h" />
+    <ClInclude Include="src\ui\win32\InfoOverlay.h" />
+    <ClInclude Include="src\ui\win32\OverlayText.h" />
+    <ClInclude Include="src\ui\win32\WindowGeometry.h" />
     <ClInclude Include="src\ui\win32\Window.h" />
   </ItemGroup>
   <ItemGroup>
@@ -236,6 +242,9 @@
     <ClCompile Include="src\platform\win32\ImgHeaderProbe.cpp" />
     <ClCompile Include="src\platform\win32\PathPicker.cpp" />
     <ClCompile Include="src\platform\win32\ProcessDpiAwareness.cpp" />
+    <ClCompile Include="src\ui\win32\EmptyStateView.cpp" />
+    <ClCompile Include="src\ui\win32\InfoOverlay.cpp" />
+    <ClCompile Include="src\ui\win32\DisplayPresenter.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
     <ClCompile Include="src\ui\win32\ImgVwWindow.cpp" />
     <ClCompile Include="src\ui\win32\Window.cpp" />

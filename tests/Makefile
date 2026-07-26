@@ -17,7 +17,7 @@ HEADERS = $(wildcard *.h support/*.h unit/*.h ../src/app/*.h ../src/browse/*.h .
 TESTMAIN = support/TestHarness.cpp support/TestMain.cpp
 SOURCES = ImgVwTests.cpp concurrency/ConcurrencyTests.cpp image/ImgTests.cpp platform/PlatformTests.cpp \
 	ui/RendererTests.cpp \
-	unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp \
+	unit/EmptyStateViewTests.cpp unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp unit/WindowPresentationTests.cpp \
 	support/JpegFixture.cpp support/TempFile.cpp support/TestHarness.cpp support/TestMain.cpp \
 	../src/browse/BrowsePath.cpp ../src/browse/ImgBrowser.cpp ../src/browse/ImgFileList.cpp \
 	../src/image/ColorProfile.cpp \
@@ -27,11 +27,13 @@ SOURCES = ImgVwTests.cpp concurrency/ConcurrencyTests.cpp image/ImgTests.cpp pla
 	../src/image/ImgHEIFItem.cpp ../src/image/ImgItem.cpp ../src/image/ImgItemHelper.cpp \
 	../src/image/ImgJPEGDecoder.cpp ../src/image/ImgJPEGItem.cpp ../src/platform/win32/FileOperations.cpp \
 	../src/platform/win32/ImgHeaderProbe.cpp \
-	../src/ui/win32/ImgRenderer.cpp
-CORESOURCES = unit/CoreTests.cpp unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp support/TempFile.cpp $(TESTMAIN) \
+	../src/ui/win32/EmptyStateView.cpp ../src/ui/win32/ImgRenderer.cpp
+CORESOURCES = unit/CoreTests.cpp unit/EmptyStateViewTests.cpp unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp \
+	unit/WindowPresentationTests.cpp \
+	support/TempFile.cpp $(TESTMAIN) \
 	../src/browse/ImgFileList.cpp ../src/image/ExifOrientation.cpp ../src/image/ImgResampler.cpp \
 	../src/image/ImgFormatDetector.cpp ../src/image/ImgFormatResolver.cpp ../src/image/ImgBuffer.cpp \
-	../src/image/ImgItemHelper.cpp ../src/platform/win32/ImgHeaderProbe.cpp
+	../src/image/ImgItemHelper.cpp ../src/platform/win32/ImgHeaderProbe.cpp ../src/ui/win32/EmptyStateView.cpp
 PLATFORMSOURCES = platform/PlatformTests.cpp support/TempFile.cpp $(TESTMAIN) \
 	../src/browse/BrowsePath.cpp ../src/image/ImgBuffer.cpp ../src/platform/win32/FileOperations.cpp
 IMAGESOURCES = image/ImgTests.cpp support/JpegFixture.cpp support/TempFile.cpp $(TESTMAIN) \
@@ -69,7 +71,7 @@ else
 endif
 
 LDLIBS = -L$(JPEGLIBDIR) -L$(LCMSLIBDIR) -L$(HEIFLIBDIR) -L$(DE265LIBDIR) \
-	-lshell32 -lole32 -lgdi32 -lgdiplus -lshlwapi -ljpeg -llcms2 -lheif -lde265
+	-lshell32 -lole32 -lgdi32 -lgdiplus -lmsimg32 -lshlwapi -ljpeg -llcms2 -lheif -lde265
 
 .PHONY: all clean test test-core test-platform test-image test-concurrency test-ui
 

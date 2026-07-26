@@ -68,12 +68,12 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Platform)'=='Win32'">
     <Link>
-      <AdditionalDependencies>shell32.lib;ole32.lib;gdi32.lib;gdiplus.lib;shlwapi.lib;legacy_stdio_definitions.lib;$(ProjectDir)3rd-party\libjpeg-turbo\jpeg-static.lib;$(ProjectDir)3rd-party\Little-CMS\lcms2_static.lib;$(ProjectDir)3rd-party\libheif\heif.lib;$(ProjectDir)3rd-party\libde265\libde265.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>shell32.lib;ole32.lib;gdi32.lib;gdiplus.lib;msimg32.lib;shlwapi.lib;legacy_stdio_definitions.lib;$(ProjectDir)3rd-party\libjpeg-turbo\jpeg-static.lib;$(ProjectDir)3rd-party\Little-CMS\lcms2_static.lib;$(ProjectDir)3rd-party\libheif\heif.lib;$(ProjectDir)3rd-party\libde265\libde265.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
     <Link>
-      <AdditionalDependencies>shell32.lib;ole32.lib;gdi32.lib;gdiplus.lib;shlwapi.lib;legacy_stdio_definitions.lib;$(ProjectDir)3rd-party\libjpeg-turbo\x64\jpeg-static.lib;$(ProjectDir)3rd-party\Little-CMS\x64\lcms2_static.lib;$(ProjectDir)3rd-party\libheif\x64\heif.lib;$(ProjectDir)3rd-party\libde265\x64\libde265.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>shell32.lib;ole32.lib;gdi32.lib;gdiplus.lib;msimg32.lib;shlwapi.lib;legacy_stdio_definitions.lib;$(ProjectDir)3rd-party\libjpeg-turbo\x64\jpeg-static.lib;$(ProjectDir)3rd-party\Little-CMS\x64\lcms2_static.lib;$(ProjectDir)3rd-party\libheif\x64\heif.lib;$(ProjectDir)3rd-party\libde265\x64\libde265.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
@@ -138,6 +138,10 @@
     <ClInclude Include="src\platform\win32\FileOperations.h" />
     <ClInclude Include="src\platform\win32\ImgHeaderProbe.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
+    <ClInclude Include="src\ui\win32\EmptyStateLayout.h" />
+    <ClInclude Include="src\ui\win32\EmptyStateView.h" />
+    <ClInclude Include="src\ui\win32\OverlayText.h" />
+    <ClInclude Include="src\ui\win32\WindowGeometry.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\browse\BrowsePath.cpp" />
@@ -160,6 +164,7 @@
     <ClCompile Include="src\image\ImgJPEGItem.cpp" />
     <ClCompile Include="src\platform\win32\FileOperations.cpp" />
     <ClCompile Include="src\platform\win32\ImgHeaderProbe.cpp" />
+    <ClCompile Include="src\ui\win32\EmptyStateView.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
     <ClCompile Include="tests\ImgVwTests.cpp" Condition="'$(TestSuite)'=='All'" />
     <ClCompile Include="tests\concurrency\ConcurrencyTests.cpp"
@@ -172,8 +177,12 @@
     <ClCompile Include="tests\platform\PlatformTests.cpp"
                Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Platform'" />
     <ClCompile Include="tests\unit\ImgPolicyTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
+    <ClCompile Include="tests\unit\EmptyStateViewTests.cpp"
+               Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
     <ClCompile Include="tests\unit\CoreTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
     <ClCompile Include="tests\unit\ImgFileListTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
+    <ClCompile Include="tests\unit\WindowPresentationTests.cpp"
+               Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
     <ClCompile Include="tests\ui\RendererTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Ui'" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

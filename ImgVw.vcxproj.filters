@@ -160,6 +160,24 @@
     <ClInclude Include="src\ui\win32\ImgRenderer.h">
       <Filter>UI</Filter>
     </ClInclude>
+    <ClInclude Include="src\ui\win32\EmptyStateLayout.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\EmptyStateView.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\InfoOverlay.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\DisplayPresenter.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\OverlayText.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\WindowGeometry.h">
+      <Filter>UI</Filter>
+    </ClInclude>
     <ClInclude Include="src\ui\win32\Window.h">
       <Filter>UI</Filter>
     </ClInclude>
@@ -233,6 +251,15 @@
     </ClCompile>
     <ClCompile Include="src\platform\win32\ProcessDpiAwareness.cpp">
       <Filter>Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\win32\EmptyStateView.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\win32\InfoOverlay.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\win32\DisplayPresenter.cpp">
+      <Filter>UI</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp">
       <Filter>UI</Filter>

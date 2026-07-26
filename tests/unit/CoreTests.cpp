@@ -4,4 +4,6 @@ void RunCoreTests()
 {
     RunImgFileListTests();
     RunImagePolicyTests();
+    RunEmptyStateViewTests();
+    RunWindowPresentationTests();
 }

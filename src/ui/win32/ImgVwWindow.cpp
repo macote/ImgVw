@@ -2,9 +2,6 @@
 
 #include <algorithm>
 #include <climits>
-#include <cstring>
-#include <iomanip>
-#include <sstream>
 
 #ifndef WM_DPICHANGED
 #define WM_DPICHANGED 0x02E0
@@ -13,8 +10,6 @@
 namespace
 {
 typedef UINT(WINAPI* GetDpiForWindowProc)(HWND hwnd);
-
-constexpr UINT kDefaultDpi = 96;
 
 constexpr UINT kImageCommandIds[] = {
     IDR_NEXT,   IDR_PREVIOUS, IDR_FIRST,          IDR_LAST,           IDR_RECYCLE,
@@ -32,20 +27,6 @@ bool IsImageCommand(UINT command)
     }
 
     return false;
-}
-
-struct OverlayColors
-{
-    COLORREF background;
-    COLORREF panel;
-    COLORREF border;
-    COLORREF text;
-};
-
-OverlayColors GetOverlayColors(BOOL light_theme)
-{
-    return light_theme ? OverlayColors{RGB(245, 245, 245), RGB(255, 255, 255), RGB(140, 140, 140), RGB(50, 50, 50)}
-                       : OverlayColors{RGB(0, 0, 0), RGB(0, 0, 0), RGB(90, 90, 90), RGB(180, 180, 180)};
 }
 
 BOOL IsSystemLightTheme()
@@ -68,61 +49,6 @@ BOOL IsSystemLightTheme()
     return query_result == ERROR_SUCCESS ? (value != 0 ? TRUE : FALSE) : TRUE;
 }
 
-std::wstring FormatByteSize(unsigned long long bytes)
-{
-    static const wchar_t* kUnits[] = {L"B", L"KB", L"MB", L"GB", L"TB"};
-    auto value = static_cast<double>(bytes);
-    std::size_t unitindex{};
-    while (value >= 1024.0 && unitindex < _countof(kUnits) - 1)
-    {
-        value /= 1024.0;
-        ++unitindex;
-    }
-
-    std::wstringstream text;
-    if (unitindex == 0)
-    {
-        text << bytes << L" " << kUnits[unitindex];
-    }
-    else if (value >= 100.0)
-    {
-        text << static_cast<unsigned long long>(value + 0.5) << L" " << kUnits[unitindex];
-    }
-    else
-    {
-        text.setf(std::ios::fixed);
-        text.precision(1);
-        text << value << L" " << kUnits[unitindex];
-    }
-
-    return text.str();
-}
-
-void WriteByteSizeColumn(std::wostream& text, unsigned long long bytes, std::streamsize width)
-{
-    constexpr std::streamsize kUnitWidth = 2;
-    const auto formatted = FormatByteSize(bytes);
-    const auto separator = formatted.rfind(L' ');
-    const auto value = formatted.substr(0, separator);
-    const auto unit = formatted.substr(separator + 1);
-    const auto valuewidth = width - kUnitWidth - 1;
-
-    text << std::right << std::setw(valuewidth) << value << L' ' << std::left << std::setw(kUnitWidth) << unit
-         << std::right;
-}
-
-std::wstring FormatPercent(std::size_t numerator, std::size_t denominator)
-{
-    std::wstringstream text;
-    text << (denominator > 0 ? numerator * 100 / denominator : 0) << L"%";
-    return text.str();
-}
-
-bool ContainsRect(const RECT& outer, const RECT& inner)
-{
-    return inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right &&
-           inner.bottom <= outer.bottom;
-}
 } // namespace
 
 struct ImgVwWindow::MonitorCreateContext
@@ -229,18 +155,6 @@ BOOL CALLBACK ImgVwWindow::CreateSlideShowWindowForMonitor(HMONITOR monitor, HDC
 
 LRESULT ImgVwWindow::OnCreate()
 {
-    NONCLIENTMETRICS nonclientmetrics;
-#if (WINVER >= 0x0600)
-    nonclientmetrics.cbSize = sizeof(NONCLIENTMETRICS) - sizeof(nonclientmetrics.iPaddedBorderWidth);
-#else
-    nonclientmetrics.cbSize = sizeof(NONCLIENTMETRICS);
-#endif
-    if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &nonclientmetrics, 0))
-    {
-        captionfont_ = CreateFontIndirect(&nonclientmetrics.lfMessageFont);
-    }
-    LoadEmptyStateLogo();
-
     QueryPerformanceFrequency(&qpcfrequency_);
     arrowcursor_ = LoadCursor(nullptr, IDC_ARROW);
     SetCursor(arrowcursor_);
@@ -252,9 +166,9 @@ LRESULT ImgVwWindow::OnCreate()
 
     InitializeMonitorState();
     UpdateSystemTheme();
-    CreateEmptyStateControls();
     if (owner_ == nullptr)
     {
+        empty_state_view_.Initialize(hwnd_, hinst_);
         DragAcceptFiles(hwnd_, TRUE);
     }
     if (path_.empty())
@@ -273,17 +187,28 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
 {
     if (IsEmptyStateVisible())
     {
-        PaintEmptyState(pps);
+        empty_state_view_.Paint(pps->hdc, GetWindowDpi(), systemlighttheme_ != FALSE);
         return;
     }
 
     const auto imgitem = browser_.GetCurrentItem();
+    const DisplaySnapshot snapshot{imgitem, browser_.GetCurrentFilePath(),
+                                   imgitem != nullptr ? imgitem->GetDisplayState() : ImgItem::DisplayState{}};
     bool overlaydrawn = false;
     if (imgitem != nullptr)
     {
-        const auto status = imgitem->status();
-        if ((slideshowwaitingforimage_ || firstimagepaint_) && status != ImgItem::Status::Ready &&
-            status != ImgItem::Status::Error)
+        RECT client_rectangle{};
+        GetClientRect(hwnd_, &client_rectangle);
+        const DisplayPresentationInput presentation_input{pps->hdc,
+                                                          backgroundbrush_,
+                                                          client_rectangle,
+                                                          slideshowwaitingforimage_,
+                                                          firstimagepaint_,
+                                                          IsInfoOverlayVisible() &&
+                                                              !IsRectEmpty(&info_overlay_.rectangle()),
+                                                          info_overlay_.rectangle()};
+        const auto presentation = display_presenter_.Present(snapshot, presentation_input);
+        if (presentation.presentation == DisplayPresentation::WaitingForImage)
         {
             if (IsInfoOverlayVisible())
             {
@@ -296,18 +221,21 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
             return;
         }
 
-        firstimagepaint_ = FALSE;
+        if (presentation.ShouldCompleteFirstPaint())
+        {
+            firstimagepaint_ = FALSE;
+        }
 
-        if (IsInfoOverlayVisible() && imgitem->status() == ImgItem::Status::Ready &&
-            !IsRectEmpty(&loaderstatsoverlayrect_) && ContainsRect(loaderstatsoverlayrect_, pps->rcPaint))
+        if (DisplayPresenter::ShouldDrawOnlyOverlay(IsInfoOverlayVisible() != FALSE, snapshot.state.status,
+                                                    info_overlay_.rectangle(), pps->rcPaint))
         {
             DrawLoaderStatsOverlay(pps->hdc, imgitem.get());
             return;
         }
 
-        if (DisplayImage(pps->hdc, imgitem.get()))
+        if (presentation.IsImageReady())
         {
-            paintedslidepath_ = browser_.GetCurrentFilePath();
+            paintedslidepath_ = snapshot.path;
         }
         else
         {
@@ -398,7 +326,7 @@ void ImgVwWindow::OpenImage()
     }
 
     SelectPath(path_picker_.SelectImage(hwnd_));
-    RestoreEmptyStateButtonFocus(openimagebutton_);
+    empty_state_view_.RestoreFocus(IDM_OPEN_IMAGE);
 
     if (restore_viewer_input && !IsEmptyStateVisible())
     {
@@ -425,7 +353,7 @@ void ImgVwWindow::OpenFolder()
     }
 
     SelectPath(path_picker_.SelectFolder(hwnd_));
-    RestoreEmptyStateButtonFocus(openfolderbutton_);
+    empty_state_view_.RestoreFocus(IDM_OPEN_FOLDER);
 
     if (restore_viewer_input && !IsEmptyStateVisible())
     {
@@ -434,32 +362,9 @@ void ImgVwWindow::OpenFolder()
     }
 }
 
-void ImgVwWindow::RestoreEmptyStateButtonFocus(HWND button)
-{
-    if (!IsEmptyStateVisible() || button == nullptr || !IsWindowVisible(button))
-    {
-        return;
-    }
-
-    SetFocus(button);
-    if (GetFocus() == button)
-    {
-        InvalidateRect(button, nullptr, FALSE);
-        UpdateWindow(button);
-    }
-}
-
 void ImgVwWindow::ActivateEmptyStateButton()
 {
-    if (!IsEmptyStateVisible())
-    {
-        return;
-    }
-
-    const auto focusedwindow = GetFocus();
-    const auto focusedbutton = focusedwindow == openimagebutton_ || focusedwindow == openfolderbutton_ ||
-                               focusedwindow == searchsubfoldersbutton_ || focusedwindow == exitbutton_;
-    SendMessage(focusedbutton ? focusedwindow : openimagebutton_, BM_CLICK, 0, 0);
+    empty_state_view_.ActivateFocusedButton();
 }
 
 void ImgVwWindow::SelectPath(const PathPickerResult& result)
@@ -529,93 +434,14 @@ void ImgVwWindow::BrowseEmptyStateSubFolders()
     }
 }
 
-void ImgVwWindow::LoadEmptyStateLogo()
-{
-    const auto resource = FindResource(hinst_, MAKEINTRESOURCE(IDR_WELCOME_LOGO), RT_RCDATA);
-    if (resource == nullptr)
-    {
-        return;
-    }
-
-    const auto resource_size = SizeofResource(hinst_, resource);
-    const auto resource_handle = LoadResource(hinst_, resource);
-    const auto resource_data = resource_handle == nullptr ? nullptr : LockResource(resource_handle);
-    if (resource_size == 0 || resource_data == nullptr)
-    {
-        return;
-    }
-
-    const auto image_memory = GlobalAlloc(GMEM_MOVEABLE, resource_size);
-    if (image_memory == nullptr)
-    {
-        return;
-    }
-
-    const auto image_data = GlobalLock(image_memory);
-    if (image_data == nullptr)
-    {
-        GlobalFree(image_memory);
-        return;
-    }
-
-    std::memcpy(image_data, resource_data, resource_size);
-    GlobalUnlock(image_memory);
-
-    IStream* image_stream{};
-    if (FAILED(CreateStreamOnHGlobal(image_memory, TRUE, &image_stream)))
-    {
-        GlobalFree(image_memory);
-        return;
-    }
-
-    auto image = std::make_unique<Gdiplus::Image>(image_stream, FALSE);
-    if (image->GetLastStatus() != Gdiplus::Ok || image->GetWidth() == 0 || image->GetHeight() == 0)
-    {
-        image.reset();
-        image_stream->Release();
-        return;
-    }
-
-    emptystatelogostream_ = image_stream;
-    emptystatelogo_ = std::move(image);
-}
-
-void ImgVwWindow::CreateEmptyStateControls()
-{
-    if (owner_ != nullptr || openimagebutton_ != nullptr)
-    {
-        return;
-    }
-
-    const auto button_style = WS_CHILD | WS_TABSTOP | BS_OWNERDRAW;
-    openimagebutton_ = CreateWindow(L"BUTTON", L"Open &image...", button_style, 0, 0, 0, 0, hwnd_,
-                                    reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_OPEN_IMAGE)), hinst_, nullptr);
-    openfolderbutton_ = CreateWindow(L"BUTTON", L"Open &folder...", button_style, 0, 0, 0, 0, hwnd_,
-                                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_OPEN_FOLDER)), hinst_, nullptr);
-    searchsubfoldersbutton_ =
-        CreateWindow(L"BUTTON", L"&Search subfolders", button_style, 0, 0, 0, 0, hwnd_,
-                     reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_SEARCH_SUBFOLDERS)), hinst_, nullptr);
-    exitbutton_ = CreateWindow(L"BUTTON", L"E&xit", button_style, 0, 0, 0, 0, hwnd_,
-                               reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDM_EXIT)), hinst_, nullptr);
-
-    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_, exitbutton_})
-    {
-        if (button != nullptr && captionfont_ != nullptr)
-        {
-            SendMessage(button, WM_SETFONT, reinterpret_cast<WPARAM>(captionfont_), TRUE);
-        }
-    }
-}
-
 BOOL ImgVwWindow::IsEmptyStateVisible() const
 {
-    return browseuistate_ == BrowseUiState::Empty || browseuistate_ == BrowseUiState::NoImages ||
-           browseuistate_ == BrowseUiState::SearchingSubfolders;
+    return empty_state_view_.IsVisible() ? TRUE : FALSE;
 }
 
 BOOL ImgVwWindow::IsSearchingSubfolders() const
 {
-    return browseuistate_ == BrowseUiState::SearchingSubfolders;
+    return empty_state_view_.IsSearchingSubfolders() ? TRUE : FALSE;
 }
 
 BOOL ImgVwWindow::HasImages()
@@ -631,8 +457,7 @@ void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_s
     }
 
     const auto was_visible = IsEmptyStateVisible();
-    browseuistate_ = browserinitialized_ ? BrowseUiState::NoImages : BrowseUiState::Empty;
-    emptystatemessage_ = message;
+    empty_state_view_.Show(message, browserinitialized_ != FALSE, show_search_subfolders != FALSE);
     if (!was_visible)
     {
         KillTimer(hwnd_, IDT_HIDEMOUSE);
@@ -644,54 +469,14 @@ void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_s
         ShowCursor(TRUE);
     }
 
-    if (openimagebutton_ != nullptr)
-    {
-        ShowWindow(openimagebutton_, SW_SHOW);
-    }
-    if (openfolderbutton_ != nullptr)
-    {
-        ShowWindow(openfolderbutton_, SW_SHOW);
-    }
-    if (searchsubfoldersbutton_ != nullptr)
-    {
-        ShowWindow(searchsubfoldersbutton_, show_search_subfolders ? SW_SHOW : SW_HIDE);
-    }
-    if (exitbutton_ != nullptr)
-    {
-        ShowWindow(exitbutton_, SW_SHOW);
-    }
-
-    UpdateEmptyStateLayout();
-    const auto focusbutton =
-        show_search_subfolders && searchsubfoldersbutton_ != nullptr ? searchsubfoldersbutton_ : openimagebutton_;
-    if (focusbutton != nullptr)
-    {
-        SetFocus(focusbutton);
-    }
+    empty_state_view_.UpdateLayout(GetWindowDpi());
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 void ImgVwWindow::ShowSearchingSubfoldersState()
 {
-    browseuistate_ = BrowseUiState::SearchingSubfolders;
-    emptystatemessage_ = L"Searching subfolders for supported images...";
-    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_})
-    {
-        if (button != nullptr)
-        {
-            ShowWindow(button, SW_HIDE);
-        }
-    }
-    if (exitbutton_ != nullptr)
-    {
-        ShowWindow(exitbutton_, SW_SHOW);
-    }
-
-    UpdateEmptyStateLayout();
-    if (exitbutton_ != nullptr)
-    {
-        SetFocus(exitbutton_);
-    }
+    empty_state_view_.ShowSearchingSubfolders();
+    empty_state_view_.UpdateLayout(GetWindowDpi());
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -702,15 +487,7 @@ void ImgVwWindow::HideEmptyState()
         return;
     }
 
-    browseuistate_ = BrowseUiState::Collecting;
-    for (const auto button : {openimagebutton_, openfolderbutton_, searchsubfoldersbutton_, exitbutton_})
-    {
-        if (button != nullptr)
-        {
-            ShowWindow(button, SW_HIDE);
-        }
-    }
-
+    empty_state_view_.Hide();
     if (primarywindow_)
     {
         SetCapture(hwnd_);
@@ -719,133 +496,9 @@ void ImgVwWindow::HideEmptyState()
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
-ImgVwWindow::EmptyStateLayout ImgVwWindow::CalculateEmptyStateLayout(const RECT& client_rect) const
-{
-    EmptyStateLayout layout;
-    const auto available_width = std::max(0, static_cast<INT>(client_rect.right) - ScaleForWindowDpi(48));
-    layout.panel_width = std::min(available_width, ScaleForWindowDpi(460));
-    layout.panel_height = ScaleForWindowDpi(browseuistate_ == BrowseUiState::NoImages ? 132 : 96);
-
-    if (emptystatelogo_ != nullptr && emptystatelogo_->GetWidth() > 0 && emptystatelogo_->GetHeight() > 0)
-    {
-        layout.logo_width = layout.panel_width * 4 / 5;
-        layout.logo_height = MulDiv(layout.logo_width, static_cast<INT>(emptystatelogo_->GetHeight()),
-                                    static_cast<INT>(emptystatelogo_->GetWidth()));
-    }
-
-    const auto logo_gap = layout.logo_height > 0 ? ScaleForWindowDpi(12) : 0;
-    const auto panel_button_gap = ScaleForWindowDpi(20);
-    const auto button_height = ScaleForWindowDpi(28);
-    const auto button_row_gap = ScaleForWindowDpi(12);
-    const auto button_rows = IsSearchingSubfolders() ? 1 : 2;
-    const auto content_height = layout.logo_height + logo_gap + layout.panel_height + panel_button_gap +
-                                button_height * button_rows + button_row_gap * (button_rows - 1);
-    const auto content_top = std::max(0, (static_cast<INT>(client_rect.bottom) - content_height) / 2);
-    layout.buttons_top = content_top + layout.logo_height + logo_gap + layout.panel_height + panel_button_gap;
-    return layout;
-}
-
-void ImgVwWindow::UpdateEmptyStateLayout()
-{
-    if (owner_ != nullptr || openimagebutton_ == nullptr || openfolderbutton_ == nullptr)
-    {
-        return;
-    }
-
-    RECT client_rect{};
-    if (!GetClientRect(hwnd_, &client_rect))
-    {
-        return;
-    }
-
-    const auto layout = CalculateEmptyStateLayout(client_rect);
-    const auto button_width = ScaleForWindowDpi(150);
-    const auto button_height = ScaleForWindowDpi(28);
-    const auto gap = ScaleForWindowDpi(12);
-    const auto buttons_width = button_width * 2 + gap;
-    const auto left = (client_rect.right - buttons_width) / 2;
-    const auto top = layout.buttons_top;
-    if (IsSearchingSubfolders())
-    {
-        if (exitbutton_ != nullptr)
-        {
-            MoveWindow(exitbutton_, (client_rect.right - button_width) / 2, top, button_width, button_height, TRUE);
-        }
-        return;
-    }
-
-    MoveWindow(openimagebutton_, left, top, button_width, button_height, TRUE);
-    MoveWindow(openfolderbutton_, left + button_width + gap, top, button_width, button_height, TRUE);
-    const auto secondary_top = top + button_height + gap;
-    if (searchsubfoldersbutton_ != nullptr)
-    {
-        const auto search_visible = IsWindowVisible(searchsubfoldersbutton_);
-        const auto search_left = search_visible ? left : (client_rect.right - button_width) / 2;
-        MoveWindow(searchsubfoldersbutton_, search_left, secondary_top, button_width, button_height, TRUE);
-        if (exitbutton_ != nullptr)
-        {
-            const auto exit_left = search_visible ? left + button_width + gap : (client_rect.right - button_width) / 2;
-            MoveWindow(exitbutton_, exit_left, secondary_top, button_width, button_height, TRUE);
-        }
-    }
-    else if (exitbutton_ != nullptr)
-    {
-        MoveWindow(exitbutton_, (client_rect.right - button_width) / 2, secondary_top, button_width, button_height,
-                   TRUE);
-    }
-}
-
 BOOL ImgVwWindow::TranslateEmptyStateDialogMessage(MSG* message) const
 {
-    return message != nullptr && IsEmptyStateVisible() && IsDialogMessage(hwnd_, message);
-}
-
-void ImgVwWindow::PaintEmptyState(PAINTSTRUCT* pps)
-{
-    RECT client_rect{};
-    if (!GetClientRect(hwnd_, &client_rect))
-    {
-        return;
-    }
-
-    const auto colors = GetOverlayColors(systemlighttheme_);
-    const auto background = CreateSolidBrush(colors.background);
-    if (background != nullptr)
-    {
-        FillRect(pps->hdc, &client_rect, background);
-        DeleteObject(background);
-    }
-
-    const auto layout = CalculateEmptyStateLayout(client_rect);
-    const auto panel_width = layout.panel_width;
-    const auto panel_height = layout.panel_height;
-    const auto panel_left = (client_rect.right - panel_width) / 2;
-    const auto panel_top = layout.buttons_top - ScaleForWindowDpi(20) - panel_height;
-    const RECT panel_rect{panel_left, panel_top, panel_left + panel_width, panel_top + panel_height};
-
-    const auto text = IsSearchingSubfolders()
-                          ? emptystatemessage_
-                          : emptystatemessage_ + L"\r\n\r\nYou can also drag an image or folder here.";
-    DrawTextOverlay(pps->hdc, panel_rect, text, nullptr, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX, colors.background,
-                    TRUE);
-
-    if (emptystatelogo_ != nullptr && layout.logo_width > 0 && layout.logo_height > 0)
-    {
-        const auto logo_left = (client_rect.right - layout.logo_width) / 2;
-        const auto logo_top = panel_top - layout.logo_height - ScaleForWindowDpi(12);
-        Gdiplus::Graphics graphics(pps->hdc);
-        graphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
-        graphics.SetCompositingQuality(Gdiplus::CompositingQualityHighQuality);
-        graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-        graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-        graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-
-        Gdiplus::ImageAttributes image_attributes;
-        image_attributes.SetWrapMode(Gdiplus::WrapModeTileFlipXY);
-        const Gdiplus::Rect destination(logo_left, logo_top, layout.logo_width, layout.logo_height);
-        graphics.DrawImage(emptystatelogo_.get(), destination, 0, 0, emptystatelogo_->GetWidth(),
-                           emptystatelogo_->GetHeight(), Gdiplus::UnitPixel, &image_attributes);
-    }
+    return empty_state_view_.TranslateDialogMessage(message);
 }
 
 BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
@@ -895,7 +548,7 @@ void ImgVwWindow::HandleSize(WPARAM wParam, LPARAM lParam)
     {
         InvalidateScreen();
     }
-    UpdateEmptyStateLayout();
+    empty_state_view_.UpdateLayout(GetWindowDpi());
 }
 
 void ImgVwWindow::HandleDpiChanged(LPARAM lParam)
@@ -920,7 +573,7 @@ void ImgVwWindow::HandleDpiChanged(LPARAM lParam)
     {
         RefreshLoaderStatsOverlay();
     }
-    UpdateEmptyStateLayout();
+    empty_state_view_.UpdateLayout(GetWindowDpi());
 }
 
 void ImgVwWindow::InitializeMonitorState()
@@ -1060,34 +713,6 @@ void ImgVwWindow::FinishWindowDrag()
     }
 }
 
-bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
-{
-    const auto displaystate = item->GetDisplayState();
-    if (displaystate.status != ImgItem::Status::Ready || displaystate.frame == nullptr)
-    {
-        return false;
-    }
-
-    RECT windowrectangle{};
-    if (!GetClientRect(hwnd_, &windowrectangle))
-    {
-        return false;
-    }
-
-    const auto imgbitmap = displaystate.frame->GetBitmap();
-    const ImgRenderInput input{dc,
-                               backgroundbrush_,
-                               windowrectangle,
-                               imgbitmap.bitmap(),
-                               displaystate.frame->offsetx(),
-                               displaystate.frame->offsety(),
-                               displaystate.frame->width(),
-                               displaystate.frame->height(),
-                               IsInfoOverlayVisible() && !IsRectEmpty(&loaderstatsoverlayrect_),
-                               loaderstatsoverlayrect_};
-    return image_renderer_.Render(input).Succeeded();
-}
-
 bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const ImgItem* item,
                                          const std::wstring& filepath)
 {
@@ -1097,18 +722,17 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
     }
 
     const auto overlaydrawn = IsInfoOverlayVisible();
-    auto text = BuildItemInfoOverlayText(item, filepath);
+    auto text = InfoOverlay::BuildItemText(item, filepath);
     RECT overlayrect{};
-    if (loaderstatsoverlayvisible_)
+    if (info_overlay_.stats_visible())
     {
-        loaderstatsoverlaytext_ = BuildLoaderStatsOverlayText();
-        loaderstatsoverlayrect_ = CalculateLoaderStatsOverlayRect(dc, loaderstatsoverlaytext_);
-        text = loaderstatsoverlaytext_;
-        overlayrect = loaderstatsoverlayrect_;
+        text = BuildLoaderStatsOverlayText();
+        overlayrect = info_overlay_.CalculateRectangle(dc, text, GetWindowDpi(), clientwidth_, clientheight_);
+        info_overlay_.SetContent(text, overlayrect);
     }
     else
     {
-        overlayrect = CalculateLoaderStatsOverlayRect(dc, text);
+        overlayrect = info_overlay_.CalculateRectangle(dc, text, GetWindowDpi(), clientwidth_, clientheight_);
     }
 
     const auto paintwidth = paintrect.right - paintrect.left;
@@ -1126,7 +750,7 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
             DeleteDC(memorydc);
         }
         FillRect(dc, &paintrect, backgroundbrush_);
-        DrawTextOverlay(dc, overlayrect, text, nullptr);
+        info_overlay_.Draw(dc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
         return overlaydrawn;
     }
 
@@ -1136,14 +760,14 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
         DeleteObject(bitmap);
         DeleteDC(memorydc);
         FillRect(dc, &paintrect, backgroundbrush_);
-        DrawTextOverlay(dc, overlayrect, text, nullptr);
+        info_overlay_.Draw(dc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
         return overlaydrawn;
     }
 
     POINT previousorigin{};
     SetViewportOrgEx(memorydc, -paintrect.left, -paintrect.top, &previousorigin);
     FillRect(memorydc, &paintrect, backgroundbrush_);
-    DrawTextOverlay(memorydc, overlayrect, text, nullptr);
+    info_overlay_.Draw(memorydc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
     SetViewportOrgEx(memorydc, previousorigin.x, previousorigin.y, nullptr);
 
     BitBlt(dc, paintrect.left, paintrect.top, paintwidth, paintheight, memorydc, 0, 0, SRCCOPY);
@@ -1156,50 +780,16 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
 bool ImgVwWindow::DisplayLoadingProgress(HDC dc, const RECT& paintrect, const ImgItem* item,
                                          const std::wstring& filepath)
 {
-    if (IsRectEmpty(&paintrect) || !IsLoadingProgressOverlayVisible(item))
+    if (IsRectEmpty(&paintrect) || !info_overlay_.loading_progress_visible())
     {
         return false;
     }
 
-    const auto text = BuildItemInfoOverlayText(item, filepath);
-    const auto overlayrect = CalculateLoaderStatsOverlayRect(dc, text);
+    const auto text = InfoOverlay::BuildItemText(item, filepath);
+    const auto overlayrect = info_overlay_.CalculateRectangle(dc, text, GetWindowDpi(), clientwidth_, clientheight_);
     FillRect(dc, &paintrect, backgroundbrush_);
-    DrawTextOverlay(dc, overlayrect, text, nullptr);
+    info_overlay_.Draw(dc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
     return true;
-}
-
-std::wstring ImgVwWindow::BuildItemInfoOverlayText(const ImgItem* item, const std::wstring& filepath) const
-{
-    std::wstringstream text;
-    if (item == nullptr || item->status() != ImgItem::Status::Ready)
-    {
-        auto percent = 0;
-        if (item != nullptr && item->status() == ImgItem::Status::Loading)
-        {
-            percent = std::max(item->loadingprogresspercent(), 0);
-        }
-
-        text << L"[" << percent << L"%] ";
-    }
-    text << filepath;
-
-    return text.str();
-}
-
-BOOL ImgVwWindow::IsLoadingProgressOverlayVisible(const ImgItem* item) const
-{
-    if (item == nullptr)
-    {
-        return FALSE;
-    }
-
-    const auto status = item->status();
-    if (status == ImgItem::Status::Ready || status == ImgItem::Status::Error || loadingprogresswaitstarttick_ == 0)
-    {
-        return FALSE;
-    }
-
-    return GetTickCount() - loadingprogresswaitstarttick_ >= kLoadingProgressOverlayDebounceInMilliseconds;
 }
 
 void ImgVwWindow::UpdateLoadingProgressOverlayTimer()
@@ -1207,55 +797,25 @@ void ImgVwWindow::UpdateLoadingProgressOverlayTimer()
     const auto item = browser_.GetCurrentItem();
     const auto waiting =
         item != nullptr && item->status() != ImgItem::Status::Ready && item->status() != ImgItem::Status::Error;
-    if (!waiting)
+    const InfoOverlayProgressInput input{
+        waiting,        item != nullptr ? item->loadingprogresspercent() : 0, browser_.GetCurrentFilePath(),
+        GetTickCount(), kLoadingProgressOverlayDebounceInMilliseconds,        IsInfoOverlayVisible() != FALSE};
+    const auto actions = info_overlay_.UpdateLoadingProgress(input);
+    if (actions.cancel_progress_timer)
     {
-        if (loadingprogressoverlayvisible_)
-        {
-            InvalidateRect(hwnd_, nullptr, FALSE);
-        }
-        if (IsInfoOverlayVisible())
-        {
-            RefreshLoaderStatsOverlay();
-        }
-
         KillTimer(hwnd_, kLoadingProgressOverlayTimer);
-        lastloadingprogresspercent_ = -2;
-        loadingprogresswaitstarttick_ = 0;
-        loadingprogressoverlayvisible_ = FALSE;
-        loadingprogresspath_.clear();
-        return;
     }
-
-    const auto currentpath = browser_.GetCurrentFilePath();
-    if (loadingprogresspath_ != currentpath)
+    if (actions.arm_progress_timer)
     {
-        loadingprogresspath_ = currentpath;
-        lastloadingprogresspercent_ = -2;
-        loadingprogresswaitstarttick_ = 0;
-        loadingprogressoverlayvisible_ = FALSE;
+        SetTimer(hwnd_, kLoadingProgressOverlayTimer, kLoadingProgressOverlayIntervalInMilliseconds, nullptr);
     }
-
-    if (loadingprogresswaitstarttick_ == 0)
+    if (actions.refresh_overlay)
     {
-        loadingprogresswaitstarttick_ = GetTickCount();
+        RefreshLoaderStatsOverlay();
     }
-
-    SetTimer(hwnd_, kLoadingProgressOverlayTimer, kLoadingProgressOverlayIntervalInMilliseconds, nullptr);
-
-    const auto percent = item->loadingprogresspercent();
-    const auto visible = IsLoadingProgressOverlayVisible(item.get());
-    if (percent != lastloadingprogresspercent_ || visible != loadingprogressoverlayvisible_)
+    if (actions.invalidate_all)
     {
-        lastloadingprogresspercent_ = percent;
-        loadingprogressoverlayvisible_ = visible;
-        if (IsInfoOverlayVisible())
-        {
-            RefreshLoaderStatsOverlay();
-        }
-        else if (visible)
-        {
-            InvalidateRect(hwnd_, nullptr, FALSE);
-        }
+        InvalidateRect(hwnd_, nullptr, FALSE);
     }
 }
 
@@ -1272,7 +832,7 @@ BOOL ImgVwWindow::IsFilenameOverlayVisible() const
 
 BOOL ImgVwWindow::IsInfoOverlayVisible() const
 {
-    return loaderstatsoverlayvisible_ || IsFilenameOverlayVisible();
+    return info_overlay_.stats_visible() || IsFilenameOverlayVisible();
 }
 
 void ImgVwWindow::UpdateLoaderStatsOverlayVisibility()
@@ -1301,13 +861,12 @@ void ImgVwWindow::UpdateLoaderStatsOverlayVisibility()
 void ImgVwWindow::UpdateLoaderStatsOverlayVisibilityForWindow()
 {
     const auto visible = IsLoaderStatsOverlayKeyDown();
-    if (loaderstatsoverlayvisible_ == visible)
+    if (!info_overlay_.SetStatsVisible(visible != FALSE))
     {
         return;
     }
 
-    loaderstatsoverlayvisible_ = visible;
-    if (loaderstatsoverlayvisible_)
+    if (info_overlay_.stats_visible())
     {
         SetTimer(hwnd_, kLoaderStatsOverlayTimer, kLoaderStatsOverlayIntervalInMilliseconds, nullptr);
         UpdateLoadingProgressOverlayTimer();
@@ -1334,9 +893,7 @@ void ImgVwWindow::UpdateInfoOverlayForWindow()
 
 void ImgVwWindow::ClearInfoOverlay()
 {
-    const auto previousrect = loaderstatsoverlayrect_;
-    loaderstatsoverlaytext_.clear();
-    SetRectEmpty(&loaderstatsoverlayrect_);
+    const auto previousrect = info_overlay_.Clear();
     if (!IsRectEmpty(&previousrect))
     {
         InvalidateRect(hwnd_, &previousrect, FALSE);
@@ -1392,30 +949,26 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
         addtargets(window);
     }
 
-    std::wstringstream text;
-    std::size_t cached{};
-    std::size_t queued{};
-    std::size_t freeslots{};
-    std::size_t maximumslots{};
+    InfoOverlayStatsSnapshot snapshot;
+    snapshot.found_images = sharedstats.found_images;
     for (const auto& target : targetstats)
     {
         const auto& size_stats = target.size;
-        const auto size_total = size_stats.queued + size_stats.loading + size_stats.ready + size_stats.error;
-        cached += size_total;
-        queued += target.loader.queued;
-        freeslots += target.loader.free_slots;
-        maximumslots += target.loader.maximum_slots;
+        snapshot.targets.push_back({size_stats.targetwidth, size_stats.targetheight, size_stats.queued,
+                                    size_stats.loading, size_stats.ready, size_stats.error, size_stats.temp_file_bytes,
+                                    target.loader.queued, target.loader.free_slots, target.loader.maximum_slots});
     }
 
-    text << L"Found: " << sharedstats.found_images << L"; Cached: " << cached << L"; Queued: " << queued << L"; Slots: "
-         << freeslots << L"/" << maximumslots;
     const auto temppath = ImgSettings::GetInstance().temppath();
     ULARGE_INTEGER freebytesavailable{};
     if (!temppath.empty() && GetDiskFreeSpaceEx(temppath.c_str(), &freebytesavailable, nullptr, nullptr))
     {
-        text << L"; Free: " << FormatByteSize(freebytesavailable.QuadPart);
+        snapshot.has_free_bytes = true;
+        snapshot.free_bytes = freebytesavailable.QuadPart;
     }
 
+    snapshot.slideshow_running = slideshowrunning != FALSE;
+    snapshot.random_slideshow = randomslideshow != FALSE;
     if (slideshowrunning)
     {
         auto progress = randomslideshow ? sharedstats.random : sharedstats.sequential;
@@ -1424,44 +977,17 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
         {
             progress = slideshowowner->browser_.GetSequentialProgress(slideshowowner->multimonitorslideshowcursorpath_);
         }
-        text << L"\r\n--------------------------------------------------------------------------\r\n";
-        text << L"Mode: " << (randomslideshow ? L"Random" : L"Sequential") << L" slideshow; Cycle: "
-             << progress.position << L" / " << progress.total;
-        if (progress.total > 0)
-        {
-            text << L" (" << FormatPercent(progress.position, progress.total) << L")";
-        }
-    }
-
-    text << L"\r\n";
-    text << L"--------------------------------------------------------------------------\r\n";
-    text << std::left << std::setw(12) << L"Size" << std::right << std::setw(8) << L"Ready" << std::setw(10)
-         << L"Loaded" << std::setw(10) << L"Loading" << std::setw(10) << L"Queued" << std::setw(8) << L"Errors"
-         << std::setw(10) << L"Used" << std::setw(3) << L"" << L"\r\n";
-    text << L"--------------------------------------------------------------------------\r\n";
-
-    for (const auto& target : targetstats)
-    {
-        const auto& size_stats = target.size;
-        const auto size_total = size_stats.queued + size_stats.loading + size_stats.ready + size_stats.error;
-        std::wstringstream size;
-        size << size_stats.targetwidth << L"x" << size_stats.targetheight;
-        text << std::left << std::setw(12) << size.str() << std::right << std::setw(8)
-             << FormatPercent(size_stats.ready, size_total) << std::setw(10) << size_stats.ready << std::setw(10)
-             << size_stats.loading << std::setw(10) << size_stats.queued << std::setw(8) << size_stats.error;
-        WriteByteSizeColumn(text, size_stats.temp_file_bytes, 13);
-        text << L"\r\n";
+        snapshot.cycle_position = progress.position;
+        snapshot.cycle_total = progress.total;
     }
 
     const auto currentitem = browser_.GetCurrentItem();
     const auto currentpath = browser_.GetCurrentFilePath();
     if (!currentpath.empty())
     {
-        text << L"--------------------------------------------------------------------------\r\n";
-        text << BuildItemInfoOverlayText(currentitem.get(), currentpath);
+        snapshot.current_item_text = InfoOverlay::BuildItemText(currentitem.get(), currentpath);
     }
-
-    return text.str();
+    return InfoOverlay::BuildStatsText(snapshot);
 }
 
 UINT ImgVwWindow::GetWindowDpi() const
@@ -1492,85 +1018,17 @@ UINT ImgVwWindow::GetWindowDpi() const
         }
     }
 
-    return kDefaultDpi;
+    return WindowGeometry::kDefaultDpi;
 }
 
 INT ImgVwWindow::ScaleForWindowDpi(INT value) const
 {
-    return MulDiv(value, static_cast<INT>(GetWindowDpi()), static_cast<INT>(kDefaultDpi));
-}
-
-HFONT ImgVwWindow::GetLoaderStatsOverlayFont()
-{
-    const auto dpi = GetWindowDpi();
-    if (loaderstatsoverlayfont_ != nullptr && loaderstatsoverlayfontdpi_ == dpi)
-    {
-        return loaderstatsoverlayfont_;
-    }
-
-    if (loaderstatsoverlayfont_ != nullptr)
-    {
-        DeleteObject(loaderstatsoverlayfont_);
-        loaderstatsoverlayfont_ = nullptr;
-    }
-
-    LOGFONT logfont{};
-    logfont.lfHeight = -MulDiv(10, static_cast<INT>(dpi), 72);
-    logfont.lfWeight = FW_NORMAL;
-    logfont.lfOutPrecision = OUT_TT_PRECIS;
-    logfont.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
-    BOOL fontsmoothing{};
-    UINT fontsmoothingtype{};
-    const auto cleartypeenabled = SystemParametersInfo(SPI_GETFONTSMOOTHING, 0, &fontsmoothing, 0) && fontsmoothing &&
-                                  SystemParametersInfo(SPI_GETFONTSMOOTHINGTYPE, 0, &fontsmoothingtype, 0) &&
-                                  fontsmoothingtype == FE_FONTSMOOTHINGCLEARTYPE;
-    logfont.lfQuality = cleartypeenabled ? CLEARTYPE_NATURAL_QUALITY : ANTIALIASED_QUALITY;
-    lstrcpy(logfont.lfFaceName, L"Lucida Console");
-
-    loaderstatsoverlayfont_ = CreateFontIndirect(&logfont);
-    loaderstatsoverlayfontdpi_ = dpi;
-    return loaderstatsoverlayfont_;
+    return WindowGeometry::ScaleForDpi(value, GetWindowDpi());
 }
 
 void ImgVwWindow::ResetLoaderStatsOverlayLayout()
 {
-    if (loaderstatsoverlayfont_ != nullptr)
-    {
-        DeleteObject(loaderstatsoverlayfont_);
-        loaderstatsoverlayfont_ = nullptr;
-    }
-    loaderstatsoverlayfontdpi_ = 0;
-    loaderstatsoverlaytext_.clear();
-    SetRectEmpty(&loaderstatsoverlayrect_);
-}
-
-RECT ImgVwWindow::CalculateLoaderStatsOverlayRect(HDC dc, const std::wstring& text) const
-{
-    const auto inset = ScaleForWindowDpi(16);
-    const auto horizontalpadding = ScaleForWindowDpi(8);
-    const auto verticalpadding = ScaleForWindowDpi(6);
-    const auto horizontalmargin = inset;
-    const auto verticalmargin = inset;
-    const auto fallbackwidth = ScaleForWindowDpi(800);
-    const auto fallbackheight = ScaleForWindowDpi(600);
-    const auto availablewidth =
-        std::max(1, (clientwidth_ > 0 ? clientwidth_ : fallbackwidth) - horizontalmargin * 2 - horizontalpadding * 2);
-    const auto availableheight =
-        std::max(1, (clientheight_ > 0 ? clientheight_ : fallbackheight) - verticalmargin * 2 - verticalpadding * 2);
-    RECT textrect{0, 0, availablewidth, availableheight};
-    const auto font = const_cast<ImgVwWindow*>(this)->GetLoaderStatsOverlayFont();
-    const auto previousfont = font == nullptr ? nullptr : SelectObject(dc, font);
-    DrawText(dc, text.c_str(), -1, &textrect, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
-    if (previousfont != nullptr)
-    {
-        SelectObject(dc, previousfont);
-    }
-
-    const auto textwidth = std::min(availablewidth, static_cast<INT>(textrect.right - textrect.left));
-    const auto textheight = std::min(availableheight, static_cast<INT>(textrect.bottom - textrect.top));
-    RECT backgroundrect{horizontalmargin, verticalmargin, horizontalmargin + textwidth + horizontalpadding * 2,
-                        verticalmargin + textheight + verticalpadding * 2};
-    return backgroundrect;
+    info_overlay_.ResetLayout();
 }
 
 void ImgVwWindow::RefreshLoaderStatsOverlay()
@@ -1582,9 +1040,9 @@ void ImgVwWindow::RefreshLoaderStatsOverlay()
     }
 
     const auto currentitem = browser_.GetCurrentItem();
-    const auto text = loaderstatsoverlayvisible_
+    const auto text = info_overlay_.stats_visible()
                           ? BuildLoaderStatsOverlayText()
-                          : BuildItemInfoOverlayText(currentitem.get(), browser_.GetCurrentFilePath());
+                          : InfoOverlay::BuildItemText(currentitem.get(), browser_.GetCurrentFilePath());
     if (text.empty())
     {
         ClearInfoOverlay();
@@ -1597,203 +1055,28 @@ void ImgVwWindow::RefreshLoaderStatsOverlay()
         return;
     }
 
-    const auto rect = CalculateLoaderStatsOverlayRect(dc, text);
+    const auto rect = info_overlay_.CalculateRectangle(dc, text, GetWindowDpi(), clientwidth_, clientheight_);
     ReleaseDC(hwnd_, dc);
 
     RECT invalidaterect = rect;
-    if (!IsRectEmpty(&loaderstatsoverlayrect_))
+    if (!IsRectEmpty(&info_overlay_.rectangle()))
     {
-        UnionRect(&invalidaterect, &invalidaterect, &loaderstatsoverlayrect_);
+        UnionRect(&invalidaterect, &invalidaterect, &info_overlay_.rectangle());
     }
 
-    if (loaderstatsoverlaytext_ == text && EqualRect(&loaderstatsoverlayrect_, &rect))
+    if (!info_overlay_.SetContent(text, rect))
     {
         return;
     }
 
-    loaderstatsoverlaytext_ = text;
-    loaderstatsoverlayrect_ = rect;
     InvalidateRect(hwnd_, &invalidaterect, FALSE);
-}
-
-void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::wstring& text, const ImgItem* item,
-                                  UINT textformat, COLORREF fallbackbackground, BOOL vertically_center_text)
-{
-    if (text.empty() || IsRectEmpty(&overlayrect))
-    {
-        return;
-    }
-
-    const auto overlaywidth = overlayrect.right - overlayrect.left;
-    const auto overlayheight = overlayrect.bottom - overlayrect.top;
-    const auto memorydc = CreateCompatibleDC(dc);
-    const auto bitmap = memorydc == nullptr ? nullptr : CreateCompatibleBitmap(dc, overlaywidth, overlayheight);
-    if (memorydc == nullptr || bitmap == nullptr)
-    {
-        if (bitmap != nullptr)
-        {
-            DeleteObject(bitmap);
-        }
-        if (memorydc != nullptr)
-        {
-            DeleteDC(memorydc);
-        }
-        return;
-    }
-
-    const auto previousbitmap = SelectObject(memorydc, bitmap);
-    if (previousbitmap == nullptr || previousbitmap == HGDI_ERROR)
-    {
-        DeleteObject(bitmap);
-        DeleteDC(memorydc);
-        return;
-    }
-
-    RECT backgroundrect{0, 0, overlaywidth, overlayheight};
-    const auto colors = GetOverlayColors(systemlighttheme_);
-    const auto fallback_background = CreateSolidBrush(fallbackbackground);
-    if (fallback_background != nullptr)
-    {
-        FillRect(memorydc, &backgroundrect, fallback_background);
-        DeleteObject(fallback_background);
-    }
-
-    const auto displaystate = item == nullptr ? ImgItem::DisplayState{} : item->GetDisplayState();
-    if (displaystate.status == ImgItem::Status::Ready && displaystate.frame != nullptr)
-    {
-        RECT imagerect{displaystate.frame->offsetx(), displaystate.frame->offsety(),
-                       displaystate.frame->offsetx() + displaystate.frame->width(),
-                       displaystate.frame->offsety() + displaystate.frame->height()};
-        RECT intersection{};
-        if (IntersectRect(&intersection, &overlayrect, &imagerect))
-        {
-            const auto imgbitmap = displaystate.frame->GetBitmap();
-            const auto sourcedc = CreateCompatibleDC(dc);
-            if (sourcedc != nullptr)
-            {
-                const auto previoussourcebitmap = SelectObject(sourcedc, imgbitmap.bitmap());
-                if (previoussourcebitmap != nullptr && previoussourcebitmap != HGDI_ERROR)
-                {
-                    BitBlt(memorydc, intersection.left - overlayrect.left, intersection.top - overlayrect.top,
-                           intersection.right - intersection.left, intersection.bottom - intersection.top, sourcedc,
-                           intersection.left - imagerect.left, intersection.top - imagerect.top, SRCCOPY);
-                    SelectObject(sourcedc, previoussourcebitmap);
-                }
-
-                DeleteDC(sourcedc);
-            }
-        }
-    }
-
-    const auto paneldc = CreateCompatibleDC(dc);
-    const auto panelbitmap = paneldc == nullptr ? nullptr : CreateCompatibleBitmap(dc, overlaywidth, overlayheight);
-    if (paneldc != nullptr && panelbitmap != nullptr)
-    {
-        const auto previouspanelbitmap = SelectObject(paneldc, panelbitmap);
-        const auto panel_brush = CreateSolidBrush(colors.panel);
-        if (panel_brush != nullptr)
-        {
-            FillRect(paneldc, &backgroundrect, panel_brush);
-            DeleteObject(panel_brush);
-        }
-
-        BLENDFUNCTION blend{};
-        blend.BlendOp = AC_SRC_OVER;
-        blend.SourceConstantAlpha = 128;
-        AlphaBlend(memorydc, 0, 0, overlaywidth, overlayheight, paneldc, 0, 0, overlaywidth, overlayheight, blend);
-
-        SelectObject(paneldc, previouspanelbitmap);
-    }
-
-    if (panelbitmap != nullptr)
-    {
-        DeleteObject(panelbitmap);
-    }
-    if (paneldc != nullptr)
-    {
-        DeleteDC(paneldc);
-    }
-
-    const auto borderpen = CreatePen(PS_SOLID, 1, colors.border);
-    if (borderpen != nullptr)
-    {
-        const auto previouspen = SelectObject(memorydc, borderpen);
-        const auto previousbrush = SelectObject(memorydc, GetStockObject(NULL_BRUSH));
-        Rectangle(memorydc, 0, 0, overlaywidth, overlayheight);
-        SelectObject(memorydc, previousbrush);
-        SelectObject(memorydc, previouspen);
-        DeleteObject(borderpen);
-    }
-
-    SetBkMode(memorydc, TRANSPARENT);
-    SetTextColor(memorydc, colors.text);
-    const auto horizontalpadding = ScaleForWindowDpi(8);
-    const auto verticalpadding = ScaleForWindowDpi(6);
-    RECT textrect{horizontalpadding, verticalpadding, overlaywidth - horizontalpadding,
-                  overlayheight - verticalpadding};
-    const auto overlayfont = GetLoaderStatsOverlayFont();
-    const auto previousfont = overlayfont == nullptr ? nullptr : SelectObject(memorydc, overlayfont);
-    if (vertically_center_text)
-    {
-        RECT measured_text{0, 0, textrect.right - textrect.left, 0};
-        DrawText(memorydc, text.c_str(), -1, &measured_text, textformat | DT_CALCRECT);
-        const auto available_height = textrect.bottom - textrect.top;
-        const auto text_height = measured_text.bottom - measured_text.top;
-        if (text_height < available_height)
-        {
-            textrect.top += (available_height - text_height) / 2;
-            textrect.bottom = textrect.top + text_height;
-        }
-    }
-
-    DrawText(memorydc, text.c_str(), -1, &textrect, textformat);
-    if (overlayfont != nullptr)
-    {
-        SelectObject(memorydc, previousfont);
-    }
-
-    BitBlt(dc, overlayrect.left, overlayrect.top, overlaywidth, overlayheight, memorydc, 0, 0, SRCCOPY);
-    SelectObject(memorydc, previousbitmap);
-    DeleteObject(bitmap);
-    DeleteDC(memorydc);
 }
 
 void ImgVwWindow::DrawLoaderStatsOverlay(HDC dc, const ImgItem* item)
 {
-    DrawTextOverlay(dc, loaderstatsoverlayrect_, loaderstatsoverlaytext_, item);
-}
-
-void ImgVwWindow::DrawEmptyStateButton(const DRAWITEMSTRUCT* drawitem)
-{
-    if (drawitem == nullptr || drawitem->CtlType != ODT_BUTTON)
-    {
-        return;
-    }
-
-    wchar_t text[64]{};
-    GetWindowText(drawitem->hwndItem, text, _countof(text));
-    const auto colors = GetOverlayColors(systemlighttheme_);
-    auto text_format = DT_CENTER | DT_SINGLELINE | DT_VCENTER;
-    if ((drawitem->itemState & ODS_NOACCEL) != 0)
-    {
-        text_format |= DT_HIDEPREFIX;
-    }
-    DrawTextOverlay(drawitem->hDC, drawitem->rcItem, text, nullptr, text_format, colors.background);
-    if ((drawitem->itemState & ODS_FOCUS) != 0)
-    {
-        const auto focus_brush = CreateSolidBrush(RGB(123, 104, 238));
-        if (focus_brush != nullptr)
-        {
-            auto focus_rect = drawitem->rcItem;
-            const auto focus_width = std::max(2, ScaleForWindowDpi(3));
-            for (INT inset = 0; inset < focus_width && !IsRectEmpty(&focus_rect); ++inset)
-            {
-                FrameRect(drawitem->hDC, &focus_rect, focus_brush);
-                InflateRect(&focus_rect, -1, -1);
-            }
-            DeleteObject(focus_brush);
-        }
-    }
+    const auto display_state = item == nullptr ? ImgItem::DisplayState{} : item->GetDisplayState();
+    info_overlay_.Draw(dc, info_overlay_.rectangle(), info_overlay_.text(), display_state, GetWindowDpi(),
+                       systemlighttheme_ != FALSE);
 }
 
 void ImgVwWindow::InvalidateScreen()
@@ -2738,18 +2021,165 @@ void ImgVwWindow::OnNCDestroy()
     KillTimer(hwnd_, kBrowserCompletionRetryTimer);
     browser_.StopBrowsing();
     DeleteObject(backgroundbrush_);
-    DeleteObject(captionfont_);
-    emptystatelogo_.reset();
-    if (emptystatelogostream_ != nullptr)
-    {
-        emptystatelogostream_->Release();
-        emptystatelogostream_ = nullptr;
-    }
-    DeleteObject(loaderstatsoverlayfont_);
     if (owner_ != nullptr)
     {
         owner_->OnSlideShowWindowDestroyed(this);
     }
+}
+
+LRESULT ImgVwWindow::HandleCommand(UINT command, UINT notification, LPARAM lparam)
+{
+    if (owner_ != nullptr)
+    {
+        return SendMessage(CommandTarget()->hwnd(), WM_COMMAND, MAKEWPARAM(command, notification), lparam);
+    }
+
+    if (IsImageCommand(command) && !HasImages() && !(command == IDR_TOGGLE_FILENAME && notification == 1))
+    {
+        return FALSE;
+    }
+
+    switch (command)
+    {
+    case IDM_OPEN_IMAGE:
+        OpenImage();
+        break;
+    case IDM_OPEN_FOLDER:
+        OpenFolder();
+        break;
+    case IDM_SEARCH_SUBFOLDERS:
+        BrowseEmptyStateSubFolders();
+        break;
+    case IDM_ABOUT:
+        ShowCursor(TRUE);
+        DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, reinterpret_cast<DLGPROC>(AboutDialogProc));
+        break;
+    case IDR_ENTER:
+        ActivateEmptyStateButton();
+        break;
+    case IDR_TOGGLE_FILENAME:
+        if (IsEmptyStateVisible())
+        {
+            ActivateEmptyStateButton();
+        }
+        else
+        {
+            ToggleFilenameOverlay();
+        }
+        break;
+    case IDR_NEXT:
+        BrowseNext();
+        break;
+    case IDR_PREVIOUS:
+        BrowsePrevious();
+        break;
+    case IDR_FIRST:
+        BrowseFirst();
+        break;
+    case IDR_LAST:
+        BrowseLast();
+        break;
+    case IDR_RECYCLE:
+    case IDR_DELETE:
+        DeleteCurrentItem(command == IDR_RECYCLE);
+        break;
+    case IDR_TOGGLESS:
+        ToggleSlideShow(FALSE);
+        break;
+    case IDR_TOGGLESSR:
+        ToggleSlideShow(TRUE);
+        break;
+    case IDR_TOGGLESS_MULTI:
+        ToggleMultiMonitorSlideShow(FALSE);
+        break;
+    case IDR_TOGGLESS_MULTI_RANDOM:
+        ToggleMultiMonitorSlideShow(TRUE);
+        break;
+    case IDR_INCSSS:
+        IncreaseSlideShowSpeed();
+        break;
+    case IDR_DECSSS:
+        DecreaseSlideShowSpeed();
+        break;
+    case IDR_RECURSE:
+        BrowseSubFolders();
+        break;
+    case IDM_LOADICC:
+        if (SelectDefaultICCProfile())
+        {
+            ImgItem::UnloadDefaultICCProfile();
+            browser_.ReloadCurrentItem();
+            InvalidateScreen();
+        }
+        break;
+    case IDM_USEBUILTINICC:
+        UseBuiltInICCProfile();
+        break;
+    case IDM_EXIT:
+    case IDR_ESCAPE:
+        CloseWindow();
+        break;
+    }
+
+    return FALSE;
+}
+
+LRESULT ImgVwWindow::HandleTimer(UINT_PTR timer, LPARAM callback)
+{
+    switch (timer)
+    {
+    case IDT_SLIDESHOW:
+        HandleSlideShow();
+        return 0;
+    case IDT_HIDEMOUSE:
+        HandleHideMouseCursor();
+        return 0;
+    case kLoaderStatsOverlayTimer:
+        UpdateLoaderStatsOverlayVisibility();
+        if (info_overlay_.stats_visible())
+        {
+            RefreshLoaderStatsOverlay();
+        }
+        return 0;
+    case kLoadingProgressOverlayTimer:
+        UpdateLoadingProgressOverlayTimer();
+        return 0;
+    case kBrowserCompletionRetryTimer:
+        KillTimer(hwnd_, kBrowserCompletionRetryTimer);
+        HandleStartupExitConditions();
+        return 0;
+    default:
+        return Window::HandleMessage(WM_TIMER, timer, callback);
+    }
+}
+
+LRESULT ImgVwWindow::HandleMouseMessage(UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_LBUTTONDOWN:
+        if (BeginWindowDrag(lParam))
+        {
+            return 0;
+        }
+        break;
+    case WM_LBUTTONUP:
+        FinishWindowDrag();
+        return 0;
+    case WM_MOUSEMOVE:
+        if (UpdateWindowDrag(wParam, lParam) || HandleMouseMove(wParam, lParam))
+        {
+            return 0;
+        }
+        break;
+    case WM_MOUSEWHEEL:
+        HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+        return FALSE;
+    default:
+        break;
+    }
+
+    return Window::HandleMessage(message, wParam, lParam);
 }
 
 LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -2792,105 +2222,13 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_SETFOCUS:
         return FALSE;
     case WM_COMMAND:
-        if (owner_ != nullptr)
-        {
-            return SendMessage(CommandTarget()->hwnd(), uMsg, wParam, lParam);
-        }
-
-        if (IsImageCommand(LOWORD(wParam)) && !HasImages() &&
-            !(LOWORD(wParam) == IDR_TOGGLE_FILENAME && HIWORD(wParam) == 1))
-        {
-            return FALSE;
-        }
-
-        switch (LOWORD(wParam))
-        {
-        case IDM_OPEN_IMAGE:
-            OpenImage();
-            break;
-        case IDM_OPEN_FOLDER:
-            OpenFolder();
-            break;
-        case IDM_SEARCH_SUBFOLDERS:
-            BrowseEmptyStateSubFolders();
-            break;
-        case IDM_ABOUT:
-            ShowCursor(TRUE);
-            DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, reinterpret_cast<DLGPROC>(AboutDialogProc));
-            break;
-        case IDR_ENTER:
-            ActivateEmptyStateButton();
-            break;
-        case IDR_TOGGLE_FILENAME:
-            if (IsEmptyStateVisible())
-            {
-                ActivateEmptyStateButton();
-            }
-            else
-            {
-                ToggleFilenameOverlay();
-            }
-            break;
-        case IDR_NEXT:
-            BrowseNext();
-            break;
-        case IDR_PREVIOUS:
-            BrowsePrevious();
-            break;
-        case IDR_FIRST:
-            BrowseFirst();
-            break;
-        case IDR_LAST:
-            BrowseLast();
-            break;
-        case IDR_RECYCLE:
-        case IDR_DELETE:
-            DeleteCurrentItem(LOWORD(wParam) == IDR_RECYCLE);
-            break;
-        case IDR_TOGGLESS:
-            ToggleSlideShow(FALSE);
-            break;
-        case IDR_TOGGLESSR:
-            ToggleSlideShow(TRUE);
-            break;
-        case IDR_TOGGLESS_MULTI:
-            ToggleMultiMonitorSlideShow(FALSE);
-            break;
-        case IDR_TOGGLESS_MULTI_RANDOM:
-            ToggleMultiMonitorSlideShow(TRUE);
-            break;
-        case IDR_INCSSS:
-            IncreaseSlideShowSpeed();
-            break;
-        case IDR_DECSSS:
-            DecreaseSlideShowSpeed();
-            break;
-        case IDR_RECURSE:
-            BrowseSubFolders();
-            break;
-        case IDM_LOADICC:
-            if (SelectDefaultICCProfile())
-            {
-                ImgItem::UnloadDefaultICCProfile();
-                browser_.ReloadCurrentItem();
-                InvalidateScreen();
-            }
-            break;
-        case IDM_USEBUILTINICC:
-            UseBuiltInICCProfile();
-            break;
-        case IDM_EXIT:
-        case IDR_ESCAPE:
-            CloseWindow();
-            break;
-        }
-
-        return FALSE;
+        return HandleCommand(LOWORD(wParam), HIWORD(wParam), lParam);
     case WM_DRAWITEM:
         if (wParam == IDM_OPEN_IMAGE || wParam == IDM_OPEN_FOLDER || wParam == IDM_SEARCH_SUBFOLDERS ||
             wParam == IDM_EXIT)
         {
-            DrawEmptyStateButton(reinterpret_cast<DRAWITEMSTRUCT*>(lParam));
+            empty_state_view_.DrawButton(reinterpret_cast<DRAWITEMSTRUCT*>(lParam), GetWindowDpi(),
+                                         systemlighttheme_ != FALSE);
             return TRUE;
         }
         break;
@@ -2901,31 +2239,10 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HandleDroppedFiles(reinterpret_cast<HDROP>(wParam));
         return 0;
     case WM_LBUTTONDOWN:
-        if (BeginWindowDrag(lParam))
-        {
-            return 0;
-        }
-
-        break;
     case WM_LBUTTONUP:
-        FinishWindowDrag();
-        return 0;
     case WM_MOUSEMOVE:
-        if (UpdateWindowDrag(wParam, lParam))
-        {
-            return 0;
-        }
-
-        if (HandleMouseMove(wParam, lParam))
-        {
-            return 0;
-        }
-
-        break;
     case WM_MOUSEWHEEL:
-        HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
-
-        return FALSE;
+        return HandleMouseMessage(uMsg, wParam, lParam);
     case WM_SYSCOMMAND:
         if (LOWORD(wParam) == SC_CLOSE)
         {
@@ -2934,31 +2251,7 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         return FALSE;
     case WM_TIMER:
-        switch (wParam)
-        {
-        case IDT_SLIDESHOW:
-            HandleSlideShow();
-            return 0;
-        case IDT_HIDEMOUSE:
-            HandleHideMouseCursor();
-            return 0;
-        case kLoaderStatsOverlayTimer:
-            UpdateLoaderStatsOverlayVisibility();
-            if (loaderstatsoverlayvisible_)
-            {
-                RefreshLoaderStatsOverlay();
-            }
-            return 0;
-        case kLoadingProgressOverlayTimer:
-            UpdateLoadingProgressOverlayTimer();
-            return 0;
-        case kBrowserCompletionRetryTimer:
-            KillTimer(hwnd_, kBrowserCompletionRetryTimer);
-            HandleStartupExitConditions();
-            return 0;
-        }
-
-        break;
+        return HandleTimer(static_cast<UINT_PTR>(wParam), lParam);
     case WM_NCDESTROY:
         OnNCDestroy();
         break;
