@@ -14,6 +14,7 @@
 #endif
 
 #include "PathPicker.h"
+#include "ComPtr.h"
 
 #include <ShlObj.h>
 #include <ShObjIdl.h>
@@ -62,9 +63,10 @@ INT CALLBACK BrowseForFolderCallback(HWND, UINT, LPARAM, LPARAM)
 
 PathPickerResult PathPicker::SelectImage(HWND owner) const
 {
-    IFileOpenDialog* dialog{};
+    IFileOpenDialog* raw_dialog{};
     const auto create_result =
-        CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog));
+        CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&raw_dialog));
+    ComPtr<IFileOpenDialog> dialog(raw_dialog);
     if (FAILED(create_result))
     {
         return SelectImageLegacy(owner);
@@ -73,14 +75,12 @@ PathPickerResult PathPicker::SelectImage(HWND owner) const
     const auto set_types_result = dialog->SetFileTypes(_countof(kImageFileTypes), kImageFileTypes);
     if (FAILED(set_types_result))
     {
-        dialog->Release();
         return FailedResult(set_types_result);
     }
 
     const auto set_type_index_result = dialog->SetFileTypeIndex(1);
     if (FAILED(set_type_index_result))
     {
-        dialog->Release();
         return FailedResult(set_type_index_result);
     }
 
@@ -88,7 +88,6 @@ PathPickerResult PathPicker::SelectImage(HWND owner) const
     const auto get_options_result = dialog->GetOptions(&options);
     if (FAILED(get_options_result))
     {
-        dialog->Release();
         return FailedResult(get_options_result);
     }
 
@@ -96,48 +95,44 @@ PathPickerResult PathPicker::SelectImage(HWND owner) const
         dialog->SetOptions(options | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST | FOS_FORCEFILESYSTEM);
     if (FAILED(set_options_result))
     {
-        dialog->Release();
         return FailedResult(set_options_result);
     }
 
     const auto show_result = dialog->Show(owner);
     if (show_result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
     {
-        dialog->Release();
         return CancelledResult();
     }
     if (FAILED(show_result))
     {
-        dialog->Release();
         return FailedResult(show_result);
     }
 
-    IShellItem* item{};
-    const auto get_result_result = dialog->GetResult(&item);
-    dialog->Release();
+    IShellItem* raw_item{};
+    const auto get_result_result = dialog->GetResult(&raw_item);
+    ComPtr<IShellItem> item(raw_item);
     if (FAILED(get_result_result))
     {
         return FailedResult(get_result_result);
     }
 
-    PWSTR path{};
-    const auto get_path_result = item->GetDisplayName(SIGDN_FILESYSPATH, &path);
-    item->Release();
+    PWSTR raw_path{};
+    const auto get_path_result = item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path);
+    CoTaskMemPtr<WCHAR> path(raw_path);
     if (FAILED(get_path_result))
     {
         return FailedResult(get_path_result);
     }
 
-    const auto result = SelectedResult(path);
-    CoTaskMemFree(path);
-    return result;
+    return SelectedResult(path.get());
 }
 
 PathPickerResult PathPicker::SelectFolder(HWND owner) const
 {
-    IFileOpenDialog* dialog{};
+    IFileOpenDialog* raw_dialog{};
     const auto create_result =
-        CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog));
+        CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&raw_dialog));
+    ComPtr<IFileOpenDialog> dialog(raw_dialog);
     if (FAILED(create_result))
     {
         return SelectFolderLegacy(owner);
@@ -147,7 +142,6 @@ PathPickerResult PathPicker::SelectFolder(HWND owner) const
     const auto get_options_result = dialog->GetOptions(&options);
     if (FAILED(get_options_result))
     {
-        dialog->Release();
         return FailedResult(get_options_result);
     }
 
@@ -155,41 +149,36 @@ PathPickerResult PathPicker::SelectFolder(HWND owner) const
         dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_PATHMUSTEXIST | FOS_FORCEFILESYSTEM);
     if (FAILED(set_options_result))
     {
-        dialog->Release();
         return FailedResult(set_options_result);
     }
 
     const auto show_result = dialog->Show(owner);
     if (show_result == HRESULT_FROM_WIN32(ERROR_CANCELLED))
     {
-        dialog->Release();
         return CancelledResult();
     }
     if (FAILED(show_result))
     {
-        dialog->Release();
         return FailedResult(show_result);
     }
 
-    IShellItem* item{};
-    const auto get_result_result = dialog->GetResult(&item);
-    dialog->Release();
+    IShellItem* raw_item{};
+    const auto get_result_result = dialog->GetResult(&raw_item);
+    ComPtr<IShellItem> item(raw_item);
     if (FAILED(get_result_result))
     {
         return FailedResult(get_result_result);
     }
 
-    PWSTR path{};
-    const auto get_path_result = item->GetDisplayName(SIGDN_FILESYSPATH, &path);
-    item->Release();
+    PWSTR raw_path{};
+    const auto get_path_result = item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path);
+    CoTaskMemPtr<WCHAR> path(raw_path);
     if (FAILED(get_path_result))
     {
         return FailedResult(get_path_result);
     }
 
-    const auto result = SelectedResult(path);
-    CoTaskMemFree(path);
-    return result;
+    return SelectedResult(path.get());
 }
 
 PathPickerResult PathPicker::SelectImageLegacy(HWND owner) const
@@ -222,15 +211,14 @@ PathPickerResult PathPicker::SelectFolderLegacy(HWND owner) const
     browse_info.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
     browse_info.lpfn = BrowseForFolderCallback;
 
-    PIDLIST_ABSOLUTE item_id_list = SHBrowseForFolder(&browse_info);
-    if (item_id_list == nullptr)
+    CoTaskMemPtr<ITEMIDLIST> item_id_list(SHBrowseForFolder(&browse_info));
+    if (!item_id_list.valid())
     {
         return CancelledResult();
     }
 
     wchar_t path[MAX_PATH]{};
-    const auto converted = SHGetPathFromIDList(item_id_list, path);
-    CoTaskMemFree(item_id_list);
+    const auto converted = SHGetPathFromIDList(item_id_list.get(), path);
     if (!converted)
     {
         return FailedResult(HRESULT_FROM_WIN32(GetLastError()));

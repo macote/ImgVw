@@ -2,6 +2,7 @@
 
 #include "ImgItem.h"
 #include "OverlayText.h"
+#include "GdiObject.h"
 
 #include <Windows.h>
 
@@ -72,7 +73,7 @@ struct InfoOverlayStatsSnapshot
 class InfoOverlay final
 {
   public:
-    ~InfoOverlay();
+    ~InfoOverlay() = default;
     InfoOverlay() = default;
     InfoOverlay(const InfoOverlay&) = delete;
     InfoOverlay& operator=(const InfoOverlay&) = delete;
@@ -191,7 +192,7 @@ class InfoOverlay final
 
     std::wstring text_;
     RECT rectangle_{};
-    HFONT font_{nullptr};
+    GdiObject<HFONT> font_;
     UINT font_dpi_{};
     InfoOverlayProgressState progress_state_;
     bool stats_visible_{};

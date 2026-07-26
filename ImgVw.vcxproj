@@ -176,8 +176,11 @@
     <ClInclude Include="resources\resource.h" />
     <ClInclude Include="src\app\ImgVw.h" />
     <ClInclude Include="src\browse\BrowsePath.h" />
+    <ClInclude Include="src\browse\BrowseSession.h" />
+    <ClInclude Include="src\browse\FolderScanner.h" />
     <ClInclude Include="src\browse\ImgFileList.h" />
     <ClInclude Include="src\browse\ImgBrowser.h" />
+    <ClInclude Include="src\browse\PreloadScheduler.h" />
     <ClInclude Include="src\image\ColorProfile.h" />
     <ClInclude Include="src\image\ColorTransform.h" />
     <ClInclude Include="src\image\ImgDispatcher.h" />
@@ -196,18 +199,22 @@
     <ClInclude Include="src\image\ImgJPEGItem.h" />
     <ClInclude Include="src\image\ImgLoader.h" />
     <ClInclude Include="src\platform\win32\CompatibleDeviceContext.h" />
+    <ClInclude Include="src\platform\win32\ComPtr.h" />
     <ClInclude Include="src\platform\win32\CountingSemaphore.h" />
     <ClInclude Include="src\platform\win32\CriticalSection.h" />
     <ClInclude Include="src\platform\win32\FileOperations.h" />
     <ClInclude Include="src\platform\win32\FileMapView.h" />
     <ClInclude Include="src\platform\win32\FindHandle.h" />
     <ClInclude Include="src\platform\win32\GdiObject.h" />
+    <ClInclude Include="src\platform\win32\GlobalMemory.h" />
     <ClInclude Include="src\platform\win32\ImgHeaderProbe.h" />
     <ClInclude Include="src\platform\win32\ImgSettings.h" />
     <ClInclude Include="src\platform\win32\PathPicker.h" />
     <ClInclude Include="src\platform\win32\ProcessDpiAwareness.h" />
+    <ClInclude Include="src\platform\win32\RegistryKey.h" />
     <ClInclude Include="src\platform\win32\SelectedGdiObject.h" />
     <ClInclude Include="src\platform\win32\Win32Handle.h" />
+    <ClInclude Include="src\platform\win32\WindowDeviceContext.h" />
     <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
     <ClInclude Include="src\ui\win32\BrowseWindowState.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
@@ -230,8 +237,11 @@
   <ItemGroup>
     <ClCompile Include="src\app\Program.cpp" />
     <ClCompile Include="src\browse\BrowsePath.cpp" />
+    <ClCompile Include="src\browse\BrowseSession.cpp" />
+    <ClCompile Include="src\browse\FolderScanner.cpp" />
     <ClCompile Include="src\browse\ImgFileList.cpp" />
     <ClCompile Include="src\browse\ImgBrowser.cpp" />
+    <ClCompile Include="src\browse\PreloadScheduler.cpp" />
     <ClCompile Include="src\image\ColorProfile.cpp" />
     <ClCompile Include="src\image\ColorTransform.cpp" />
     <ClCompile Include="src\image\ImgDispatcher.cpp" />

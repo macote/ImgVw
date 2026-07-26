@@ -1,5 +1,7 @@
 #pragma once
 
+#include "WindowDeviceContext.h"
+
 #include <Windows.h>
 #include <algorithm>
 #include <limits>
@@ -74,16 +76,15 @@ inline void ImgBitmap::Initialize(const BITMAPINFO* bitmapinfo, const BYTE* buff
         throw std::invalid_argument("ImgBitmap.Initialize() buffer size does not match its bitmap geometry.");
     }
 
-    const auto dc = GetDC(NULL);
-    if (dc == NULL)
+    WindowDeviceContext dc(nullptr, GetDC(nullptr));
+    if (!dc.valid())
     {
         throw std::runtime_error("ImgBitmap.Initialize(GetDC()) failed.");
     }
 
     const auto usage = bitmapinfo->bmiHeader.biClrUsed > 0 ? DIB_PAL_COLORS : DIB_RGB_COLORS;
     PBYTE bits{nullptr};
-    bitmap_ = CreateDIBSection(dc, bitmapinfo, usage, reinterpret_cast<void**>(&bits), NULL, 0);
-    ReleaseDC(NULL, dc);
+    bitmap_ = CreateDIBSection(dc.get(), bitmapinfo, usage, reinterpret_cast<void**>(&bits), nullptr, 0);
     if (bitmap_ == nullptr || bits == nullptr)
     {
         throw std::runtime_error("ImgBitmap.Initialize(CreateDIBSection()) failed.");

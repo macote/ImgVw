@@ -1,5 +1,7 @@
 #include "InfoOverlay.h"
 
+#include "CompatibleDeviceContext.h"
+#include "SelectedGdiObject.h"
 #include "WindowGeometry.h"
 
 #include <algorithm>
@@ -22,11 +24,6 @@ OverlayColors GetOverlayColors(bool light_theme)
                        : OverlayColors{RGB(0, 0, 0), RGB(0, 0, 0), RGB(90, 90, 90), RGB(180, 180, 180)};
 }
 } // namespace
-
-InfoOverlay::~InfoOverlay()
-{
-    DeleteObject(font_);
-}
 
 std::wstring InfoOverlay::BuildStatsText(const InfoOverlayStatsSnapshot& snapshot)
 {
@@ -90,8 +87,7 @@ std::wstring InfoOverlay::BuildStatsText(const InfoOverlayStatsSnapshot& snapsho
 
 void InfoOverlay::ResetLayout()
 {
-    DeleteObject(font_);
-    font_ = nullptr;
+    font_.reset();
     font_dpi_ = 0;
     Clear();
 }
@@ -109,12 +105,12 @@ RECT InfoOverlay::CalculateRectangle(HDC dc, const std::wstring& text, UINT dpi,
         (std::max)(1, (client_height > 0 ? client_height : fallback_height) - inset * 2 - vertical_padding * 2);
     RECT text_rectangle{0, 0, available_width, available_height};
     const auto font = GetFont(dpi);
-    const auto previous_font = font == nullptr ? nullptr : SelectObject(dc, font);
-    DrawText(dc, text.c_str(), -1, &text_rectangle, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
-    if (previous_font != nullptr)
+    SelectedGdiObject font_selection;
+    if (font != nullptr)
     {
-        SelectObject(dc, previous_font);
+        font_selection = SelectedGdiObject(dc, font);
     }
+    DrawText(dc, text.c_str(), -1, &text_rectangle, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
 
     const auto text_width = (std::min)(available_width, static_cast<INT>(text_rectangle.right - text_rectangle.left));
     const auto text_height = (std::min)(available_height, static_cast<INT>(text_rectangle.bottom - text_rectangle.top));
@@ -132,30 +128,25 @@ void InfoOverlay::Draw(HDC dc, const RECT& rectangle, const std::wstring& text,
 
     const auto width = rectangle.right - rectangle.left;
     const auto height = rectangle.bottom - rectangle.top;
-    const auto memory_dc = CreateCompatibleDC(dc);
-    const auto bitmap = memory_dc == nullptr ? nullptr : CreateCompatibleBitmap(dc, width, height);
-    if (memory_dc == nullptr || bitmap == nullptr)
+    CompatibleDeviceContext memory_dc(CreateCompatibleDC(dc));
+    GdiObject<HBITMAP> bitmap(memory_dc.valid() ? CreateCompatibleBitmap(dc, width, height) : nullptr);
+    if (!memory_dc.valid() || !bitmap.valid())
     {
-        DeleteObject(bitmap);
-        DeleteDC(memory_dc);
         return;
     }
 
-    const auto previous_bitmap = SelectObject(memory_dc, bitmap);
-    if (previous_bitmap == nullptr || previous_bitmap == HGDI_ERROR)
+    SelectedGdiObject bitmap_selection(memory_dc.get(), bitmap.get());
+    if (!bitmap_selection.valid())
     {
-        DeleteObject(bitmap);
-        DeleteDC(memory_dc);
         return;
     }
 
     RECT background_rectangle{0, 0, width, height};
     const auto colors = GetOverlayColors(light_theme);
-    const auto background_brush = CreateSolidBrush(fallback_background);
-    if (background_brush != nullptr)
+    GdiObject<HBRUSH> background_brush(CreateSolidBrush(fallback_background));
+    if (background_brush.valid())
     {
-        FillRect(memory_dc, &background_rectangle, background_brush);
-        DeleteObject(background_brush);
+        FillRect(memory_dc.get(), &background_rectangle, background_brush.get());
     }
 
     if (display_state.status == ImgItem::Status::Ready && display_state.frame != nullptr)
@@ -167,65 +158,64 @@ void InfoOverlay::Draw(HDC dc, const RECT& rectangle, const std::wstring& text,
         if (IntersectRect(&intersection, &rectangle, &image_rectangle))
         {
             const auto image_bitmap = display_state.frame->GetBitmap();
-            const auto source_dc = CreateCompatibleDC(dc);
-            if (source_dc != nullptr)
+            CompatibleDeviceContext source_dc(CreateCompatibleDC(dc));
+            if (source_dc.valid())
             {
-                const auto previous_source_bitmap = SelectObject(source_dc, image_bitmap.bitmap());
-                if (previous_source_bitmap != nullptr && previous_source_bitmap != HGDI_ERROR)
+                SelectedGdiObject source_bitmap_selection(source_dc.get(), image_bitmap.bitmap());
+                if (source_bitmap_selection.valid())
                 {
-                    BitBlt(memory_dc, intersection.left - rectangle.left, intersection.top - rectangle.top,
-                           intersection.right - intersection.left, intersection.bottom - intersection.top, source_dc,
-                           intersection.left - image_rectangle.left, intersection.top - image_rectangle.top, SRCCOPY);
-                    SelectObject(source_dc, previous_source_bitmap);
+                    BitBlt(memory_dc.get(), intersection.left - rectangle.left, intersection.top - rectangle.top,
+                           intersection.right - intersection.left, intersection.bottom - intersection.top,
+                           source_dc.get(), intersection.left - image_rectangle.left,
+                           intersection.top - image_rectangle.top, SRCCOPY);
                 }
-                DeleteDC(source_dc);
             }
         }
     }
 
-    const auto panel_dc = CreateCompatibleDC(dc);
-    const auto panel_bitmap = panel_dc == nullptr ? nullptr : CreateCompatibleBitmap(dc, width, height);
-    if (panel_dc != nullptr && panel_bitmap != nullptr)
+    CompatibleDeviceContext panel_dc(CreateCompatibleDC(dc));
+    GdiObject<HBITMAP> panel_bitmap(panel_dc.valid() ? CreateCompatibleBitmap(dc, width, height) : nullptr);
+    if (panel_dc.valid() && panel_bitmap.valid())
     {
-        const auto previous_panel_bitmap = SelectObject(panel_dc, panel_bitmap);
-        const auto panel_brush = CreateSolidBrush(colors.panel);
-        if (panel_brush != nullptr)
+        SelectedGdiObject panel_bitmap_selection(panel_dc.get(), panel_bitmap.get());
+        GdiObject<HBRUSH> panel_brush(CreateSolidBrush(colors.panel));
+        if (panel_bitmap_selection.valid() && panel_brush.valid())
         {
-            FillRect(panel_dc, &background_rectangle, panel_brush);
-            DeleteObject(panel_brush);
+            FillRect(panel_dc.get(), &background_rectangle, panel_brush.get());
         }
 
-        BLENDFUNCTION blend{};
-        blend.BlendOp = AC_SRC_OVER;
-        blend.SourceConstantAlpha = 128;
-        AlphaBlend(memory_dc, 0, 0, width, height, panel_dc, 0, 0, width, height, blend);
-        SelectObject(panel_dc, previous_panel_bitmap);
+        if (panel_bitmap_selection.valid())
+        {
+            BLENDFUNCTION blend{};
+            blend.BlendOp = AC_SRC_OVER;
+            blend.SourceConstantAlpha = 128;
+            AlphaBlend(memory_dc.get(), 0, 0, width, height, panel_dc.get(), 0, 0, width, height, blend);
+        }
     }
-    DeleteObject(panel_bitmap);
-    DeleteDC(panel_dc);
 
-    const auto border_pen = CreatePen(PS_SOLID, 1, colors.border);
-    if (border_pen != nullptr)
+    GdiObject<HPEN> border_pen(CreatePen(PS_SOLID, 1, colors.border));
+    if (border_pen.valid())
     {
-        const auto previous_pen = SelectObject(memory_dc, border_pen);
-        const auto previous_brush = SelectObject(memory_dc, GetStockObject(NULL_BRUSH));
-        Rectangle(memory_dc, 0, 0, width, height);
-        SelectObject(memory_dc, previous_brush);
-        SelectObject(memory_dc, previous_pen);
-        DeleteObject(border_pen);
+        SelectedGdiObject pen_selection(memory_dc.get(), border_pen.get());
+        SelectedGdiObject brush_selection(memory_dc.get(), GetStockObject(NULL_BRUSH));
+        Rectangle(memory_dc.get(), 0, 0, width, height);
     }
 
-    SetBkMode(memory_dc, TRANSPARENT);
-    SetTextColor(memory_dc, colors.text);
+    SetBkMode(memory_dc.get(), TRANSPARENT);
+    SetTextColor(memory_dc.get(), colors.text);
     const auto horizontal_padding = WindowGeometry::ScaleForDpi(8, dpi);
     const auto vertical_padding = WindowGeometry::ScaleForDpi(6, dpi);
     RECT text_rectangle{horizontal_padding, vertical_padding, width - horizontal_padding, height - vertical_padding};
     const auto font = GetFont(dpi);
-    const auto previous_font = font == nullptr ? nullptr : SelectObject(memory_dc, font);
+    SelectedGdiObject font_selection;
+    if (font != nullptr)
+    {
+        font_selection = SelectedGdiObject(memory_dc.get(), font);
+    }
     if (vertically_center_text)
     {
         RECT measured_text{0, 0, text_rectangle.right - text_rectangle.left, 0};
-        DrawText(memory_dc, text.c_str(), -1, &measured_text, text_format | DT_CALCRECT);
+        DrawText(memory_dc.get(), text.c_str(), -1, &measured_text, text_format | DT_CALCRECT);
         const auto available_height = text_rectangle.bottom - text_rectangle.top;
         const auto text_height = measured_text.bottom - measured_text.top;
         if (text_height < available_height)
@@ -235,28 +225,19 @@ void InfoOverlay::Draw(HDC dc, const RECT& rectangle, const std::wstring& text,
         }
     }
 
-    DrawText(memory_dc, text.c_str(), -1, &text_rectangle, text_format);
-    if (previous_font != nullptr)
-    {
-        SelectObject(memory_dc, previous_font);
-    }
-
-    BitBlt(dc, rectangle.left, rectangle.top, width, height, memory_dc, 0, 0, SRCCOPY);
-    SelectObject(memory_dc, previous_bitmap);
-    DeleteObject(bitmap);
-    DeleteDC(memory_dc);
+    DrawText(memory_dc.get(), text.c_str(), -1, &text_rectangle, text_format);
+    BitBlt(dc, rectangle.left, rectangle.top, width, height, memory_dc.get(), 0, 0, SRCCOPY);
 }
 
 HFONT InfoOverlay::GetFont(UINT dpi)
 {
     dpi = dpi == 0 ? WindowGeometry::kDefaultDpi : dpi;
-    if (font_ != nullptr && font_dpi_ == dpi)
+    if (font_.valid() && font_dpi_ == dpi)
     {
-        return font_;
+        return font_.get();
     }
 
-    DeleteObject(font_);
-    font_ = nullptr;
+    font_.reset();
 
     LOGFONT log_font{};
     log_font.lfHeight = -MulDiv(10, static_cast<INT>(dpi), 72);
@@ -272,7 +253,7 @@ HFONT InfoOverlay::GetFont(UINT dpi)
     log_font.lfQuality = clear_type_enabled ? CLEARTYPE_NATURAL_QUALITY : ANTIALIASED_QUALITY;
     lstrcpy(log_font.lfFaceName, L"Lucida Console");
 
-    font_ = CreateFontIndirect(&log_font);
+    font_.reset(CreateFontIndirect(&log_font));
     font_dpi_ = dpi;
-    return font_;
+    return font_.get();
 }

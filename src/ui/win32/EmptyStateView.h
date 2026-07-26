@@ -1,6 +1,8 @@
 #pragma once
 
 #include "EmptyStateLayout.h"
+#include "ComPtr.h"
+#include "GdiObject.h"
 #include "resource.h"
 
 #include <Windows.h>
@@ -62,9 +64,9 @@ class EmptyStateView
     HWND open_folder_button_{nullptr};
     HWND search_subfolders_button_{nullptr};
     HWND exit_button_{nullptr};
-    HFONT caption_font_{nullptr};
-    HFONT text_font_{nullptr};
+    GdiObject<HFONT> caption_font_;
+    GdiObject<HFONT> text_font_;
     UINT text_font_dpi_{};
     std::unique_ptr<Gdiplus::Image> logo_;
-    IStream* logo_stream_{nullptr};
+    ComPtr<IStream> logo_stream_;
 };

@@ -1,6 +1,9 @@
 #include "BrowsePath.h"
+#include "BrowseSession.h"
+#include "FolderScanner.h"
 #include "ImgBrowser.h"
 #include "ImgLoader.h"
+#include "PreloadScheduler.h"
 #include "Win32Handle.h"
 #include "../support/JpegFixture.h"
 #include "../support/TempFile.h"
@@ -56,6 +59,112 @@ class BlockingImgItem final : public ImgItem
     Win32Handle started_;
     Win32Handle release_;
 };
+
+void TestFolderScanner()
+{
+    const auto suffix = std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount());
+    const auto folder = TempPath((L"ImgVwFolderScanner-" + suffix).c_str());
+    const auto child = folder + L"\\child";
+    const auto top_level_image = folder + L"\\top.jpg";
+    const auto child_image = child + L"\\nested.jpg";
+    const auto unsupported_file = folder + L"\\ignored.txt";
+    Check(CreateDirectoryW(folder.c_str(), nullptr) != FALSE, "folder scanner test folder is created");
+    Check(CreateDirectoryW(child.c_str(), nullptr) != FALSE, "folder scanner test child folder is created");
+    const auto jpeg = CreateJpeg(false, false);
+    WriteBytes(top_level_image, jpeg);
+    WriteBytes(child_image, jpeg);
+    WriteBytes(unsupported_file, {0});
+
+    FolderScanner scanner;
+    std::vector<std::wstring> files;
+    std::vector<std::wstring> folders;
+    const auto flat_result =
+        scanner.Scan(folder + L"\\", false,
+                     {{},
+                      [&files](const std::wstring& path, ImgItem::Format) { files.push_back(path); },
+                      [&folders](const std::wstring& path) { folders.push_back(path); }});
+    Check(flat_result.Succeeded(), "folder scanner completes a readable folder");
+    Check(files.size() == 1 && files.front() == top_level_image,
+          "folder scanner filters unsupported files from a flat scan");
+    Check(folders.size() == 1 && folders.front() == child + L"\\",
+          "folder scanner reports child folders for a flat scan");
+
+    files.clear();
+    const auto recursive_result = scanner.Scan(
+        folder + L"\\", true, {{}, [&files](const std::wstring& path, ImgItem::Format) { files.push_back(path); }, {}});
+    Check(recursive_result.Succeeded() && files.size() == 2,
+          "folder scanner includes supported files from recursive children");
+
+    bool cancelled = false;
+    files.clear();
+    const auto cancelled_result = scanner.Scan(folder + L"\\", true,
+                                               {[&cancelled] { return cancelled; },
+                                                [&files, &cancelled](const std::wstring& path, ImgItem::Format) {
+                                                    files.push_back(path);
+                                                    cancelled = true;
+                                                },
+                                                {}});
+    Check(cancelled_result.Succeeded() && files.size() == 1,
+          "folder scanner stops after its cancellation callback is signalled");
+
+    const auto missing_result = scanner.Scan(folder + L"\\missing\\", false, {});
+    Check(!missing_result.Succeeded() && missing_result.win32_error != ERROR_SUCCESS,
+          "folder scanner preserves an enumeration failure");
+
+    DeleteFileW(top_level_image.c_str());
+    DeleteFileW(child_image.c_str());
+    DeleteFileW(unsupported_file.c_str());
+    RemoveDirectoryW(child.c_str());
+    RemoveDirectoryW(folder.c_str());
+}
+
+void TestBrowseSession()
+{
+    BrowseSession session;
+    const auto generation = NextImgGeneration();
+    session.set_folderpath(L"C:\\Images\\");
+    session.files().Add(L"C:\\Images\\first.jpg");
+    session.folders().push_back(L"C:\\Images\\child\\");
+
+    Check(session.folderpath() == L"C:\\Images\\" && session.files().Size() == 1 && session.folders().size() == 1,
+          "browse session owns the current folder and discovered navigation state");
+
+    session.Reset(generation);
+    session.SetCollectionErrorIfClear(ERROR_ACCESS_DENIED);
+    session.SetCollectionErrorIfClear(ERROR_WRITE_FAULT);
+    Check(session.folderpath().empty() && session.files().Empty() && session.folders().empty() &&
+              session.generation() == generation && session.collection_error() == ERROR_ACCESS_DENIED,
+          "browse session reset advances collection state and preserves its first collection error");
+}
+
+void TestPreloadScheduler()
+{
+    PreloadScheduler scheduler;
+    scheduler.SetActiveTargetSize(800, 600);
+    std::vector<PreloadSize> added_sizes;
+    const std::vector<SIZE> requested{{800, 600}, {1920, 1080}, {1920, 1080}, {0, 720}};
+
+    Check(scheduler.AddTargetSizes(requested, &added_sizes) && added_sizes.size() == 2,
+          "preload scheduler accepts unique positive target sizes");
+    Check(scheduler.IsTargetSizeActive(800, 600) && scheduler.IsTargetSizeActive(1920, 1080),
+          "preload scheduler keeps the active and requested target sizes available");
+    Check(!scheduler.AddTargetSize(1920, 1080), "preload scheduler rejects duplicate target sizes");
+
+    scheduler.Reset();
+    Check(scheduler.target_sizes().empty() && scheduler.IsTargetSizeActive(800, 600),
+          "preload scheduler reset preserves the current active target size");
+
+    Win32Handle started(CreateEvent(nullptr, TRUE, FALSE, nullptr));
+    Check(started.valid(), "preload scheduler test creates a worker-start event");
+    Check(scheduler.Queue([event = started.get()](const std::shared_ptr<BrowseSessionCancellation>& cancellation) {
+              SetEvent(event);
+              WaitForSingleObject(cancellation->event(), INFINITE);
+          }),
+          "preload scheduler starts worker-owned queue work");
+    Check(WaitForSingleObject(started.get(), 3000) == WAIT_OBJECT_0, "preload scheduler worker starts");
+    const auto stop = scheduler.Stop(3000);
+    Check(stop.Stopped(), "preload scheduler cancels and joins queued work");
+}
 
 void TestBrowserStartResults()
 {
@@ -585,6 +694,9 @@ void TestMultiMonitorPreloadResynchronizesNewSourcePaths()
 
 void RunConcurrencyTests()
 {
+    TestBrowseSession();
+    TestPreloadScheduler();
+    TestFolderScanner();
     TestBrowserStartResults();
     TestLoaderShutdown();
     TestLoaderQueueSignalFailure();

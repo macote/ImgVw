@@ -39,11 +39,13 @@ with checked children is in progress.
 ### Track 2: Remaining Production Hardening
 
 - [x] Preserve completed loader/browser cancellation, worker-lifetime, generation, and notification-target contracts.
-- [ ] Finish lower-risk Win32 RAII conversions beyond the completed high-risk prerequisites.
+- [x] Finish lower-risk Win32 RAII conversions beyond the completed high-risk prerequisites.
+  - [x] Convert remaining registry-key and COM interface/allocation ownership.
+  - [x] Convert remaining lower-risk UI GDI and acquired-DC ownership.
 - [ ] Split `ImgBrowserCore`.
-  - [ ] Extract `FolderScanner`.
-  - [ ] Extract `BrowseSession`.
-  - [ ] Extract `PreloadScheduler`.
+  - [x] Extract `FolderScanner`.
+  - [x] Extract `BrowseSession`.
+  - [x] Extract `PreloadScheduler`.
 - [ ] Finish buffer and decode-boundary hardening beyond the completed foundational checks.
 - [ ] Extend explicit result/error boundaries for enumeration, ICC handling, mappings, settings, and temporary paths.
 - [ ] Run focused layering and static-analysis cleanup.
@@ -55,8 +57,7 @@ with checked children is in progress.
 - [ ] Add tests alongside each remaining production component extraction.
 - [ ] Complete final x86/x64 MSYS and Visual Studio builds, formatting/static analysis, and manual regression checks.
 
-Current next item: begin Track 2 browser decomposition with `FolderScanner`, preserving the completed cancellation,
-generation, notification-target, and navigation contracts.
+Current next item: finish buffer and decode-boundary hardening beyond the completed foundational checks.
 
 ## Review Update (2026-07-26)
 

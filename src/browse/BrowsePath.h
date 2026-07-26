@@ -23,3 +23,4 @@ struct BrowsePathResult
 };
 
 BrowsePathResult ClassifyBrowsePath(const std::wstring& path);
+bool BrowsePathsShareFolder(const std::wstring& first, const std::wstring& second);

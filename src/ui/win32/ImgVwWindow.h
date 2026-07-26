@@ -140,6 +140,7 @@ class ImgVwWindow final : public Window
     void StopMultiMonitorSlideShow();
     void RestartMultiMonitorSlideShowTimer();
     void HandleMultiMonitorSlideShow();
+    void RefreshMultiMonitorPreloadContexts();
     std::size_t PreloadMultiMonitorSlideShowContexts();
     static MultiMonitorWindowId WindowId(HWND window);
     static HWND WindowHandle(MultiMonitorWindowId window);

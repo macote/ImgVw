@@ -58,10 +58,19 @@
     <ClInclude Include="src\browse\BrowsePath.h">
       <Filter>Browse</Filter>
     </ClInclude>
+    <ClInclude Include="src\browse\BrowseSession.h">
+      <Filter>Browse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\browse\FolderScanner.h">
+      <Filter>Browse</Filter>
+    </ClInclude>
     <ClInclude Include="src\browse\ImgFileList.h">
       <Filter>Browse</Filter>
     </ClInclude>
     <ClInclude Include="src\browse\ImgBrowser.h">
+      <Filter>Browse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\browse\PreloadScheduler.h">
       <Filter>Browse</Filter>
     </ClInclude>
     <ClInclude Include="src\image\ColorProfile.h">
@@ -124,6 +133,9 @@
     <ClInclude Include="src\platform\win32\CriticalSection.h">
       <Filter>Platform</Filter>
     </ClInclude>
+    <ClInclude Include="src\platform\win32\ComPtr.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
     <ClInclude Include="src\platform\win32\FileOperations.h">
       <Filter>Platform</Filter>
     </ClInclude>
@@ -134,6 +146,9 @@
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\GdiObject.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\GlobalMemory.h">
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\ImgHeaderProbe.h">
@@ -148,10 +163,16 @@
     <ClInclude Include="src\platform\win32\ProcessDpiAwareness.h">
       <Filter>Platform</Filter>
     </ClInclude>
+    <ClInclude Include="src\platform\win32\RegistryKey.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
     <ClInclude Include="src\platform\win32\SelectedGdiObject.h">
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\win32\Win32Handle.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\WindowDeviceContext.h">
       <Filter>Platform</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\win32\ImgVwWindow.h">
@@ -216,10 +237,19 @@
     <ClCompile Include="src\browse\BrowsePath.cpp">
       <Filter>Browse</Filter>
     </ClCompile>
+    <ClCompile Include="src\browse\BrowseSession.cpp">
+      <Filter>Browse</Filter>
+    </ClCompile>
+    <ClCompile Include="src\browse\FolderScanner.cpp">
+      <Filter>Browse</Filter>
+    </ClCompile>
     <ClCompile Include="src\browse\ImgFileList.cpp">
       <Filter>Browse</Filter>
     </ClCompile>
     <ClCompile Include="src\browse\ImgBrowser.cpp">
+      <Filter>Browse</Filter>
+    </ClCompile>
+    <ClCompile Include="src\browse\PreloadScheduler.cpp">
       <Filter>Browse</Filter>
     </ClCompile>
     <ClCompile Include="src\image\ColorProfile.cpp">

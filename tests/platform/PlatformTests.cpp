@@ -1,19 +1,24 @@
 #include "BrowsePath.h"
 #include "CompatibleDeviceContext.h"
+#include "ComPtr.h"
 #include "CriticalSection.h"
 #include "FileOperations.h"
 #include "FindHandle.h"
 #include "GdiObject.h"
+#include "GlobalMemory.h"
 #include "ImgBitmap.h"
 #include "ImgBuffer.h"
 #include "ImgSettings.h"
 #include "SelectedGdiObject.h"
+#include "RegistryKey.h"
 #include "Win32Handle.h"
+#include "WindowDeviceContext.h"
 #include "../support/TempFile.h"
 #include "../support/TestHarness.h"
 
 #include <Windows.h>
 
+#include <objidl.h>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -96,6 +101,12 @@ void TestCriticalSectionOwnership()
 
 void TestGdiOwnership()
 {
+    WindowDeviceContext window_dc(nullptr, GetDC(nullptr));
+    Check(window_dc.valid(), "window DC owner acquires a screen DC");
+    const auto raw_window_dc = window_dc.get();
+    WindowDeviceContext moved_window_dc(std::move(window_dc));
+    Check(!window_dc.valid() && moved_window_dc.get() == raw_window_dc, "window DC move transfers release ownership");
+
     CompatibleDeviceContext dc(CreateCompatibleDC(nullptr));
     Check(dc.valid(), "compatible DC owner creates a memory DC");
 
@@ -122,6 +133,33 @@ void TestGdiOwnership()
 
     Check(GetCurrentObject(moved_dc.get(), OBJ_BITMAP) == original_bitmap,
           "selected GDI object guard restores the previous bitmap");
+}
+
+void TestRegistryAndComOwnership()
+{
+    RegistryKey current_user;
+    Check(RegOpenCurrentUser(KEY_QUERY_VALUE, current_user.put()) == ERROR_SUCCESS && current_user.valid(),
+          "registry key owns an opened key");
+    const auto raw_key = current_user.get();
+    RegistryKey moved_key(std::move(current_user));
+    Check(!current_user.valid() && moved_key.get() == raw_key, "registry key move transfers ownership");
+
+    GlobalMemory memory(GlobalAlloc(GMEM_MOVEABLE, 16));
+    Check(memory.valid(), "global memory owns an allocation");
+    IStream* raw_stream{};
+    Check(CreateStreamOnHGlobal(memory.get(), TRUE, &raw_stream) == S_OK, "COM stream adopts global memory");
+    if (raw_stream != nullptr)
+    {
+        memory.release();
+    }
+    ComPtr<IStream> stream(raw_stream);
+    ComPtr<IStream> moved_stream(std::move(stream));
+    Check(!stream.valid() && moved_stream.valid(), "COM pointer move transfers interface ownership");
+
+    CoTaskMemPtr<BYTE> task_memory(reinterpret_cast<BYTE*>(CoTaskMemAlloc(16)));
+    Check(task_memory.valid(), "COM task-memory pointer owns an allocation");
+    CoTaskMemPtr<BYTE> moved_task_memory(std::move(task_memory));
+    Check(!task_memory.valid() && moved_task_memory.valid(), "COM task-memory move transfers ownership");
 }
 
 void TestImgSettingsTempDirectory()
@@ -157,6 +195,13 @@ void TestBrowsePathClassification()
     Check(absolute_file.Succeeded() && absolute_file.kind == BrowsePathKind::File &&
               absolute_file.folderpath == folder.folderpath && absolute_file.filepath == test_file,
           "absolute file path is split into its file and folder paths");
+    Check(BrowsePathsShareFolder(test_file, test_folder),
+          "file and folder paths in the same browsing scope share decoded caches");
+
+    const auto other_folder = test_folder + L"-other";
+    CreateDirectory(other_folder.c_str(), nullptr);
+    Check(!BrowsePathsShareFolder(test_file, other_folder),
+          "paths in different browsing scopes do not share decoded caches");
 
     const auto file_as_folder = ClassifyBrowsePath(test_file + L"\\");
     Check(!file_as_folder.Succeeded() && file_as_folder.win32_error == ERROR_DIRECTORY,
@@ -174,6 +219,7 @@ void TestBrowsePathClassification()
     Check(!missing.Succeeded() && missing.win32_error != ERROR_SUCCESS, "missing browse path reports a native error");
 
     DeleteFile(test_file.c_str());
+    RemoveDirectory(other_folder.c_str());
     RemoveDirectory(test_folder.c_str());
 }
 
@@ -314,6 +360,7 @@ void RunPlatformTests()
     TestFindHandleOwnership();
     TestCriticalSectionOwnership();
     TestGdiOwnership();
+    TestRegistryAndComOwnership();
     TestImgSettingsTempDirectory();
     TestBrowsePathClassification();
     TestImgBufferValidationAndMapping();

@@ -1,5 +1,12 @@
 #include "ImgVwWindow.h"
 
+#include "BrowsePath.h"
+#include "CompatibleDeviceContext.h"
+#include "GdiObject.h"
+#include "RegistryKey.h"
+#include "SelectedGdiObject.h"
+#include "WindowDeviceContext.h"
+
 #include <Windowsx.h>
 
 #include <algorithm>
@@ -33,10 +40,10 @@ bool IsImageCommand(UINT command)
 
 BOOL IsSystemLightTheme()
 {
-    HKEY personalize_key{};
+    RegistryKey personalize_key;
     const auto open_result =
         RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0,
-                     KEY_QUERY_VALUE, &personalize_key);
+                     KEY_QUERY_VALUE, personalize_key.put());
     if (open_result != ERROR_SUCCESS)
     {
         // Windows XP has no AppsUseLightTheme preference. Keep its traditional light appearance.
@@ -45,9 +52,8 @@ BOOL IsSystemLightTheme()
 
     DWORD value{};
     DWORD value_size = sizeof(value);
-    const auto query_result = RegQueryValueEx(personalize_key, L"AppsUseLightTheme", nullptr, nullptr,
+    const auto query_result = RegQueryValueEx(personalize_key.get(), L"AppsUseLightTheme", nullptr, nullptr,
                                               reinterpret_cast<LPBYTE>(&value), &value_size);
-    RegCloseKey(personalize_key);
     return query_result == ERROR_SUCCESS ? (value != 0 ? TRUE : FALSE) : TRUE;
 }
 
@@ -67,7 +73,7 @@ ImgVwWindow* ImgVwWindow::Create(HINSTANCE hInst, const std::vector<std::wstring
     auto self = new ImgVwWindow(hInst, args);
     if (self != nullptr)
     {
-        self->backgroundbrush_ = CreateSolidBrush(RGB(0, 0, 0));
+        self->backgroundbrush_.reset(CreateSolidBrush(RGB(0, 0, 0)));
         self->manualcursor_ = TRUE;
         self->dontfillbackground_ = TRUE;
         if (self->WinCreateWindow(WS_EX_APPWINDOW, L"ImgVw", WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN),
@@ -114,7 +120,7 @@ ImgVwWindow* ImgVwWindow::CreateOnMonitor(HINSTANCE hInst, const std::wstring& p
             owner->RememberTargetLoadContext(width, height, self->browser_.loadcontext());
         }
 
-        self->backgroundbrush_ = CreateSolidBrush(RGB(0, 0, 0));
+        self->backgroundbrush_.reset(CreateSolidBrush(RGB(0, 0, 0)));
         self->manualcursor_ = TRUE;
         self->dontfillbackground_ = TRUE;
         const auto ownerhwnd = owner == nullptr ? nullptr : owner->hwnd();
@@ -204,7 +210,7 @@ void ImgVwWindow::PaintContent(PAINTSTRUCT* pps)
         RECT client_rectangle{};
         GetClientRect(hwnd_, &client_rectangle);
         const DisplayPresentationInput presentation_input{pps->hdc,
-                                                          backgroundbrush_,
+                                                          backgroundbrush_.get(),
                                                           client_rectangle,
                                                           slideshow_.waiting_for_image(),
                                                           display_session_.first_paint(),
@@ -284,6 +290,7 @@ BOOL ImgVwWindow::OpenPath(const std::wstring& path)
         return FALSE;
     }
 
+    const auto preserve_load_contexts = BrowsePathsShareFolder(browse_state_.path(), path);
     const auto was_empty = IsEmptyStateVisible();
     if (was_empty)
     {
@@ -291,7 +298,7 @@ BOOL ImgVwWindow::OpenPath(const std::wstring& path)
     }
     StopMultiMonitorSlideShow();
     StopSlideShow();
-    if (!InitializeBrowser(path, TRUE))
+    if (!InitializeBrowser(path, preserve_load_contexts ? FALSE : TRUE))
     {
         if (was_empty)
         {
@@ -304,7 +311,10 @@ BOOL ImgVwWindow::OpenPath(const std::wstring& path)
         return FALSE;
     }
 
-    multi_monitor_slideshow_.ClearLoadContexts();
+    if (!preserve_load_contexts)
+    {
+        multi_monitor_slideshow_.ClearLoadContexts();
+    }
     browse_state_.OpenPath(path);
     InvalidateScreen();
     return TRUE;
@@ -727,43 +737,30 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
 
     const auto paintwidth = paintrect.right - paintrect.left;
     const auto paintheight = paintrect.bottom - paintrect.top;
-    const auto memorydc = CreateCompatibleDC(dc);
-    const auto bitmap = memorydc == nullptr ? nullptr : CreateCompatibleBitmap(dc, paintwidth, paintheight);
-    if (memorydc == nullptr || bitmap == nullptr)
+    CompatibleDeviceContext memorydc(CreateCompatibleDC(dc));
+    GdiObject<HBITMAP> bitmap(memorydc.valid() ? CreateCompatibleBitmap(dc, paintwidth, paintheight) : nullptr);
+    if (!memorydc.valid() || !bitmap.valid())
     {
-        if (bitmap != nullptr)
-        {
-            DeleteObject(bitmap);
-        }
-        if (memorydc != nullptr)
-        {
-            DeleteDC(memorydc);
-        }
-        FillRect(dc, &paintrect, backgroundbrush_);
+        FillRect(dc, &paintrect, backgroundbrush_.get());
         info_overlay_.Draw(dc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
         return overlaydrawn;
     }
 
-    const auto previousbitmap = SelectObject(memorydc, bitmap);
-    if (previousbitmap == nullptr || previousbitmap == HGDI_ERROR)
+    SelectedGdiObject bitmap_selection(memorydc.get(), bitmap.get());
+    if (!bitmap_selection.valid())
     {
-        DeleteObject(bitmap);
-        DeleteDC(memorydc);
-        FillRect(dc, &paintrect, backgroundbrush_);
+        FillRect(dc, &paintrect, backgroundbrush_.get());
         info_overlay_.Draw(dc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
         return overlaydrawn;
     }
 
     POINT previousorigin{};
-    SetViewportOrgEx(memorydc, -paintrect.left, -paintrect.top, &previousorigin);
-    FillRect(memorydc, &paintrect, backgroundbrush_);
-    info_overlay_.Draw(memorydc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
-    SetViewportOrgEx(memorydc, previousorigin.x, previousorigin.y, nullptr);
+    SetViewportOrgEx(memorydc.get(), -paintrect.left, -paintrect.top, &previousorigin);
+    FillRect(memorydc.get(), &paintrect, backgroundbrush_.get());
+    info_overlay_.Draw(memorydc.get(), overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
+    SetViewportOrgEx(memorydc.get(), previousorigin.x, previousorigin.y, nullptr);
 
-    BitBlt(dc, paintrect.left, paintrect.top, paintwidth, paintheight, memorydc, 0, 0, SRCCOPY);
-    SelectObject(memorydc, previousbitmap);
-    DeleteObject(bitmap);
-    DeleteDC(memorydc);
+    BitBlt(dc, paintrect.left, paintrect.top, paintwidth, paintheight, memorydc.get(), 0, 0, SRCCOPY);
     return overlaydrawn;
 }
 
@@ -777,7 +774,7 @@ bool ImgVwWindow::DisplayLoadingProgress(HDC dc, const RECT& paintrect, const Im
 
     const auto text = InfoOverlay::BuildItemText(item, filepath);
     const auto overlayrect = info_overlay_.CalculateRectangle(dc, text, GetWindowDpi(), clientwidth_, clientheight_);
-    FillRect(dc, &paintrect, backgroundbrush_);
+    FillRect(dc, &paintrect, backgroundbrush_.get());
     info_overlay_.Draw(dc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
     return true;
 }
@@ -959,11 +956,10 @@ UINT ImgVwWindow::GetWindowDpi() const
         }
     }
 
-    HDC dc = GetDC(hwnd_);
-    if (dc != nullptr)
+    WindowDeviceContext dc(hwnd_, GetDC(hwnd_));
+    if (dc.valid())
     {
-        const auto dpi = GetDeviceCaps(dc, LOGPIXELSX);
-        ReleaseDC(hwnd_, dc);
+        const auto dpi = GetDeviceCaps(dc.get(), LOGPIXELSX);
         if (dpi > 0)
         {
             return static_cast<UINT>(dpi);
@@ -996,14 +992,13 @@ void ImgVwWindow::RefreshLoaderStatsOverlay()
         return;
     }
 
-    HDC dc = GetDC(hwnd_);
-    if (dc == nullptr)
+    WindowDeviceContext dc(hwnd_, GetDC(hwnd_));
+    if (!dc.valid())
     {
         return;
     }
 
-    const auto rect = info_overlay_.CalculateRectangle(dc, text, GetWindowDpi(), clientwidth_, clientheight_);
-    ReleaseDC(hwnd_, dc);
+    const auto rect = info_overlay_.CalculateRectangle(dc.get(), text, GetWindowDpi(), clientwidth_, clientheight_);
 
     RECT invalidaterect = rect;
     if (!IsRectEmpty(&info_overlay_.rectangle()))
@@ -1292,6 +1287,7 @@ void ImgVwWindow::RestartMultiMonitorSlideShowTimer()
 
 void ImgVwWindow::HandleMultiMonitorSlideShow()
 {
+    RefreshMultiMonitorPreloadContexts();
     const auto window = ResolveSlideShowWindow(multi_monitor_slideshow_.NextTarget(WindowId(hwnd_)));
     if (window != nullptr)
     {
@@ -1299,6 +1295,20 @@ void ImgVwWindow::HandleMultiMonitorSlideShow()
     }
 
     RestartMultiMonitorSlideShowTimer();
+}
+
+void ImgVwWindow::RefreshMultiMonitorPreloadContexts()
+{
+    if (!multi_monitor_slideshow_.running())
+    {
+        return;
+    }
+
+    const auto foundimages = browser_.GetStats().found_images;
+    if (foundimages > multi_monitor_slideshow_.preloaded_path_count())
+    {
+        multi_monitor_slideshow_.SetPreloadedPathCount(PreloadMultiMonitorSlideShowContexts());
+    }
 }
 
 std::size_t ImgVwWindow::PreloadMultiMonitorSlideShowContexts()
@@ -1673,13 +1683,9 @@ void ImgVwWindow::HandleBrowserChanged()
         HideEmptyState();
     }
     HandleStartupExitConditions();
-    if (owner_ == nullptr && multi_monitor_slideshow_.running() && browser_.IsCollectingComplete())
+    if (owner_ == nullptr && browser_.IsCollectingComplete())
     {
-        const auto foundimages = browser_.GetStats().found_images;
-        if (foundimages > multi_monitor_slideshow_.preloaded_path_count())
-        {
-            multi_monitor_slideshow_.SetPreloadedPathCount(PreloadMultiMonitorSlideShowContexts());
-        }
+        RefreshMultiMonitorPreloadContexts();
     }
     UpdateLoadingProgressOverlayTimer();
 
@@ -1970,7 +1976,7 @@ void ImgVwWindow::OnNCDestroy()
     KillTimer(hwnd_, kLoadingProgressOverlayTimer);
     KillTimer(hwnd_, kBrowserCompletionRetryTimer);
     browser_.StopBrowsing();
-    DeleteObject(backgroundbrush_);
+    backgroundbrush_.reset();
     if (owner_ != nullptr)
     {
         owner_->OnSlideShowWindowDestroyed(this);

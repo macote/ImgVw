@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GdiObject.h"
 #include "resource.h"
 #include <Windows.h>
 
@@ -20,7 +21,7 @@ class Window
     }
     HINSTANCE hinst_;
     HWND hwnd_{NULL};
-    HBRUSH backgroundbrush_{nullptr};
+    GdiObject<HBRUSH> backgroundbrush_;
     BOOL manualcursor_{};
     BOOL dontfillbackground_{};
 

@@ -1,8 +1,10 @@
 #include "ImgBrowser.h"
 #include "BrowsePath.h"
+#include "BrowseSession.h"
 #include "CriticalSection.h"
-#include "FindHandle.h"
+#include "FolderScanner.h"
 #include "ImgFormatResolver.h"
+#include "PreloadScheduler.h"
 #include "Win32Handle.h"
 
 #include <algorithm>
@@ -11,13 +13,6 @@
 
 namespace
 {
-HANDLE CreateReadyEvent(DWORD* error)
-{
-    const auto event = CreateEvent(nullptr, TRUE, FALSE, nullptr);
-    *error = event == nullptr ? GetLastError() : ERROR_SUCCESS;
-    return event;
-}
-
 DWORD StopError(const ImgBrowserOperationStopResult& result)
 {
     return result.win32_error != ERROR_SUCCESS
@@ -68,88 +63,38 @@ class ImgBrowserCore final : public std::enable_shared_from_this<ImgBrowserCore>
     ImgFileListProgress GetSequentialProgress(const std::wstring& filepath);
 
   private:
-    struct CancellationState
-    {
-        CancellationState()
-            : event(CreateEvent(nullptr, TRUE, FALSE, nullptr)), error(event.valid() ? ERROR_SUCCESS : GetLastError())
-        {
-        }
-        bool Cancelled() const
-        {
-            return event.valid() && WaitForSingleObject(event.get(), 0) == WAIT_OBJECT_0;
-        }
-        bool Signal()
-        {
-            return event.valid() && SetEvent(event.get()) != FALSE;
-        }
-
-        Win32Handle event;
-        DWORD error{};
-    };
-    struct TargetSize
-    {
-        INT width{};
-        INT height{};
-    };
+    using CancellationState = BrowseSessionCancellation;
+    using TargetSize = PreloadSize;
     struct CollectionRequest
     {
         std::shared_ptr<ImgBrowserCore> browser;
-        std::shared_ptr<CancellationState> cancellation;
-        std::wstring folderpath;
-        volatile LONG recursive{};
+        std::shared_ptr<BrowseSessionCollection> collection;
         volatile LONG enumeration_error{};
-        BOOL subfolders_only{};
-        ULONG generation{};
     };
-    struct TargetSizeQueueRequest
-    {
-        std::shared_ptr<ImgBrowserCore> browser;
-        std::shared_ptr<CancellationState> cancellation;
-        std::vector<TargetSize> sizes;
-        BOOL loadnext{};
-    };
-    struct PathQueueRequest
-    {
-        std::shared_ptr<ImgBrowserCore> browser;
-        std::shared_ptr<CancellationState> cancellation;
-        std::vector<std::wstring> paths;
-        INT targetwidth{};
-        INT targetheight{};
-    };
-
     std::shared_ptr<ImgBrowserLoadContext> loadcontext_{std::make_shared<ImgBrowserLoadContext>()};
-    std::wstring folderpath_;
-    ImgFileList files_;
-    std::vector<std::wstring> folders_;
-    Win32Handle collectorthread_;
+    BrowseSession session_;
+    std::wstring& folderpath_{session_.folderpath()};
+    ImgFileList& files_{session_.files()};
+    std::vector<std::wstring>& folders_{session_.folders()};
+    PreloadScheduler preload_scheduler_;
     std::weak_ptr<CollectionRequest> collectionrequest_;
-    std::vector<Win32Handle> targetqueuethreads_;
-    std::shared_ptr<CancellationState> targetcancellation_;
-    DWORD readyeventerror_{ERROR_SUCCESS};
-    Win32Handle readyevent_;
     CriticalSection browsecriticalsection_;
     INT targetwidth_{};
     INT targetheight_{};
-    std::vector<TargetSize> preload_target_sizes_;
     HWND notificationhwnd_{nullptr};
     UINT notificationmessage_{};
-    DWORD collection_error_{ERROR_SUCCESS};
-    volatile LONG generation_{static_cast<LONG>(NextImgGeneration())};
 #if defined(IMGVW_TESTING)
     std::shared_ptr<ImgBrowserTestHooks> test_hooks_;
 #endif
 
     void CollectFile(const std::shared_ptr<CollectionRequest>& request, const std::wstring& filepath,
                      ImgItem::Format imgformat);
-    void CollectFolder(const std::shared_ptr<CollectionRequest>& request, const std::wstring& folderpath);
     void CollectSubFolders(const std::shared_ptr<CollectionRequest>& request);
     ImgBrowserOperationStopResult StopCollecting();
     ImgBrowserOperationStopResult StopTargetQueueing();
     void NotifyChanged(ULONG generation = 0);
     static DWORD WINAPI StaticThreadCollect(void* context);
-    static DWORD WINAPI StaticThreadQueueTargetSize(void* context);
-    static DWORD WINAPI StaticThreadQueuePaths(void* context);
-    void Reset();
+    void Reset(ULONG generation);
     BOOL AddPreloadTargetSize(INT targetwidth, INT targetheight);
     BOOL AddPreloadTargetSizes(const std::vector<SIZE>& target_sizes, std::vector<TargetSize>* added_sizes);
     BOOL IsTargetSizeActiveLocked(INT targetwidth, INT targetheight) const;
@@ -161,23 +106,18 @@ class ImgBrowserCore final : public std::enable_shared_from_this<ImgBrowserCore>
     void QueuePaths(const std::shared_ptr<CancellationState>& cancellation, const std::vector<std::wstring>& paths,
                     INT targetwidth, INT targetheight);
     void QueueFileForTargetSizes(const std::wstring& filepath, ImgItem::Format imgformat, BOOL loadnext);
-    void CleanupTargetQueueThreads();
 #if defined(IMGVW_TESTING)
     bool WaitBeforeQueuePath(const std::shared_ptr<CancellationState>& cancellation);
 #endif
-    ImgItem::Format ResolveFileFormat(const std::wstring& filepath);
     std::shared_ptr<ImgItem> GetOrCreateCachedItem(const std::wstring& filepath);
     std::shared_ptr<ImgItem> GetOrCreateCachedItem(const std::wstring& filepath, INT targetwidth, INT targetheight,
                                                    ImgItem::Format imgformat);
 };
 
-ImgBrowserCore::ImgBrowserCore() : readyevent_(CreateReadyEvent(&readyeventerror_)) {}
+ImgBrowserCore::ImgBrowserCore() = default;
 
 #if defined(IMGVW_TESTING)
-ImgBrowserCore::ImgBrowserCore(std::shared_ptr<ImgBrowserTestHooks> test_hooks)
-    : readyevent_(CreateReadyEvent(&readyeventerror_)), test_hooks_(std::move(test_hooks))
-{
-}
+ImgBrowserCore::ImgBrowserCore(std::shared_ptr<ImgBrowserTestHooks> test_hooks) : test_hooks_(std::move(test_hooks)) {}
 #endif
 
 std::shared_ptr<ImgBrowserLoadContext> ImgBrowserCore::loadcontext() const
@@ -208,13 +148,13 @@ void ImgBrowserCore::ShareLoadContext(const std::shared_ptr<ImgBrowserLoadContex
 void ImgBrowserCore::CollectFile(const std::shared_ptr<CollectionRequest>& request, const std::wstring& filepath,
                                  ImgItem::Format imgformat)
 {
-    if (request->cancellation->Cancelled())
+    if (request->collection->cancellation->Cancelled())
     {
         return;
     }
 
     EnterCriticalSection(browsecriticalsection_.get());
-    if (request->generation != static_cast<ULONG>(InterlockedCompareExchange(&generation_, 0, 0)))
+    if (request->collection->generation != session_.generation())
     {
         LeaveCriticalSection(browsecriticalsection_.get());
         return;
@@ -225,75 +165,13 @@ void ImgBrowserCore::CollectFile(const std::shared_ptr<CollectionRequest>& reque
         QueueFileForTargetSizes(filepath, imgformat, FALSE);
     }
 
-    if (!SetEvent(readyevent_.get()))
+    if (!session_.SignalReadyEvent())
     {
         InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(GetLastError()), ERROR_SUCCESS);
     }
-    NotifyChanged(request->generation);
+    NotifyChanged(request->collection->generation);
 
     LeaveCriticalSection(browsecriticalsection_.get());
-}
-
-void ImgBrowserCore::CollectFolder(const std::shared_ptr<CollectionRequest>& request, const std::wstring& folderpath)
-{
-    WIN32_FIND_DATA findfiledata{};
-    std::wstring pattern = folderpath + L"*";
-    FindHandle findhandle(FindFirstFile(pattern.c_str(), &findfiledata));
-    if (!findhandle.valid())
-    {
-        const auto error = GetLastError();
-        if (error != ERROR_FILE_NOT_FOUND)
-        {
-            InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(error), ERROR_SUCCESS);
-        }
-        return;
-    }
-
-    do
-    {
-        if (request->cancellation->Cancelled())
-        {
-            break;
-        }
-
-        if (findfiledata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-        {
-            if (lstrcmp(findfiledata.cFileName, L".") != 0 && lstrcmp(findfiledata.cFileName, L"..") != 0)
-            {
-                std::wstring currentpath(folderpath + findfiledata.cFileName + L"\\");
-                if (InterlockedCompareExchange(&request->recursive, 0, 0) != 0)
-                {
-                    CollectFolder(request, currentpath);
-                }
-                else
-                {
-                    EnterCriticalSection(browsecriticalsection_.get());
-                    folders_.push_back(currentpath);
-                    LeaveCriticalSection(browsecriticalsection_.get());
-                }
-            }
-        }
-        else
-        {
-            std::wstring currentfile(folderpath + findfiledata.cFileName);
-            const auto imgformat = ResolveFileFormat(currentfile);
-            if (imgformat != ImgItem::Format::Unsupported)
-            {
-                CollectFile(request, currentfile, imgformat);
-            }
-        }
-    } while (FindNextFile(findhandle.get(), &findfiledata));
-
-    const auto error = GetLastError();
-    if (!request->cancellation->Cancelled() && error != ERROR_NO_MORE_FILES)
-    {
-        InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(error), ERROR_SUCCESS);
-    }
-}
-
-ImgItem::Format ImgBrowserCore::ResolveFileFormat(const std::wstring& filepath)
-{
-    return ImgFormatResolver::Resolve(filepath);
 }
 
 ImgBrowserStartResult ImgBrowserCore::StartBrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight,
@@ -303,9 +181,9 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseAsync(const std::wstring& path,
     {
         return {ImgBrowserStartStatus::InvalidTargetSize, ERROR_INVALID_PARAMETER};
     }
-    if (!readyevent_.valid())
+    if (!session_.ReadyEventValid())
     {
-        return {ImgBrowserStartStatus::ReadyEventUnavailable, readyeventerror_};
+        return {ImgBrowserStartStatus::ReadyEventUnavailable, session_.ready_event_error()};
     }
 
     const auto browsepath = ClassifyBrowsePath(path);
@@ -331,21 +209,20 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseAsync(const std::wstring& path,
     }
 
     const auto generation = NextImgGeneration();
-    InterlockedExchange(&generation_, static_cast<LONG>(generation));
-    Reset();
+    Reset(generation);
 
     targetwidth_ = targetwidth;
     targetheight_ = targetheight;
+    preload_scheduler_.SetActiveTargetSize(targetwidth_, targetheight_);
     loadcontext_->loader->PrioritizeTargetSize(targetwidth_, targetheight_);
-    const auto cancellation = std::make_shared<CancellationState>();
-    if (!cancellation->event.valid())
+    const auto collection = session_.BeginCollection(generation);
+    if (!collection->cancellation->valid())
     {
-        return {ImgBrowserStartStatus::CreateCancellationEventFailed, cancellation->error};
+        return {ImgBrowserStartStatus::CreateCancellationEventFailed, collection->cancellation->error()};
     }
     auto request = std::make_shared<CollectionRequest>();
     request->browser = shared_from_this();
-    request->cancellation = cancellation;
-    request->generation = generation;
+    request->collection = collection;
     BOOL readyeventreset{};
 #if defined(IMGVW_TESTING)
     if (test_hooks_ != nullptr && test_hooks_->fail_ready_reset)
@@ -356,7 +233,7 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseAsync(const std::wstring& path,
     else
 #endif
     {
-        readyeventreset = ResetEvent(readyevent_.get());
+        readyeventreset = session_.ResetReadyEvent() ? TRUE : FALSE;
     }
     if (!readyeventreset)
     {
@@ -366,7 +243,7 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseAsync(const std::wstring& path,
     if (browsepath.kind == BrowsePathKind::File)
     {
         folderpath_ = browsepath.folderpath;
-        const auto imgformat = ResolveFileFormat(browsepath.filepath);
+        const auto imgformat = ImgFormatResolver::Resolve(browsepath.filepath);
         if (imgformat != ImgItem::Format::Unsupported)
         {
             CollectFile(request, browsepath.filepath, imgformat);
@@ -378,23 +255,25 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseAsync(const std::wstring& path,
         folderpath_ = browsepath.folderpath;
     }
 
-    request->folderpath = folderpath_;
+    collection->folderpath = folderpath_;
     auto context = new std::shared_ptr<CollectionRequest>(request);
 #if defined(IMGVW_TESTING)
     if (test_hooks_ != nullptr && test_hooks_->fail_collector_thread_create)
     {
         SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-        collectorthread_.reset();
+        session_.ClearCollectorThread();
     }
     else
 #endif
     {
-        collectorthread_.reset(CreateThread(nullptr, 0, StaticThreadCollect, context, 0, nullptr));
+        const auto thread = CreateThread(nullptr, 0, StaticThreadCollect, context, 0, nullptr);
+        session_.SetCollectorThread(thread, collection->cancellation);
     }
-    if (!collectorthread_.valid())
+    if (!session_.HasCollectorThread())
     {
         const auto error = GetLastError();
         delete context;
+        session_.ClearCollectorThread();
         return {ImgBrowserStartStatus::CreateThreadFailed, error};
     }
     collectionrequest_ = request;
@@ -415,9 +294,10 @@ BOOL ImgBrowserCore::UpdateTargetSize(INT targetwidth, INT targetheight)
     BOOL keep_previous_target = FALSE;
     if (changed)
     {
+        keep_previous_target = IsTargetSizeActiveLocked(previouswidth, previousheight);
         targetwidth_ = targetwidth;
         targetheight_ = targetheight;
-        keep_previous_target = IsTargetSizeActiveLocked(previouswidth, previousheight);
+        preload_scheduler_.SetActiveTargetSize(targetwidth_, targetheight_);
     }
 
     LeaveCriticalSection(browsecriticalsection_.get());
@@ -437,7 +317,7 @@ BOOL ImgBrowserCore::UpdateTargetSize(INT targetwidth, INT targetheight)
 ImgBrowserStartResult ImgBrowserCore::StartBrowseSubFoldersAsync()
 {
     auto request = collectionrequest_.lock();
-    if (request != nullptr && InterlockedCompareExchange(&request->recursive, 1, 0) != 0)
+    if (request != nullptr && InterlockedCompareExchange(&request->collection->recursive, 1, 0) != 0)
     {
         return {ImgBrowserStartStatus::AlreadyRecursive, ERROR_SUCCESS};
     }
@@ -452,7 +332,8 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseSubFoldersAsync()
     else
 #endif
     {
-        collectorstatus = collectorthread_.valid() ? WaitForSingleObject(collectorthread_.get(), 0) : WAIT_OBJECT_0;
+        collectorstatus =
+            session_.HasCollectorThread() ? WaitForSingleObject(session_.collector_thread(), 0) : WAIT_OBJECT_0;
     }
     if (collectorstatus == WAIT_TIMEOUT)
     {
@@ -470,17 +351,16 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseSubFoldersAsync()
     LeaveCriticalSection(browsecriticalsection_.get());
     if (hasfolders)
     {
-        auto cancellation = std::make_shared<CancellationState>();
-        if (!cancellation->event.valid())
+        const auto collection = session_.BeginCollection(session_.generation());
+        if (!collection->cancellation->valid())
         {
-            return {ImgBrowserStartStatus::CreateCancellationEventFailed, cancellation->error};
+            return {ImgBrowserStartStatus::CreateCancellationEventFailed, collection->cancellation->error()};
         }
         request = std::make_shared<CollectionRequest>();
         request->browser = shared_from_this();
-        request->cancellation = cancellation;
-        request->recursive = 1;
-        request->subfolders_only = TRUE;
-        request->generation = static_cast<ULONG>(InterlockedCompareExchange(&generation_, 0, 0));
+        request->collection = collection;
+        collection->recursive = 1;
+        collection->subfolders_only = TRUE;
         BOOL readyeventreset{};
 #if defined(IMGVW_TESTING)
         if (test_hooks_ != nullptr && test_hooks_->fail_ready_reset)
@@ -491,7 +371,7 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseSubFoldersAsync()
         else
 #endif
         {
-            readyeventreset = ResetEvent(readyevent_.get());
+            readyeventreset = session_.ResetReadyEvent() ? TRUE : FALSE;
         }
         if (!readyeventreset)
         {
@@ -502,17 +382,19 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseSubFoldersAsync()
         if (test_hooks_ != nullptr && test_hooks_->fail_collector_thread_create)
         {
             SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-            collectorthread_.reset();
+            session_.ClearCollectorThread();
         }
         else
 #endif
         {
-            collectorthread_.reset(CreateThread(nullptr, 0, StaticThreadCollect, context, 0, nullptr));
+            const auto thread = CreateThread(nullptr, 0, StaticThreadCollect, context, 0, nullptr);
+            session_.SetCollectorThread(thread, collection->cancellation);
         }
-        if (!collectorthread_.valid())
+        if (!session_.HasCollectorThread())
         {
             const auto error = GetLastError();
             delete context;
+            session_.ClearCollectorThread();
             return {ImgBrowserStartStatus::CreateThreadFailed, error};
         }
         collectionrequest_ = request;
@@ -524,17 +406,17 @@ ImgBrowserStartResult ImgBrowserCore::StartBrowseSubFoldersAsync()
 
 BOOL ImgBrowserCore::IsCollectingComplete() const
 {
-    if (!collectorthread_.valid())
+    if (!session_.HasCollectorThread())
     {
         return TRUE;
     }
 
-    return WaitForSingleObject(collectorthread_.get(), 0) == WAIT_OBJECT_0 ? TRUE : FALSE;
+    return WaitForSingleObject(session_.collector_thread(), 0) == WAIT_OBJECT_0 ? TRUE : FALSE;
 }
 
 ULONG ImgBrowserCore::generation() const
 {
-    return static_cast<ULONG>(InterlockedCompareExchange(const_cast<volatile LONG*>(&generation_), 0, 0));
+    return session_.generation();
 }
 
 ULONG ImgBrowserCore::loadgeneration() const
@@ -558,7 +440,7 @@ bool ImgBrowserCore::IsCurrentNotification(WPARAM generation, LPARAM kind) const
 DWORD ImgBrowserCore::GetCollectionError()
 {
     EnterCriticalSection(browsecriticalsection_.get());
-    const auto error = collection_error_;
+    const auto error = session_.collection_error();
     LeaveCriticalSection(browsecriticalsection_.get());
     return error;
 }
@@ -573,19 +455,19 @@ BOOL ImgBrowserCore::HasFiles()
 
 ImgBrowserOperationStopResult ImgBrowserCore::StopCollecting()
 {
-    if (!collectorthread_.valid())
+    if (!session_.HasCollectorThread())
     {
         return {ImgBrowserStopStatus::AlreadyStopped, ERROR_SUCCESS};
     }
 
-    const auto request = collectionrequest_.lock();
-    if (request != nullptr && !request->cancellation->Signal())
+    const auto cancellation = session_.cancellation();
+    if (cancellation != nullptr && !cancellation->Signal())
     {
         return {ImgBrowserStopStatus::SignalFailed, GetLastError()};
     }
 
     const DWORD timeoutMs = 3000;
-    const DWORD waitResult = WaitForSingleObject(collectorthread_.get(), timeoutMs);
+    const DWORD waitResult = WaitForSingleObject(session_.collector_thread(), timeoutMs);
     if (waitResult == WAIT_TIMEOUT)
     {
 #if defined(IMGVW_DEBUG)
@@ -605,7 +487,7 @@ ImgBrowserOperationStopResult ImgBrowserCore::StopCollecting()
         return {ImgBrowserStopStatus::WaitFailed, error};
     }
 
-    collectorthread_.reset();
+    session_.ClearCollectorThread();
     collectionrequest_.reset();
     return {ImgBrowserStopStatus::Stopped, ERROR_SUCCESS};
 }
@@ -629,52 +511,31 @@ ImgBrowserStopResult ImgBrowserCore::StopBrowsing()
 
 ImgBrowserOperationStopResult ImgBrowserCore::StopTargetQueueing()
 {
-    if (targetqueuethreads_.empty())
+    const auto result = preload_scheduler_.Stop(3000);
+    switch (result.status)
     {
-        targetcancellation_.reset();
-        return {ImgBrowserStopStatus::AlreadyStopped, ERROR_SUCCESS};
-    }
-
-    if (targetcancellation_ != nullptr && !targetcancellation_->Signal())
-    {
-        return {ImgBrowserStopStatus::SignalFailed, GetLastError()};
-    }
-
-    const DWORD timeoutMs = 3000;
-    const DWORD start = GetTickCount();
-    for (const auto& thread : targetqueuethreads_)
-    {
-        if (!thread.valid())
-        {
-            continue;
-        }
-
-        const DWORD elapsed = GetTickCount() - start;
-        const DWORD remaining = elapsed < timeoutMs ? timeoutMs - elapsed : 0;
-        const DWORD waitResult = WaitForSingleObject(thread.get(), remaining);
-        if (waitResult == WAIT_TIMEOUT)
-        {
+    case PreloadSchedulerStopStatus::AlreadyStopped:
+        return {ImgBrowserStopStatus::AlreadyStopped, result.win32_error};
+    case PreloadSchedulerStopStatus::Stopped:
+        return {ImgBrowserStopStatus::Stopped, result.win32_error};
+    case PreloadSchedulerStopStatus::SignalFailed:
+        return {ImgBrowserStopStatus::SignalFailed, result.win32_error};
+    case PreloadSchedulerStopStatus::TimedOut:
 #if defined(IMGVW_DEBUG)
-            OutputDebugString(L"ImgBrowser::StopTargetQueueing: Warning: target queue thread did not terminate.\n");
+        OutputDebugString(L"ImgBrowser::StopTargetQueueing: Warning: target queue thread did not terminate.\n");
 #endif
-            return {ImgBrowserStopStatus::TimedOut, ERROR_SUCCESS};
-        }
-        else if (waitResult == WAIT_FAILED)
-        {
-            const DWORD error = GetLastError();
+        return {ImgBrowserStopStatus::TimedOut, result.win32_error};
+    case PreloadSchedulerStopStatus::WaitFailed:
 #if defined(IMGVW_DEBUG)
-            WCHAR buf[256];
-            swprintf_s(buf, L"ImgBrowser::StopTargetQueueing: WaitForSingleObject failed with error 0x%08lX\n",
-                       static_cast<unsigned long>(error));
-            OutputDebugString(buf);
+        WCHAR buf[256];
+        swprintf_s(buf, L"ImgBrowser::StopTargetQueueing: WaitForSingleObject failed with error 0x%08lX\n",
+                   static_cast<unsigned long>(result.win32_error));
+        OutputDebugString(buf);
 #endif
-            return {ImgBrowserStopStatus::WaitFailed, error};
-        }
+        return {ImgBrowserStopStatus::WaitFailed, result.win32_error};
     }
 
-    targetqueuethreads_.clear();
-    targetcancellation_.reset();
-    return {ImgBrowserStopStatus::Stopped, ERROR_SUCCESS};
+    return {ImgBrowserStopStatus::WaitFailed, ERROR_INVALID_FUNCTION};
 }
 
 void ImgBrowserCore::SetNotificationWindow(HWND hwnd, UINT message)
@@ -690,64 +551,25 @@ void ImgBrowserCore::SetNotificationWindow(HWND hwnd, UINT message)
     LeaveCriticalSection(browsecriticalsection_.get());
 }
 
-void ImgBrowserCore::Reset()
+void ImgBrowserCore::Reset(ULONG generation)
 {
-    files_.Clear();
-    folderpath_.clear();
-    folders_.clear();
-    preload_target_sizes_.clear();
-    collection_error_ = ERROR_SUCCESS;
+    session_.Reset(generation);
+    preload_scheduler_.Reset();
 }
 
 BOOL ImgBrowserCore::AddPreloadTargetSize(INT targetwidth, INT targetheight)
 {
-    const auto match = std::find_if(preload_target_sizes_.begin(), preload_target_sizes_.end(),
-                                    [targetwidth, targetheight](const TargetSize& target_size) {
-                                        return target_size.width == targetwidth && target_size.height == targetheight;
-                                    });
-    if (match != preload_target_sizes_.end())
-    {
-        return FALSE;
-    }
-
-    preload_target_sizes_.push_back({targetwidth, targetheight});
-    return TRUE;
+    return preload_scheduler_.AddTargetSize(targetwidth, targetheight) ? TRUE : FALSE;
 }
 
 BOOL ImgBrowserCore::AddPreloadTargetSizes(const std::vector<SIZE>& target_sizes, std::vector<TargetSize>* added_sizes)
 {
-    BOOL added = FALSE;
-    for (const auto& target_size : target_sizes)
-    {
-        if (target_size.cx <= 0 || target_size.cy <= 0)
-        {
-            continue;
-        }
-
-        if (AddPreloadTargetSize(target_size.cx, target_size.cy))
-        {
-            added = TRUE;
-            if (added_sizes != nullptr)
-            {
-                added_sizes->push_back({target_size.cx, target_size.cy});
-            }
-        }
-    }
-
-    return added;
+    return preload_scheduler_.AddTargetSizes(target_sizes, added_sizes) ? TRUE : FALSE;
 }
 
 BOOL ImgBrowserCore::IsTargetSizeActiveLocked(INT targetwidth, INT targetheight) const
 {
-    if (targetwidth_ == targetwidth && targetheight_ == targetheight)
-    {
-        return TRUE;
-    }
-
-    return std::find_if(preload_target_sizes_.begin(), preload_target_sizes_.end(),
-                        [targetwidth, targetheight](const TargetSize& target_size) {
-                            return target_size.width == targetwidth && target_size.height == targetheight;
-                        }) != preload_target_sizes_.end();
+    return preload_scheduler_.IsTargetSizeActive(targetwidth, targetheight) ? TRUE : FALSE;
 }
 
 void ImgBrowserCore::QueueTargetSizes(const std::shared_ptr<CancellationState>& cancellation,
@@ -765,7 +587,7 @@ void ImgBrowserCore::QueueTargetSizes(const std::shared_ptr<CancellationState>& 
             break;
         }
 
-        const auto imgformat = ResolveFileFormat(filepath);
+        const auto imgformat = ImgFormatResolver::Resolve(filepath);
         if (imgformat == ImgItem::Format::Unsupported)
         {
             continue;
@@ -804,7 +626,7 @@ bool ImgBrowserCore::WaitBeforeQueuePath(const std::shared_ptr<CancellationState
         test_hooks_->path_queue_continue != nullptr)
     {
         SetEvent(test_hooks_->path_queue_entered);
-        const HANDLE events[] = {cancellation->event.get(), test_hooks_->path_queue_continue};
+        const HANDLE events[] = {cancellation->event(), test_hooks_->path_queue_continue};
         const auto wait_result = WaitForMultipleObjects(2, events, FALSE, INFINITE);
         if (test_hooks_->path_queue_resumed != nullptr)
         {
@@ -823,51 +645,18 @@ void ImgBrowserCore::QueueTargetSizeAsync(INT targetwidth, INT targetheight, BOO
 
 void ImgBrowserCore::QueueTargetSizesAsync(const std::vector<TargetSize>& target_sizes, BOOL loadnext)
 {
-    CleanupTargetQueueThreads();
-    if (targetcancellation_ == nullptr)
-    {
-        targetcancellation_ = std::make_shared<CancellationState>();
-    }
-    if (!targetcancellation_->event.valid())
-    {
-        targetcancellation_.reset();
-        return;
-    }
-
-    const auto request = new TargetSizeQueueRequest{shared_from_this(), targetcancellation_, target_sizes, loadnext};
-    const auto thread = CreateThread(nullptr, 0, StaticThreadQueueTargetSize, request, 0, nullptr);
-    if (thread == nullptr)
-    {
-        delete request;
-        return;
-    }
-
-    targetqueuethreads_.emplace_back(thread);
+    preload_scheduler_.Queue(
+        [browser = shared_from_this(), target_sizes, loadnext](const std::shared_ptr<CancellationState>& cancellation) {
+            browser->QueueTargetSizes(cancellation, target_sizes, loadnext);
+        });
 }
 
 void ImgBrowserCore::QueuePathsAsync(std::vector<std::wstring> paths, INT targetwidth, INT targetheight)
 {
-    CleanupTargetQueueThreads();
-    if (targetcancellation_ == nullptr)
-    {
-        targetcancellation_ = std::make_shared<CancellationState>();
-    }
-    if (!targetcancellation_->event.valid())
-    {
-        targetcancellation_.reset();
-        return;
-    }
-
-    const auto request =
-        new PathQueueRequest{shared_from_this(), targetcancellation_, std::move(paths), targetwidth, targetheight};
-    const auto thread = CreateThread(nullptr, 0, StaticThreadQueuePaths, request, 0, nullptr);
-    if (thread == nullptr)
-    {
-        delete request;
-        return;
-    }
-
-    targetqueuethreads_.emplace_back(thread);
+    preload_scheduler_.Queue([browser = shared_from_this(), paths = std::move(paths), targetwidth,
+                              targetheight](const std::shared_ptr<CancellationState>& cancellation) {
+        browser->QueuePaths(cancellation, paths, targetwidth, targetheight);
+    });
 }
 
 void ImgBrowserCore::QueuePaths(const std::shared_ptr<CancellationState>& cancellation,
@@ -886,7 +675,7 @@ void ImgBrowserCore::QueuePaths(const std::shared_ptr<CancellationState>& cancel
         }
 #endif
 
-        const auto imgformat = ResolveFileFormat(filepath);
+        const auto imgformat = ImgFormatResolver::Resolve(filepath);
         EnterCriticalSection(browsecriticalsection_.get());
         const auto active = IsTargetSizeActiveLocked(targetwidth, targetheight);
         const auto imgitem =
@@ -916,7 +705,7 @@ void ImgBrowserCore::QueueFileForTargetSizes(const std::wstring& filepath, ImgIt
         }
     }
 
-    for (const auto& target_size : preload_target_sizes_)
+    for (const auto& target_size : preload_scheduler_.target_sizes())
     {
         if (target_size.width == targetwidth_ && target_size.height == targetheight_)
         {
@@ -932,26 +721,6 @@ void ImgBrowserCore::QueueFileForTargetSizes(const std::wstring& filepath, ImgIt
                 next = FALSE;
             }
         }
-    }
-}
-
-void ImgBrowserCore::CleanupTargetQueueThreads()
-{
-    auto thread = targetqueuethreads_.begin();
-    while (thread != targetqueuethreads_.end())
-    {
-        if (!thread->valid() || WaitForSingleObject(thread->get(), 0) == WAIT_OBJECT_0)
-        {
-            thread = targetqueuethreads_.erase(thread);
-        }
-        else
-        {
-            ++thread;
-        }
-    }
-    if (targetqueuethreads_.empty())
-    {
-        targetcancellation_.reset();
     }
 }
 
@@ -1097,7 +866,7 @@ BOOL ImgBrowserCore::MoveToItem(const std::wstring& filepath)
 
 BOOL ImgBrowserCore::MoveToOrAddItem(const std::wstring& filepath)
 {
-    const auto imgformat = ResolveFileFormat(filepath);
+    const auto imgformat = ImgFormatResolver::Resolve(filepath);
     if (imgformat == ImgItem::Format::Unsupported)
     {
         return FALSE;
@@ -1181,14 +950,14 @@ void ImgBrowserCore::CollectSubFolders(const std::shared_ptr<CollectionRequest>&
     EnterCriticalSection(browsecriticalsection_.get());
     const auto folders = folders_;
     LeaveCriticalSection(browsecriticalsection_.get());
-    for (const auto& folder : folders)
-    {
-        if (request->cancellation->Cancelled())
-        {
-            break;
-        }
-        CollectFolder(request, folder);
-    }
+    FolderScanner scanner;
+    const auto result =
+        scanner.ScanFolders(folders, {[request] { return request->collection->cancellation->Cancelled(); },
+                                      [this, request](const std::wstring& filepath, ImgItem::Format format) {
+                                          CollectFile(request, filepath, format);
+                                      },
+                                      {}});
+    InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(result.win32_error), ERROR_SUCCESS);
 
     EnterCriticalSection(browsecriticalsection_.get());
     folders_.clear();
@@ -1197,7 +966,7 @@ void ImgBrowserCore::CollectSubFolders(const std::shared_ptr<CollectionRequest>&
 
 std::shared_ptr<ImgItem> ImgBrowserCore::GetOrCreateCachedItem(const std::wstring& filepath)
 {
-    const auto imgformat = ResolveFileFormat(filepath);
+    const auto imgformat = ImgFormatResolver::Resolve(filepath);
     return GetOrCreateCachedItem(filepath, targetwidth_, targetheight_, imgformat);
 }
 
@@ -1223,7 +992,7 @@ void ImgBrowserCore::NotifyChanged(ULONG generation)
     EnterCriticalSection(browsecriticalsection_.get());
     if (generation == 0)
     {
-        generation = static_cast<ULONG>(InterlockedCompareExchange(&generation_, 0, 0));
+        generation = session_.generation();
     }
     if (notificationhwnd_ != nullptr && notificationmessage_ != 0)
     {
@@ -1242,10 +1011,10 @@ void ImgBrowserCore::NotifyChanged(ULONG generation)
         if (!posted)
         {
             const auto error = GetLastError();
-            const auto current_generation = static_cast<ULONG>(InterlockedCompareExchange(&generation_, 0, 0));
-            if (generation == current_generation && collection_error_ == ERROR_SUCCESS)
+            const auto current_generation = session_.generation();
+            if (generation == current_generation)
             {
-                collection_error_ = error;
+                session_.SetCollectionErrorIfClear(error);
             }
         }
     }
@@ -1262,56 +1031,44 @@ DWORD WINAPI ImgBrowserCore::StaticThreadCollect(void* context)
         return 0;
     }
 
-    if (request->subfolders_only)
+    if (request->collection->subfolders_only)
     {
         request->browser->CollectSubFolders(request);
     }
     else
     {
-        request->browser->CollectFolder(request, request->folderpath);
-        if (InterlockedCompareExchange(&request->recursive, 0, 0) != 0)
+        FolderScanner scanner;
+        const auto recursive = InterlockedCompareExchange(&request->collection->recursive, 0, 0) != 0;
+        const auto result =
+            scanner.Scan(request->collection->folderpath, recursive,
+                         {[request] { return request->collection->cancellation->Cancelled(); },
+                          [browser = request->browser, request](const std::wstring& filepath, ImgItem::Format format) {
+                              browser->CollectFile(request, filepath, format);
+                          },
+                          [browser = request->browser](const std::wstring& folderpath) {
+                              EnterCriticalSection(browser->browsecriticalsection_.get());
+                              browser->folders_.push_back(folderpath);
+                              LeaveCriticalSection(browser->browsecriticalsection_.get());
+                          }});
+        InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(result.win32_error), ERROR_SUCCESS);
+        if (recursive)
         {
             request->browser->CollectSubFolders(request);
         }
     }
 
-    if (!SetEvent(request->browser->readyevent_.get()))
+    if (!request->browser->session_.SignalReadyEvent())
     {
         InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(GetLastError()), ERROR_SUCCESS);
     }
     EnterCriticalSection(request->browser->browsecriticalsection_.get());
-    if (request->generation == static_cast<ULONG>(InterlockedCompareExchange(&request->browser->generation_, 0, 0)))
+    if (request->collection->generation == request->browser->session_.generation())
     {
-        request->browser->collection_error_ = static_cast<DWORD>(request->enumeration_error);
+        request->browser->session_.SetCollectionError(static_cast<DWORD>(request->enumeration_error));
     }
     LeaveCriticalSection(request->browser->browsecriticalsection_.get());
-    request->browser->NotifyChanged(request->generation);
+    request->browser->NotifyChanged(request->collection->generation);
 
-    return 0;
-}
-
-DWORD WINAPI ImgBrowserCore::StaticThreadQueueTargetSize(void* targetsizequeuerequest)
-{
-    const auto request = reinterpret_cast<TargetSizeQueueRequest*>(targetsizequeuerequest);
-    if (request != nullptr && request->browser != nullptr)
-    {
-        request->browser->QueueTargetSizes(request->cancellation, request->sizes, request->loadnext);
-    }
-
-    delete request;
-    return 0;
-}
-
-DWORD WINAPI ImgBrowserCore::StaticThreadQueuePaths(void* pathqueuerequest)
-{
-    const auto request = reinterpret_cast<PathQueueRequest*>(pathqueuerequest);
-    if (request != nullptr && request->browser != nullptr)
-    {
-        request->browser->QueuePaths(request->cancellation, request->paths, request->targetwidth,
-                                     request->targetheight);
-    }
-
-    delete request;
     return 0;
 }
 

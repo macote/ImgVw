@@ -14,9 +14,9 @@ void Window::Register()
     wndclassex.hIconSm =
         reinterpret_cast<HICON>(LoadImage(hinst_, MAKEINTRESOURCE(IDI_SMALL), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
     wndclassex.hCursor = manualcursor_ ? nullptr : LoadCursor(nullptr, IDC_ARROW);
-    wndclassex.hbrBackground = dontfillbackground_           ? nullptr
-                               : backgroundbrush_ != nullptr ? backgroundbrush_
-                                                             : GetSysColorBrush(COLOR_BTNFACE);
+    wndclassex.hbrBackground = dontfillbackground_        ? nullptr
+                               : backgroundbrush_.valid() ? backgroundbrush_.get()
+                                                          : GetSysColorBrush(COLOR_BTNFACE);
     wndclassex.lpszMenuName = nullptr;
     wndclassex.lpszClassName = ClassName();
     WinRegisterClass(&wndclassex);

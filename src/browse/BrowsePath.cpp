@@ -2,6 +2,16 @@
 
 #include <Shlwapi.h>
 
+namespace
+{
+std::wstring GetAbsoluteFolderPath(const std::wstring& folder)
+{
+    wchar_t absolute_path[MAX_PATH]{};
+    const auto length = GetFullPathName(folder.c_str(), MAX_PATH, absolute_path, nullptr);
+    return length > 0 && length < MAX_PATH ? std::wstring(absolute_path) : folder;
+}
+} // namespace
+
 BrowsePathResult ClassifyBrowsePath(const std::wstring& path)
 {
     BrowsePathResult result;
@@ -58,4 +68,18 @@ BrowsePathResult ClassifyBrowsePath(const std::wstring& path)
     }
 
     return result;
+}
+
+bool BrowsePathsShareFolder(const std::wstring& first, const std::wstring& second)
+{
+    const auto first_path = ClassifyBrowsePath(first);
+    const auto second_path = ClassifyBrowsePath(second);
+    if (!first_path.Succeeded() || !second_path.Succeeded())
+    {
+        return false;
+    }
+
+    const auto first_folder = GetAbsoluteFolderPath(first_path.folderpath);
+    const auto second_folder = GetAbsoluteFolderPath(second_path.folderpath);
+    return _wcsicmp(first_folder.c_str(), second_folder.c_str()) == 0;
 }

@@ -19,7 +19,7 @@ SOURCES = ImgVwTests.cpp concurrency/ConcurrencyTests.cpp image/ImgTests.cpp pla
 	ui/RendererTests.cpp \
 	unit/EmptyStateViewTests.cpp unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp unit/WindowPresentationTests.cpp \
 	support/JpegFixture.cpp support/TempFile.cpp support/TestHarness.cpp support/TestMain.cpp \
-	../src/browse/BrowsePath.cpp ../src/browse/ImgBrowser.cpp ../src/browse/ImgFileList.cpp \
+	../src/browse/BrowsePath.cpp ../src/browse/BrowseSession.cpp ../src/browse/FolderScanner.cpp ../src/browse/ImgBrowser.cpp ../src/browse/ImgFileList.cpp ../src/browse/PreloadScheduler.cpp \
 	../src/image/ColorProfile.cpp \
 	../src/image/ColorTransform.cpp ../src/image/ExifOrientation.cpp ../src/image/ImgResampler.cpp \
 	../src/image/ImgDispatcher.cpp ../src/image/ImgLoader.cpp ../src/image/ImgFormatDetector.cpp \
@@ -41,7 +41,7 @@ IMAGESOURCES = image/ImgTests.cpp support/JpegFixture.cpp support/TempFile.cpp $
 	../src/image/ImgResampler.cpp ../src/image/ImgBuffer.cpp ../src/image/ImgGDIItem.cpp ../src/image/ImgItem.cpp \
 	../src/image/ImgItemHelper.cpp ../src/image/ImgJPEGDecoder.cpp
 CONCURRENCYSOURCES = concurrency/ConcurrencyTests.cpp support/JpegFixture.cpp support/TempFile.cpp $(TESTMAIN) \
-	../src/browse/BrowsePath.cpp ../src/browse/ImgBrowser.cpp ../src/browse/ImgFileList.cpp \
+	../src/browse/BrowsePath.cpp ../src/browse/BrowseSession.cpp ../src/browse/FolderScanner.cpp ../src/browse/ImgBrowser.cpp ../src/browse/ImgFileList.cpp ../src/browse/PreloadScheduler.cpp \
 	../src/image/ColorProfile.cpp ../src/image/ColorTransform.cpp ../src/image/ExifOrientation.cpp \
 	../src/image/ImgResampler.cpp ../src/image/ImgDispatcher.cpp ../src/image/ImgLoader.cpp \
 	../src/image/ImgFormatDetector.cpp ../src/image/ImgFormatResolver.cpp ../src/image/ImgBuffer.cpp \

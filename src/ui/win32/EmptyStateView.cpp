@@ -1,4 +1,7 @@
 #include "EmptyStateView.h"
+#include "CompatibleDeviceContext.h"
+#include "GlobalMemory.h"
+#include "SelectedGdiObject.h"
 
 #include <algorithm>
 #include <cstring>
@@ -23,13 +26,7 @@ Colors GetColors(bool light_theme)
 EmptyStateView::~EmptyStateView()
 {
     DestroyControls();
-    DeleteObject(caption_font_);
-    DeleteObject(text_font_);
     logo_.reset();
-    if (logo_stream_ != nullptr)
-    {
-        logo_stream_->Release();
-    }
 }
 
 void EmptyStateView::Initialize(HWND parent, HINSTANCE instance)
@@ -56,9 +53,9 @@ void EmptyStateView::Initialize(HWND parent, HINSTANCE instance)
 
     for (const auto button : {open_image_button_, open_folder_button_, search_subfolders_button_, exit_button_})
     {
-        if (button != nullptr && caption_font_ != nullptr)
+        if (button != nullptr && caption_font_.valid())
         {
-            SendMessage(button, WM_SETFONT, reinterpret_cast<WPARAM>(caption_font_), TRUE);
+            SendMessage(button, WM_SETFONT, reinterpret_cast<WPARAM>(caption_font_.get()), TRUE);
         }
     }
 }
@@ -204,11 +201,10 @@ void EmptyStateView::Paint(HDC dc, UINT dpi, bool light_theme)
     }
 
     const auto colors = GetColors(light_theme);
-    const auto background = CreateSolidBrush(colors.background);
-    if (background != nullptr)
+    GdiObject<HBRUSH> background(CreateSolidBrush(colors.background));
+    if (background.valid())
     {
-        FillRect(dc, &client_rect, background);
-        DeleteObject(background);
+        FillRect(dc, &client_rect, background.get());
     }
 
     const EmptyStateLayout::Input layout_input{client_rect.right,
@@ -262,17 +258,16 @@ void EmptyStateView::DrawButton(const DRAWITEMSTRUCT* draw_item, UINT dpi, bool 
     DrawPanelText(draw_item->hDC, draw_item->rcItem, text, text_format, dpi, light_theme, false);
     if ((draw_item->itemState & ODS_FOCUS) != 0)
     {
-        const auto focus_brush = CreateSolidBrush(RGB(123, 104, 238));
-        if (focus_brush != nullptr)
+        GdiObject<HBRUSH> focus_brush(CreateSolidBrush(RGB(123, 104, 238)));
+        if (focus_brush.valid())
         {
             auto focus_rect = draw_item->rcItem;
             const auto focus_width = std::max(2, WindowGeometry::ScaleForDpi(3, dpi));
             for (INT inset = 0; inset < focus_width && !IsRectEmpty(&focus_rect); ++inset)
             {
-                FrameRect(draw_item->hDC, &focus_rect, focus_brush);
+                FrameRect(draw_item->hDC, &focus_rect, focus_brush.get());
                 InflateRect(&focus_rect, -1, -1);
             }
-            DeleteObject(focus_brush);
         }
     }
 }
@@ -320,7 +315,7 @@ void EmptyStateView::CreateCaptionFont()
 #endif
     if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &metrics, 0))
     {
-        caption_font_ = CreateFontIndirect(&metrics.lfMessageFont);
+        caption_font_.reset(CreateFontIndirect(&metrics.lfMessageFont));
     }
 }
 
@@ -340,37 +335,36 @@ void EmptyStateView::LoadLogo()
         return;
     }
 
-    const auto image_memory = GlobalAlloc(GMEM_MOVEABLE, resource_size);
-    if (image_memory == nullptr)
+    GlobalMemory image_memory(GlobalAlloc(GMEM_MOVEABLE, resource_size));
+    if (!image_memory.valid())
     {
         return;
     }
 
-    const auto image_data = GlobalLock(image_memory);
+    const auto image_data = GlobalLock(image_memory.get());
     if (image_data == nullptr)
     {
-        GlobalFree(image_memory);
         return;
     }
 
     std::memcpy(image_data, resource_data, resource_size);
-    GlobalUnlock(image_memory);
+    GlobalUnlock(image_memory.get());
 
-    IStream* image_stream{};
-    if (FAILED(CreateStreamOnHGlobal(image_memory, TRUE, &image_stream)))
+    IStream* raw_image_stream{};
+    if (FAILED(CreateStreamOnHGlobal(image_memory.get(), TRUE, &raw_image_stream)))
     {
-        GlobalFree(image_memory);
         return;
     }
+    image_memory.release();
+    ComPtr<IStream> image_stream(raw_image_stream);
 
-    auto image = std::make_unique<Gdiplus::Image>(image_stream, FALSE);
+    auto image = std::make_unique<Gdiplus::Image>(image_stream.get(), FALSE);
     if (image->GetLastStatus() != Gdiplus::Ok || image->GetWidth() == 0 || image->GetHeight() == 0)
     {
-        image_stream->Release();
         return;
     }
 
-    logo_stream_ = image_stream;
+    logo_stream_ = std::move(image_stream);
     logo_ = std::move(image);
 }
 
@@ -395,77 +389,69 @@ void EmptyStateView::DrawPanelText(HDC dc, const RECT& panel_rect, const std::ws
 
     const auto width = panel_rect.right - panel_rect.left;
     const auto height = panel_rect.bottom - panel_rect.top;
-    const auto memory_dc = CreateCompatibleDC(dc);
-    const auto bitmap = memory_dc == nullptr ? nullptr : CreateCompatibleBitmap(dc, width, height);
-    if (memory_dc == nullptr || bitmap == nullptr)
+    CompatibleDeviceContext memory_dc(CreateCompatibleDC(dc));
+    GdiObject<HBITMAP> bitmap(memory_dc.valid() ? CreateCompatibleBitmap(dc, width, height) : nullptr);
+    if (!memory_dc.valid() || !bitmap.valid())
     {
-        DeleteObject(bitmap);
-        DeleteDC(memory_dc);
         return;
     }
 
-    const auto previous_bitmap = SelectObject(memory_dc, bitmap);
-    if (previous_bitmap == nullptr || previous_bitmap == HGDI_ERROR)
+    SelectedGdiObject bitmap_selection(memory_dc.get(), bitmap.get());
+    if (!bitmap_selection.valid())
     {
-        DeleteObject(bitmap);
-        DeleteDC(memory_dc);
         return;
     }
 
     const auto colors = GetColors(light_theme);
     RECT background_rect{0, 0, width, height};
-    const auto background = CreateSolidBrush(colors.background);
-    if (background != nullptr)
+    GdiObject<HBRUSH> background(CreateSolidBrush(colors.background));
+    if (background.valid())
     {
-        FillRect(memory_dc, &background_rect, background);
-        DeleteObject(background);
+        FillRect(memory_dc.get(), &background_rect, background.get());
     }
 
-    const auto panel_dc = CreateCompatibleDC(dc);
-    const auto panel_bitmap = panel_dc == nullptr ? nullptr : CreateCompatibleBitmap(dc, width, height);
-    if (panel_dc != nullptr && panel_bitmap != nullptr)
+    CompatibleDeviceContext panel_dc(CreateCompatibleDC(dc));
+    GdiObject<HBITMAP> panel_bitmap(panel_dc.valid() ? CreateCompatibleBitmap(dc, width, height) : nullptr);
+    if (panel_dc.valid() && panel_bitmap.valid())
     {
-        const auto previous_panel_bitmap = SelectObject(panel_dc, panel_bitmap);
-        const auto panel = CreateSolidBrush(colors.panel);
-        if (panel != nullptr)
+        SelectedGdiObject panel_bitmap_selection(panel_dc.get(), panel_bitmap.get());
+        GdiObject<HBRUSH> panel(CreateSolidBrush(colors.panel));
+        if (panel_bitmap_selection.valid() && panel.valid())
         {
-            FillRect(panel_dc, &background_rect, panel);
-            DeleteObject(panel);
+            FillRect(panel_dc.get(), &background_rect, panel.get());
         }
-        BLENDFUNCTION blend{};
-        blend.BlendOp = AC_SRC_OVER;
-        blend.SourceConstantAlpha = 128;
-        AlphaBlend(memory_dc, 0, 0, width, height, panel_dc, 0, 0, width, height, blend);
-        if (previous_panel_bitmap != nullptr && previous_panel_bitmap != HGDI_ERROR)
+        if (panel_bitmap_selection.valid())
         {
-            SelectObject(panel_dc, previous_panel_bitmap);
+            BLENDFUNCTION blend{};
+            blend.BlendOp = AC_SRC_OVER;
+            blend.SourceConstantAlpha = 128;
+            AlphaBlend(memory_dc.get(), 0, 0, width, height, panel_dc.get(), 0, 0, width, height, blend);
         }
     }
-    DeleteObject(panel_bitmap);
-    DeleteDC(panel_dc);
 
-    const auto border_pen = CreatePen(PS_SOLID, 1, colors.border);
-    if (border_pen != nullptr)
+    GdiObject<HPEN> border_pen(CreatePen(PS_SOLID, 1, colors.border));
+    if (border_pen.valid())
     {
-        const auto previous_pen = SelectObject(memory_dc, border_pen);
-        const auto previous_brush = SelectObject(memory_dc, GetStockObject(NULL_BRUSH));
-        Rectangle(memory_dc, 0, 0, width, height);
-        SelectObject(memory_dc, previous_brush);
-        SelectObject(memory_dc, previous_pen);
-        DeleteObject(border_pen);
+        SelectedGdiObject pen_selection(memory_dc.get(), border_pen.get());
+        SelectedGdiObject brush_selection(memory_dc.get(), GetStockObject(NULL_BRUSH));
+        Rectangle(memory_dc.get(), 0, 0, width, height);
     }
 
-    SetBkMode(memory_dc, TRANSPARENT);
-    SetTextColor(memory_dc, colors.text);
+    SetBkMode(memory_dc.get(), TRANSPARENT);
+    SetTextColor(memory_dc.get(), colors.text);
     const auto horizontal_padding = WindowGeometry::ScaleForDpi(8, dpi);
     const auto vertical_padding = WindowGeometry::ScaleForDpi(6, dpi);
     RECT text_rect{horizontal_padding, vertical_padding, width - horizontal_padding, height - vertical_padding};
     const auto text_font = const_cast<EmptyStateView*>(this)->GetTextFont(dpi);
-    const auto previous_font = text_font == nullptr ? nullptr : SelectObject(memory_dc, text_font);
+    SelectedGdiObject font_selection;
+    if (text_font != nullptr)
+    {
+        font_selection = SelectedGdiObject(memory_dc.get(), text_font);
+    }
     if (vertically_center_text)
     {
         RECT measured_text{0, 0, text_rect.right - text_rect.left, 0};
-        DrawText(memory_dc, text.c_str(), -1, &measured_text, text_format | DT_CALCRECT);
+        DrawText(memory_dc.get(), text.c_str(), -1, &measured_text, text_format | DT_CALCRECT);
         const auto available_height = text_rect.bottom - text_rect.top;
         const auto text_height = measured_text.bottom - measured_text.top;
         if (text_height < available_height)
@@ -474,28 +460,19 @@ void EmptyStateView::DrawPanelText(HDC dc, const RECT& panel_rect, const std::ws
             text_rect.bottom = text_rect.top + text_height;
         }
     }
-    DrawText(memory_dc, text.c_str(), -1, &text_rect, text_format);
-    if (previous_font != nullptr)
-    {
-        SelectObject(memory_dc, previous_font);
-    }
-
-    BitBlt(dc, panel_rect.left, panel_rect.top, width, height, memory_dc, 0, 0, SRCCOPY);
-    SelectObject(memory_dc, previous_bitmap);
-    DeleteObject(bitmap);
-    DeleteDC(memory_dc);
+    DrawText(memory_dc.get(), text.c_str(), -1, &text_rect, text_format);
+    BitBlt(dc, panel_rect.left, panel_rect.top, width, height, memory_dc.get(), 0, 0, SRCCOPY);
 }
 
 HFONT EmptyStateView::GetTextFont(UINT dpi)
 {
     dpi = dpi == 0 ? WindowGeometry::kDefaultDpi : dpi;
-    if (text_font_ != nullptr && text_font_dpi_ == dpi)
+    if (text_font_.valid() && text_font_dpi_ == dpi)
     {
-        return text_font_;
+        return text_font_.get();
     }
 
-    DeleteObject(text_font_);
-    text_font_ = nullptr;
+    text_font_.reset();
     text_font_dpi_ = 0;
 
     LOGFONT logfont{};
@@ -512,7 +489,7 @@ HFONT EmptyStateView::GetTextFont(UINT dpi)
     logfont.lfQuality = clear_type_enabled ? CLEARTYPE_NATURAL_QUALITY : ANTIALIASED_QUALITY;
     lstrcpy(logfont.lfFaceName, L"Lucida Console");
 
-    text_font_ = CreateFontIndirect(&logfont);
+    text_font_.reset(CreateFontIndirect(&logfont));
     text_font_dpi_ = dpi;
-    return text_font_;
+    return text_font_.get();
 }
