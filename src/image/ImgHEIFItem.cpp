@@ -1,4 +1,5 @@
 #include "ImgHEIFItem.h"
+#include "ImgItemHelper.h"
 #include "ImgResampler.h"
 
 #include <libheif/heif.h>
@@ -152,30 +153,6 @@ int PaddedBgrStride(int width)
     }
 
     return ((width * 3) + 3) & ~3;
-}
-
-bool CalculateDisplaySize(int width, int height, int target_width, int target_height, int* output_width,
-                          int* output_height)
-{
-    if (width <= 0 || height <= 0 || target_width <= 0 || target_height <= 0 || output_width == nullptr ||
-        output_height == nullptr)
-    {
-        return false;
-    }
-
-    *output_width = width;
-    *output_height = height;
-    if (width <= target_width && height <= target_height)
-    {
-        return true;
-    }
-
-    const auto width_scale = static_cast<double>(target_width) / width;
-    const auto height_scale = static_cast<double>(target_height) / height;
-    const auto scale = (std::min)(width_scale, height_scale);
-    *output_width = (std::max)(1, static_cast<int>(width * scale));
-    *output_height = (std::max)(1, static_cast<int>(height * scale));
-    return true;
 }
 
 bool ReadEmbeddedRgbProfile(const heif_image_handle* handle, std::vector<std::uint8_t>* profile_data)
@@ -389,33 +366,30 @@ ImgHEIFItem::ImgHEIFItem(std::wstring filepath, INT targetwidth, INT targetheigh
 
 void ImgHEIFItem::Load()
 {
-    status_ = Status::Loading;
+    SetStatus(Status::Loading);
     ResetLoadingProgress();
-    const LoadCompletion completion(loadedevent_);
+    const LoadCompletion completion(loadedevent_.get());
 
     try
     {
         const HeifInitialization initialization;
         if (!initialization.initialized())
         {
-            errormessage_ = FormatError(L"Initializing libheif", initialization.error());
-            status_ = Status::Error;
+            SetError(FormatError(L"Initializing libheif", initialization.error()));
             return;
         }
 
         FileMapView file_map(filepath_, FileMapView::Mode::Read);
         if (file_map.filesize().HighPart != 0 || file_map.filesize().LowPart == 0)
         {
-            errormessage_ = L"HEIF file is empty or too large.";
-            status_ = Status::Error;
+            SetError(L"HEIF file is empty or too large.");
             return;
         }
 
         std::unique_ptr<heif_context, ContextDeleter> context(heif_context_alloc());
         if (!context)
         {
-            errormessage_ = L"Could not allocate a libheif context.";
-            status_ = Status::Error;
+            SetError(L"Could not allocate a libheif context.");
             return;
         }
 
@@ -423,8 +397,7 @@ void ImgHEIFItem::Load()
                                                                 file_map.filesize().LowPart, nullptr);
         if (error.code != heif_error_Ok)
         {
-            errormessage_ = FormatError(L"Reading HEIF container", error);
-            status_ = Status::Error;
+            SetError(FormatError(L"Reading HEIF container", error));
             return;
         }
 
@@ -433,8 +406,7 @@ void ImgHEIFItem::Load()
         std::unique_ptr<heif_image_handle, HandleDeleter> handle(raw_handle);
         if (error.code != heif_error_Ok || !handle)
         {
-            errormessage_ = FormatError(L"Getting HEIF primary image", error);
-            status_ = Status::Error;
+            SetError(FormatError(L"Getting HEIF primary image", error));
             return;
         }
 
@@ -442,8 +414,7 @@ void ImgHEIFItem::Load()
         height_ = heif_image_handle_get_height(handle.get());
         if (width_ <= 0 || height_ <= 0)
         {
-            errormessage_ = L"HEIF primary image has invalid dimensions.";
-            status_ = Status::Error;
+            SetError(L"HEIF primary image has invalid dimensions.");
             return;
         }
 
@@ -452,8 +423,7 @@ void ImgHEIFItem::Load()
         std::unique_ptr<heif_decoding_options, DecodingOptionsDeleter> decoding_options(heif_decoding_options_alloc());
         if (!decoding_options)
         {
-            errormessage_ = L"Could not allocate libheif decoding options.";
-            status_ = Status::Error;
+            SetError(L"Could not allocate libheif decoding options.");
             return;
         }
         decoding_options->convert_hdr_to_8bit = 1;
@@ -473,17 +443,16 @@ void ImgHEIFItem::Load()
         std::unique_ptr<heif_image, ImageDeleter> image(raw_image);
         if (error.code != heif_error_Ok || !image)
         {
-            errormessage_ = FormatError(L"Decoding HEIF primary image", error);
-            status_ = Status::Error;
+            SetError(FormatError(L"Decoding HEIF primary image", error));
             return;
         }
 
         int display_width{};
         int display_height{};
-        if (!CalculateDisplaySize(width_, height_, targetwidth_, targetheight_, &display_width, &display_height))
+        if (!ImgItemHelper::CalculateDisplaySize(width_, height_, targetwidth_, targetheight_, &display_width,
+                                                 &display_height))
         {
-            errormessage_ = L"Could not calculate HEIF display dimensions.";
-            status_ = Status::Error;
+            SetError(L"Could not calculate HEIF display dimensions.");
             return;
         }
 
@@ -498,8 +467,7 @@ void ImgHEIFItem::Load()
             if (!ImgResampler::DownscaleRgba8(source, source_stride, width_, height_, display_width, display_height,
                                               alpha_mode, &resized))
             {
-                errormessage_ = L"Scaling HEIF primary image failed.";
-                status_ = Status::Error;
+                SetError(L"Scaling HEIF primary image failed.");
                 return;
             }
             source = resized.pixels.data();
@@ -512,23 +480,19 @@ void ImgHEIFItem::Load()
         if (!ConvertRgbaToBottomUpBgr(embedded_profile, source, source_stride, premultiplied, display_width,
                                       display_height, &output, &output_stride))
         {
-            errormessage_ = L"Could not convert HEIF pixels to the display format.";
-            status_ = Status::Error;
+            SetError(L"Could not convert HEIF pixels to the display format.");
             return;
         }
 
-        displaybuffer_.WriteData(display_width, display_height, output_stride, output.data());
+        pending_displaybuffer_.WriteData(display_width, display_height, output_stride, output.data());
         SetupDisplayParameters();
-        status_ = Status::Ready;
     }
     catch (const std::exception& error)
     {
-        errormessage_ = Utf8ToWide(error.what());
-        status_ = Status::Error;
+        SetError(Utf8ToWide(error.what()));
     }
     catch (...)
     {
-        errormessage_ = L"Unexpected HEIF loading failure.";
-        status_ = Status::Error;
+        SetError(L"Unexpected HEIF loading failure.");
     }
 }

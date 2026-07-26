@@ -12,7 +12,25 @@ struct ImgLoaderStats
     std::size_t loading{};
     std::size_t free_slots{};
     std::size_t maximum_slots{};
+    std::size_t notifications{};
 };
+
+enum class ImgNotificationKind
+{
+    BrowserState = 1,
+    LoadComplete = 2
+};
+
+inline ULONG NextImgGeneration()
+{
+    static volatile LONG generation{};
+    auto next = InterlockedIncrement(&generation);
+    if (next == 0)
+    {
+        next = InterlockedIncrement(&generation);
+    }
+    return static_cast<ULONG>(next);
+}
 
 enum class ImgLoaderStartStatus
 {
@@ -68,7 +86,7 @@ class ImgLoader
     ~ImgLoader();
     ImgLoader(const ImgLoader&) = delete;
     ImgLoader& operator=(const ImgLoader&) = delete;
-    void QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext = FALSE);
+    void QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext = FALSE, ULONG generation = 0);
     void PrioritizeTargetSize(INT targetwidth, INT targetheight);
     void SetNotificationWindow(HWND hwnd, UINT message);
     void RemoveNotificationWindow(HWND hwnd);
@@ -82,6 +100,7 @@ class ImgLoader
     ImgLoaderStats GetStats();
 
   private:
+    struct QueuedItem;
     struct State;
 
     std::shared_ptr<State> state_;
@@ -91,10 +110,10 @@ class ImgLoader
   private:
     static DWORD Loop(const std::shared_ptr<State>& state);
     static void CleanupItemThreadObjects(const std::shared_ptr<State>& state);
-    static std::shared_ptr<ImgItem> GetNextItem(const std::shared_ptr<State>& state);
+    static QueuedItem GetNextItem(const std::shared_ptr<State>& state);
     static void CompleteItem(const std::shared_ptr<State>& state, const std::shared_ptr<ImgItem>& imgitem,
-                             BOOL notifysemaphore);
-    static void NotifyLoadComplete(const std::shared_ptr<State>& state);
+                             ULONG generation, BOOL notifysemaphore);
+    static void NotifyLoadComplete(const std::shared_ptr<State>& state, ULONG generation);
     static DWORD WINAPI StaticThreadLoop(void* context);
     static DWORD WINAPI StaticThreadLoad(void* context);
 };

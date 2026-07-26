@@ -126,6 +126,7 @@ class ImgVwWindow final : public Window
     BOOL primarywindow_{TRUE};
     BOOL multimonitorslideshowrunning_{FALSE};
     std::size_t multimonitorslideshowindex_{};
+    std::size_t multimonitorslideshowpreloadcount_{};
     std::wstring multimonitorslideshowcursorpath_;
     std::vector<ImgVwWindow*> slideshowwindows_;
     std::vector<TargetLoadContext> targetloadcontexts_;
@@ -196,6 +197,7 @@ class ImgVwWindow final : public Window
     void StopMultiMonitorSlideShow();
     void RestartMultiMonitorSlideShowTimer();
     void HandleMultiMonitorSlideShow();
+    std::size_t PreloadMultiMonitorSlideShowContexts();
     ImgVwWindow* MultiMonitorSlideShowWindowAt(std::size_t index);
     std::size_t MultiMonitorSlideShowWindowCount() const;
     void DestroySlideShowWindows();

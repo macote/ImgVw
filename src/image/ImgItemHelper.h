@@ -12,6 +12,8 @@ class ImgItemHelper
 {
   public:
     static ImgItem::Format GetImgFormatFromExtension(const std::wstring& filepath);
+    static bool CalculateDisplaySize(INT width, INT height, INT targetwidth, INT targetheight, INT* displaywidth,
+                                     INT* displayheight);
     static ImgBuffer Resize24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth, INT targetheight);
     static ImgBuffer ResizeAndRotate24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth,
                                                   INT targetheight, Gdiplus::RotateFlipType rotateflip);

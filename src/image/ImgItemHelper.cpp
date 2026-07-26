@@ -1,5 +1,6 @@
 #include "ImgItemHelper.h"
 #include "ExifOrientation.h"
+#include <algorithm>
 #include <vector>
 
 namespace
@@ -64,6 +65,30 @@ ImgItem::Format ImgItemHelper::GetImgFormatFromExtension(const std::wstring& fil
     return ImgItem::Format::Unsupported;
 }
 
+bool ImgItemHelper::CalculateDisplaySize(INT width, INT height, INT targetwidth, INT targetheight, INT* displaywidth,
+                                         INT* displayheight)
+{
+    if (width <= 0 || height <= 0 || targetwidth <= 0 || targetheight <= 0 || displaywidth == nullptr ||
+        displayheight == nullptr)
+    {
+        return false;
+    }
+
+    *displaywidth = width;
+    *displayheight = height;
+    if (width <= targetwidth && height <= targetheight)
+    {
+        return true;
+    }
+
+    const auto widthscale = static_cast<double>(targetwidth) / width;
+    const auto heightscale = static_cast<double>(targetheight) / height;
+    const auto scale = (std::min)(widthscale, heightscale);
+    *displaywidth = (std::max)(1, static_cast<INT>(width * scale));
+    *displayheight = (std::max)(1, static_cast<INT>(height * scale));
+    return true;
+}
+
 ImgBuffer ImgItemHelper::Resize24bppRGBImage(INT width, INT height, const PBYTE buffer, INT targetwidth,
                                              INT targetheight)
 {
@@ -94,11 +119,13 @@ ImgBuffer ImgItemHelper::ResizeImage(Gdiplus::Bitmap* bitmap, INT targetwidth, I
 ImgBuffer ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
                                               Gdiplus::RotateFlipType rotateflip)
 {
-    const auto percentWidth = static_cast<FLOAT>(targetwidth) / bitmap->GetWidth();
-    const auto percentHeight = static_cast<FLOAT>(targetheight) / bitmap->GetHeight();
-    const auto percent = percentHeight < percentWidth ? percentHeight : percentWidth;
-    const auto newwidth = static_cast<INT>(bitmap->GetWidth() * percent);
-    const auto newheight = static_cast<INT>(bitmap->GetHeight() * percent);
+    INT newwidth{};
+    INT newheight{};
+    if (!CalculateDisplaySize(bitmap->GetWidth(), bitmap->GetHeight(), targetwidth, targetheight, &newwidth,
+                              &newheight))
+    {
+        throw std::runtime_error("ImgItemHelper.ResizeAndRotateImage() received invalid dimensions.");
+    }
     const SemaphoreGuard semaphore_guard(kGDIOperationSemaphore, true);
     auto resizedbitmap = std::make_unique<Gdiplus::Bitmap>(newwidth, newheight, PixelFormat24bppRGB);
     Gdiplus::Graphics graphics(resizedbitmap.get());

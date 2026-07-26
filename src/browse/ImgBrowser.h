@@ -23,11 +23,17 @@ struct ImgBrowserLoadContext
 {
     std::shared_ptr<ImgCache> cache{std::make_shared<ImgCache>()};
     std::shared_ptr<ImgLoader> loader{std::make_shared<ImgLoader>()};
+    volatile LONG generation{static_cast<LONG>(NextImgGeneration())};
 
     void Clear()
     {
+        InterlockedExchange(&generation, static_cast<LONG>(NextImgGeneration()));
         loader->DiscardQueuedItems();
         cache->Clear();
+    }
+    ULONG CurrentGeneration() const
+    {
+        return static_cast<ULONG>(InterlockedCompareExchange(const_cast<volatile LONG*>(&generation), 0, 0));
     }
 };
 
@@ -64,10 +70,22 @@ struct ImgBrowserStopResult
 
 class ImgBrowserCore;
 
+#if defined(IMGVW_TESTING)
+struct ImgBrowserTestHooks
+{
+    HANDLE path_queue_entered{};
+    HANDLE path_queue_continue{};
+    HANDLE path_queue_resumed{};
+};
+#endif
+
 class ImgBrowser final
 {
   public:
     ImgBrowser();
+#if defined(IMGVW_TESTING)
+    explicit ImgBrowser(const std::shared_ptr<ImgBrowserTestHooks>& test_hooks);
+#endif
     ~ImgBrowser();
     ImgBrowser(const ImgBrowser&) = delete;
     ImgBrowser& operator=(const ImgBrowser&) = delete;
@@ -77,6 +95,9 @@ class ImgBrowser final
     BOOL UpdateTargetSize(INT targetwidth, INT targetheight);
     BOOL BrowseSubFoldersAsync();
     BOOL IsCollectingComplete() const;
+    ULONG generation() const;
+    ULONG loadgeneration() const;
+    bool IsCurrentNotification(WPARAM generation, LPARAM kind) const;
     DWORD GetCollectionError();
     BOOL HasFiles();
     ImgBrowserStopResult StopBrowsing();
@@ -90,7 +111,7 @@ class ImgBrowser final
     BOOL MoveToItem(const std::wstring& filepath);
     BOOL MoveToOrAddItem(const std::wstring& filepath);
     void BeginRandomCycle();
-    void PreloadFrom(ImgBrowser& source);
+    std::size_t PreloadFrom(ImgBrowser& source);
     BOOL MoveToRandom();
     BOOL MoveToRandomExcluding(const std::vector<std::wstring>& excluded);
     void RemoveCurrentItem();

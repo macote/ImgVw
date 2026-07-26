@@ -1,6 +1,7 @@
 /bin/
 /obj/
 /tests/ImgVwTests.exe
+/tests/bin/
 /ipch/
 /.vs/
 *.user

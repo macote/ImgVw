@@ -13,9 +13,9 @@ void ImgBuffer::CreateTempFile()
         tempfilename_ = tempfilenamebuffer;
     }
 
-    tempfile_ = CreateFile(tempfilename_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
-                           FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (tempfile_ == INVALID_HANDLE_VALUE)
+    tempfile_.reset(CreateFile(tempfilename_.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL, nullptr));
+    if (!tempfile_.valid())
     {
         std::stringstream ss;
         ss << "ImgItem.CreateTempFile(CreateFile()) failed with error ";
@@ -27,7 +27,7 @@ void ImgBuffer::CreateTempFile()
 
 void ImgBuffer::WriteData(INT width, INT height, INT stride, const PBYTE buffer)
 {
-    if (tempfile_ == INVALID_HANDLE_VALUE)
+    if (!tempfile_.valid())
     {
         CreateTempFile();
     }
@@ -38,8 +38,8 @@ void ImgBuffer::WriteData(INT width, INT height, INT stride, const PBYTE buffer)
     buffersize_ = stride * height;
 
     DWORD byteswritten{};
-    SetFilePointerEx(tempfile_, LARGE_INTEGER{0}, nullptr, FILE_BEGIN);
-    if (!WriteFile(tempfile_, buffer, buffersize_, &byteswritten, nullptr))
+    SetFilePointerEx(tempfile_.get(), LARGE_INTEGER{0}, nullptr, FILE_BEGIN);
+    if (!WriteFile(tempfile_.get(), buffer, buffersize_, &byteswritten, nullptr))
     {
         std::stringstream ss;
         ss << "ImgItem.WriteTempFile(WriteFile()) failed with error ";
@@ -58,11 +58,7 @@ FileMapView ImgBuffer::GetFileMapView() const
 
 void ImgBuffer::CloseTempFile()
 {
-    if (tempfile_ != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle(tempfile_);
-        tempfile_ = INVALID_HANDLE_VALUE;
-    }
+    tempfile_.reset();
 }
 
 void ImgBuffer::DeleteTempFile()

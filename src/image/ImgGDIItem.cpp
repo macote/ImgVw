@@ -3,13 +3,13 @@
 
 void ImgGDIItem::Load()
 {
-    status_ = Status::Loading;
+    SetStatus(Status::Loading);
 
     const auto bitmap = std::make_unique<Gdiplus::Bitmap>(filepath_.c_str(), FALSE);
     lastgdiplusstatus_ = bitmap->GetLastStatus();
     if (lastgdiplusstatus_ != Gdiplus::Status::Ok || bitmap->GetWidth() == 0)
     {
-        status_ = Status::Error;
+        SetError();
         goto done;
     }
 
@@ -17,20 +17,18 @@ void ImgGDIItem::Load()
     height_ = bitmap->GetHeight();
     if (width_ > targetwidth_ || height_ > targetheight_)
     {
-        displaybuffer_ = ImgItemHelper::ResizeImage(bitmap.get(), targetwidth_, targetheight_);
+        pending_displaybuffer_ = ImgItemHelper::ResizeImage(bitmap.get(), targetwidth_, targetheight_);
     }
     else
     {
-        displaybuffer_ = ImgItemHelper::GetBuffer(bitmap.get());
+        pending_displaybuffer_ = ImgItemHelper::GetBuffer(bitmap.get());
     }
 
     SetupDisplayParameters(false);
 
-    status_ = Status::Ready;
-
 done:
 
-    SetEvent(loadedevent_);
+    SetEvent(loadedevent_.get());
 }
 
 void ImgGDIItem::Unload()

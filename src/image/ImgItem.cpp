@@ -7,51 +7,89 @@ ColorProfile ImgItem::DefaultICCProfile;
 
 ImgItem::CmykProfileSource ImgItem::DefaultICCProfileSource = ImgItem::CmykProfileSource::None;
 
-CRITICAL_SECTION ImgItem::DefaultICCProfileCriticalSection = CRITICAL_SECTION();
+CriticalSection ImgItem::DefaultICCProfileCriticalSection;
 
-ImgItem::DefaultICCProfileCriticalSectionInitializer ImgItem::defaultICCProfileCriticalSectionInitializer;
+ImgItem::DisplayFrame::DisplayFrame(ImgBuffer buffer, INT targetwidth, INT targetheight, BOOL topdownbitmap)
+    : buffer_(std::move(buffer))
+{
+    bitmapinfo_.bmiHeader.biCompression = BI_RGB;
+    bitmapinfo_.bmiHeader.biBitCount = 24;
+    bitmapinfo_.bmiHeader.biWidth = buffer_.width();
+    bitmapinfo_.bmiHeader.biHeight = topdownbitmap ? -buffer_.height() : buffer_.height();
+    bitmapinfo_.bmiHeader.biPlanes = 1;
+    bitmapinfo_.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    offsetx_ = (targetwidth - buffer_.width()) / 2;
+    offsety_ = (targetheight - buffer_.height()) / 2;
+}
+
+ImgBitmap ImgItem::DisplayFrame::GetBitmap() const
+{
+    const auto filemap = buffer_.GetFileMapView();
+    return ImgBitmap(const_cast<PBITMAPINFO>(&bitmapinfo_), filemap.data(), buffer_.buffersize());
+}
 
 void ImgItem::Unload()
 {
-    status_ = Status::Queued;
+    {
+        CriticalSectionLock lock(displaystatecriticalsection_);
+        status_ = Status::Queued;
+        displayframe_.reset();
+        errormessage_.clear();
+    }
     ResetLoadingProgress();
     iccprofileloadfailed_ = FALSE;
     cmykprofilesource_ = CmykProfileSource::None;
     CloseICCProfile();
-    ResetEvent(loadedevent_);
+    ResetEvent(loadedevent_.get());
 }
 
 void ImgItem::SetupDisplayParameters(BOOL topdownbitmap)
 {
-    if (pbitmapinfo_ != nullptr)
+    auto frame =
+        std::make_shared<const DisplayFrame>(std::move(pending_displaybuffer_), targetwidth_, targetheight_, topdownbitmap);
+    CriticalSectionLock lock(displaystatecriticalsection_);
+    displayframe_ = std::move(frame);
+    errormessage_.clear();
+    status_ = Status::Ready;
+}
+
+void ImgItem::SetStatus(Status status)
+{
+    CriticalSectionLock lock(displaystatecriticalsection_);
+    status_ = status;
+    if (status != Status::Ready)
     {
-        HeapFree(heap_, 0, pbitmapinfo_);
-        pbitmapinfo_ = nullptr;
+        displayframe_.reset();
     }
-
-    pbitmapinfo_ = reinterpret_cast<PBITMAPINFO>(HeapAlloc(heap_, 0, sizeof(BITMAPINFOHEADER)));
-    if (pbitmapinfo_ == nullptr)
+    if (status == Status::Loading)
     {
-        // TODO: handle error.
-        return;
+        errormessage_.clear();
     }
+}
 
-    pbitmapinfo_->bmiHeader.biCompression = BI_RGB;
-    pbitmapinfo_->bmiHeader.biBitCount = 24;
-    pbitmapinfo_->bmiHeader.biWidth = displaybuffer_.width();
-    pbitmapinfo_->bmiHeader.biHeight = topdownbitmap ? -displaybuffer_.height() : displaybuffer_.height();
-    pbitmapinfo_->bmiHeader.biPlanes = 1;
-    pbitmapinfo_->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+void ImgItem::SetError(std::wstring errormessage)
+{
+    CriticalSectionLock lock(displaystatecriticalsection_);
+    displayframe_.reset();
+    errormessage_ = std::move(errormessage);
+    status_ = Status::Error;
+}
 
-    offsetx_ = (targetwidth_ - displaybuffer_.width()) / 2;
-    offsety_ = (targetheight_ - displaybuffer_.height()) / 2;
+ImgItem::DisplayState ImgItem::GetDisplayState() const
+{
+    CriticalSectionLock lock(displaystatecriticalsection_);
+    return DisplayState{status_, displayframe_, errormessage_};
 }
 
 ImgBitmap ImgItem::GetDisplayBitmap() const
 {
-    auto filemap = displaybuffer_.GetFileMapView();
+    const auto state = GetDisplayState();
+    if (state.status != Status::Ready || state.frame == nullptr)
+    {
+        throw std::runtime_error("ImgItem.GetDisplayBitmap() called without a ready display frame.");
+    }
 
-    return ImgBitmap(pbitmapinfo_, filemap.data(), displaybuffer_.buffersize());
+    return state.frame->GetBitmap();
 }
 
 void ImgItem::OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabytecount)
@@ -69,7 +107,7 @@ void ImgItem::OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabyte
 
 void ImgItem::LoadDefaultICCProfile()
 {
-    EnterCriticalSection(&DefaultICCProfileCriticalSection);
+    CriticalSectionLock lock(DefaultICCProfileCriticalSection);
     if (!DefaultICCProfile.IsValid())
     {
         try
@@ -126,17 +164,13 @@ void ImgItem::LoadDefaultICCProfile()
             }
         }
     }
-
-    LeaveCriticalSection(&DefaultICCProfileCriticalSection);
 }
 
 void ImgItem::UnloadDefaultICCProfile()
 {
-    EnterCriticalSection(&DefaultICCProfileCriticalSection);
+    CriticalSectionLock lock(DefaultICCProfileCriticalSection);
     DefaultICCProfile.Reset();
     DefaultICCProfileSource = CmykProfileSource::None;
-
-    LeaveCriticalSection(&DefaultICCProfileCriticalSection);
 }
 
 BOOL ImgItem::ResetDefaultICCProfile()
@@ -208,11 +242,10 @@ BOOL ImgItem::TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT n
     }
     else
     {
-        EnterCriticalSection(&DefaultICCProfileCriticalSection);
+        CriticalSectionLock lock(DefaultICCProfileCriticalSection);
         cmykprofilesource_ = DefaultICCProfileSource;
         result = ColorTransform::TransformCmyk8ReversedToBgr8(DefaultICCProfile, width, height, stride, newstride,
                                                               buffer, heap_);
-        LeaveCriticalSection(&DefaultICCProfileCriticalSection);
     }
 
     if (!result.Succeeded())

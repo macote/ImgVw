@@ -22,9 +22,10 @@ enum class ImgRenderStatus
     InvalidInput,
     CreateMemoryDcFailed,
     SelectBitmapFailed,
+    SaveDcFailed,
     ExcludeClipFailed,
     FillBackgroundFailed,
-    ResetClipFailed,
+    RestoreDcFailed,
     CopyBitmapFailed
 };
 

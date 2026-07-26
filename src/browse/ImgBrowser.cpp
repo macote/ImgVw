@@ -1,5 +1,6 @@
-﻿#include "ImgBrowser.h"
+#include "ImgBrowser.h"
 #include "BrowsePath.h"
+#include "CriticalSection.h"
 #include "FindHandle.h"
 #include "ImageFormatResolver.h"
 #include "Win32Handle.h"
@@ -12,13 +13,19 @@ class ImgBrowserCore final : public std::enable_shared_from_this<ImgBrowserCore>
 {
   public:
     ImgBrowserCore();
-    ~ImgBrowserCore();
+#if defined(IMGVW_TESTING)
+    explicit ImgBrowserCore(std::shared_ptr<ImgBrowserTestHooks> test_hooks);
+#endif
+    ~ImgBrowserCore() = default;
     void ShareLoadContext(const std::shared_ptr<ImgBrowserLoadContext>& context);
     std::shared_ptr<ImgBrowserLoadContext> loadcontext() const;
     BOOL BrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight, BOOL clearloadcontext);
     BOOL UpdateTargetSize(INT targetwidth, INT targetheight);
     BOOL BrowseSubFoldersAsync();
     BOOL IsCollectingComplete() const;
+    ULONG generation() const;
+    ULONG loadgeneration() const;
+    bool IsCurrentNotification(WPARAM generation, LPARAM kind) const;
     DWORD GetCollectionError();
     BOOL HasFiles();
     ImgBrowserStopResult StopBrowsing();
@@ -32,7 +39,7 @@ class ImgBrowserCore final : public std::enable_shared_from_this<ImgBrowserCore>
     BOOL MoveToItem(const std::wstring& filepath);
     BOOL MoveToOrAddItem(const std::wstring& filepath);
     void BeginRandomCycle();
-    void PreloadFrom(ImgBrowserCore& source);
+    std::size_t PreloadFrom(ImgBrowserCore& source);
     BOOL MoveToRandom();
     BOOL MoveToRandomExcluding(const std::vector<std::wstring>& excluded);
     void RemoveCurrentItem();
@@ -74,6 +81,7 @@ class ImgBrowserCore final : public std::enable_shared_from_this<ImgBrowserCore>
         volatile LONG recursive{};
         volatile LONG enumeration_error{};
         BOOL subfolders_only{};
+        ULONG generation{};
     };
     struct TargetSizeQueueRequest
     {
@@ -100,13 +108,17 @@ class ImgBrowserCore final : public std::enable_shared_from_this<ImgBrowserCore>
     std::vector<Win32Handle> targetqueuethreads_;
     std::shared_ptr<CancellationState> targetcancellation_;
     Win32Handle readyevent_;
-    CRITICAL_SECTION browsecriticalsection_{};
+    CriticalSection browsecriticalsection_;
     INT targetwidth_{};
     INT targetheight_{};
     std::vector<TargetSize> preload_target_sizes_;
     HWND notificationhwnd_{nullptr};
     UINT notificationmessage_{};
     DWORD collection_error_{ERROR_SUCCESS};
+    volatile LONG generation_{static_cast<LONG>(NextImgGeneration())};
+#if defined(IMGVW_TESTING)
+    std::shared_ptr<ImgBrowserTestHooks> test_hooks_;
+#endif
 
     void CollectFile(const std::shared_ptr<CollectionRequest>& request, const std::wstring& filepath,
                      ImgItem::Format imgformat);
@@ -114,7 +126,7 @@ class ImgBrowserCore final : public std::enable_shared_from_this<ImgBrowserCore>
     void CollectSubFolders(const std::shared_ptr<CollectionRequest>& request);
     ImgBrowserOperationStopResult StopCollecting();
     ImgBrowserOperationStopResult StopTargetQueueing();
-    void NotifyChanged();
+    void NotifyChanged(ULONG generation = 0);
     static DWORD WINAPI StaticThreadCollect(void* context);
     static DWORD WINAPI StaticThreadQueueTargetSize(void* context);
     static DWORD WINAPI StaticThreadQueuePaths(void* context);
@@ -131,21 +143,23 @@ class ImgBrowserCore final : public std::enable_shared_from_this<ImgBrowserCore>
                     INT targetwidth, INT targetheight);
     void QueueFileForTargetSizes(const std::wstring& filepath, ImgItem::Format imgformat, BOOL loadnext);
     void CleanupTargetQueueThreads();
+#if defined(IMGVW_TESTING)
+    bool WaitBeforeQueuePath(const std::shared_ptr<CancellationState>& cancellation);
+#endif
     ImgItem::Format ResolveFileFormat(const std::wstring& filepath);
     std::shared_ptr<ImgItem> GetOrCreateCachedItem(const std::wstring& filepath);
     std::shared_ptr<ImgItem> GetOrCreateCachedItem(const std::wstring& filepath, INT targetwidth, INT targetheight,
                                                    ImgItem::Format imgformat);
 };
 
-ImgBrowserCore::ImgBrowserCore() : readyevent_(CreateEvent(nullptr, TRUE, FALSE, nullptr))
-{
-    InitializeCriticalSectionAndSpinCount(&browsecriticalsection_, 0x00000400);
-}
+ImgBrowserCore::ImgBrowserCore() : readyevent_(CreateEvent(nullptr, TRUE, FALSE, nullptr)) {}
 
-ImgBrowserCore::~ImgBrowserCore()
+#if defined(IMGVW_TESTING)
+ImgBrowserCore::ImgBrowserCore(std::shared_ptr<ImgBrowserTestHooks> test_hooks)
+    : readyevent_(CreateEvent(nullptr, TRUE, FALSE, nullptr)), test_hooks_(std::move(test_hooks))
 {
-    DeleteCriticalSection(&browsecriticalsection_);
 }
+#endif
 
 std::shared_ptr<ImgBrowserLoadContext> ImgBrowserCore::loadcontext() const
 {
@@ -159,7 +173,7 @@ void ImgBrowserCore::ShareLoadContext(const std::shared_ptr<ImgBrowserLoadContex
         return;
     }
 
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     if (notificationhwnd_ != nullptr)
     {
         loadcontext_->loader->RemoveNotificationWindow(notificationhwnd_);
@@ -169,7 +183,7 @@ void ImgBrowserCore::ShareLoadContext(const std::shared_ptr<ImgBrowserLoadContex
     {
         loadcontext_->loader->SetNotificationWindow(notificationhwnd_, notificationmessage_);
     }
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 }
 
 void ImgBrowserCore::CollectFile(const std::shared_ptr<CollectionRequest>& request, const std::wstring& filepath,
@@ -180,7 +194,12 @@ void ImgBrowserCore::CollectFile(const std::shared_ptr<CollectionRequest>& reque
         return;
     }
 
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
+    if (request->generation != static_cast<ULONG>(InterlockedCompareExchange(&generation_, 0, 0)))
+    {
+        LeaveCriticalSection(browsecriticalsection_.get());
+        return;
+    }
 
     if (files_.Add(filepath))
     {
@@ -191,9 +210,9 @@ void ImgBrowserCore::CollectFile(const std::shared_ptr<CollectionRequest>& reque
     {
         InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(GetLastError()), ERROR_SUCCESS);
     }
-    NotifyChanged();
+    NotifyChanged(request->generation);
 
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 }
 
 void ImgBrowserCore::CollectFolder(const std::shared_ptr<CollectionRequest>& request, const std::wstring& folderpath)
@@ -229,9 +248,9 @@ void ImgBrowserCore::CollectFolder(const std::shared_ptr<CollectionRequest>& req
                 }
                 else
                 {
-                    EnterCriticalSection(&browsecriticalsection_);
+                    EnterCriticalSection(browsecriticalsection_.get());
                     folders_.push_back(currentpath);
-                    LeaveCriticalSection(&browsecriticalsection_);
+                    LeaveCriticalSection(browsecriticalsection_.get());
                 }
             }
         }
@@ -283,6 +302,8 @@ BOOL ImgBrowserCore::BrowseAsync(const std::wstring& path, INT targetwidth, INT 
         loadcontext_->Clear();
     }
 
+    const auto generation = NextImgGeneration();
+    InterlockedExchange(&generation_, static_cast<LONG>(generation));
     Reset();
 
     targetwidth_ = targetwidth;
@@ -296,6 +317,7 @@ BOOL ImgBrowserCore::BrowseAsync(const std::wstring& path, INT targetwidth, INT 
     auto request = std::make_shared<CollectionRequest>();
     request->browser = shared_from_this();
     request->cancellation = cancellation;
+    request->generation = generation;
     if (!ResetEvent(readyevent_.get()))
     {
         return FALSE;
@@ -335,7 +357,7 @@ BOOL ImgBrowserCore::UpdateTargetSize(INT targetwidth, INT targetheight)
         return FALSE;
     }
 
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto changed = targetwidth_ != targetwidth || targetheight_ != targetheight;
     const auto previouswidth = targetwidth_;
     const auto previousheight = targetheight_;
@@ -347,7 +369,7 @@ BOOL ImgBrowserCore::UpdateTargetSize(INT targetwidth, INT targetheight)
         keep_previous_target = IsTargetSizeActiveLocked(previouswidth, previousheight);
     }
 
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     if (changed)
     {
         if (!keep_previous_target)
@@ -382,9 +404,9 @@ BOOL ImgBrowserCore::BrowseSubFoldersAsync()
         return FALSE;
     }
 
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto hasfolders = !folders_.empty();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     if (hasfolders)
     {
         auto cancellation = std::make_shared<CancellationState>();
@@ -397,6 +419,7 @@ BOOL ImgBrowserCore::BrowseSubFoldersAsync()
         request->cancellation = cancellation;
         request->recursive = 1;
         request->subfolders_only = TRUE;
+        request->generation = static_cast<ULONG>(InterlockedCompareExchange(&generation_, 0, 0));
         if (!ResetEvent(readyevent_.get()))
         {
             return FALSE;
@@ -425,19 +448,42 @@ BOOL ImgBrowserCore::IsCollectingComplete() const
     return WaitForSingleObject(collectorthread_.get(), 0) == WAIT_OBJECT_0 ? TRUE : FALSE;
 }
 
+ULONG ImgBrowserCore::generation() const
+{
+    return static_cast<ULONG>(InterlockedCompareExchange(const_cast<volatile LONG*>(&generation_), 0, 0));
+}
+
+ULONG ImgBrowserCore::loadgeneration() const
+{
+    return loadcontext_->CurrentGeneration();
+}
+
+bool ImgBrowserCore::IsCurrentNotification(WPARAM generation, LPARAM kind) const
+{
+    switch (static_cast<ImgNotificationKind>(kind))
+    {
+    case ImgNotificationKind::BrowserState:
+        return generation == this->generation();
+    case ImgNotificationKind::LoadComplete:
+        return generation == loadgeneration();
+    default:
+        return false;
+    }
+}
+
 DWORD ImgBrowserCore::GetCollectionError()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto error = collection_error_;
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return error;
 }
 
 BOOL ImgBrowserCore::HasFiles()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto hasfiles = !files_.Empty();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return hasfiles ? TRUE : FALSE;
 }
 
@@ -485,11 +531,11 @@ ImgBrowserStopResult ImgBrowserCore::StopBrowsing()
     ImgBrowserStopResult result;
     result.collection = StopCollecting();
     result.target_queue = StopTargetQueueing();
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto notificationhwnd = notificationhwnd_;
     notificationhwnd_ = nullptr;
     notificationmessage_ = 0;
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     if (notificationhwnd != nullptr)
     {
         loadcontext_->loader->RemoveNotificationWindow(notificationhwnd);
@@ -549,7 +595,7 @@ ImgBrowserOperationStopResult ImgBrowserCore::StopTargetQueueing()
 
 void ImgBrowserCore::SetNotificationWindow(HWND hwnd, UINT message)
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     if (notificationhwnd_ != nullptr && notificationhwnd_ != hwnd)
     {
         loadcontext_->loader->RemoveNotificationWindow(notificationhwnd_);
@@ -557,7 +603,7 @@ void ImgBrowserCore::SetNotificationWindow(HWND hwnd, UINT message)
     notificationhwnd_ = hwnd;
     notificationmessage_ = message;
     loadcontext_->loader->SetNotificationWindow(hwnd, message);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 }
 
 void ImgBrowserCore::Reset()
@@ -623,9 +669,9 @@ BOOL ImgBrowserCore::IsTargetSizeActiveLocked(INT targetwidth, INT targetheight)
 void ImgBrowserCore::QueueTargetSizes(const std::shared_ptr<CancellationState>& cancellation,
                                       const std::vector<TargetSize>& target_sizes, BOOL loadnext)
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto paths = files_.PathsFromCurrent();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 
     BOOL next = loadnext;
     for (const auto& filepath : paths)
@@ -648,20 +694,40 @@ void ImgBrowserCore::QueueTargetSizes(const std::shared_ptr<CancellationState>& 
                 break;
             }
 
-            EnterCriticalSection(&browsecriticalsection_);
+            EnterCriticalSection(browsecriticalsection_.get());
             const auto active = IsTargetSizeActiveLocked(target_size.width, target_size.height);
             const auto imgitem = active
                                      ? GetOrCreateCachedItem(filepath, target_size.width, target_size.height, imgformat)
                                      : std::shared_ptr<ImgItem>();
-            LeaveCriticalSection(&browsecriticalsection_);
+            LeaveCriticalSection(browsecriticalsection_.get());
             if (imgitem != nullptr)
             {
-                loadcontext_->loader->QueueItem(imgitem, next);
+                loadcontext_->loader->QueueItem(imgitem, next, loadcontext_->CurrentGeneration());
                 next = FALSE;
+                NotifyChanged();
             }
         }
     }
 }
+
+#if defined(IMGVW_TESTING)
+bool ImgBrowserCore::WaitBeforeQueuePath(const std::shared_ptr<CancellationState>& cancellation)
+{
+    if (test_hooks_ != nullptr && test_hooks_->path_queue_entered != nullptr &&
+        test_hooks_->path_queue_continue != nullptr)
+    {
+        SetEvent(test_hooks_->path_queue_entered);
+        const HANDLE events[] = {cancellation->event.get(), test_hooks_->path_queue_continue};
+        const auto wait_result = WaitForMultipleObjects(2, events, FALSE, INFINITE);
+        if (test_hooks_->path_queue_resumed != nullptr)
+        {
+            SetEvent(test_hooks_->path_queue_resumed);
+        }
+        return wait_result == WAIT_OBJECT_0 + 1;
+    }
+    return true;
+}
+#endif
 
 void ImgBrowserCore::QueueTargetSizeAsync(INT targetwidth, INT targetheight, BOOL loadnext)
 {
@@ -726,16 +792,23 @@ void ImgBrowserCore::QueuePaths(const std::shared_ptr<CancellationState>& cancel
         {
             break;
         }
+#if defined(IMGVW_TESTING)
+        if (!WaitBeforeQueuePath(cancellation))
+        {
+            break;
+        }
+#endif
 
         const auto imgformat = ResolveFileFormat(filepath);
-        EnterCriticalSection(&browsecriticalsection_);
+        EnterCriticalSection(browsecriticalsection_.get());
         const auto active = IsTargetSizeActiveLocked(targetwidth, targetheight);
         const auto imgitem =
             active ? GetOrCreateCachedItem(filepath, targetwidth, targetheight, imgformat) : std::shared_ptr<ImgItem>();
-        LeaveCriticalSection(&browsecriticalsection_);
+        LeaveCriticalSection(browsecriticalsection_.get());
         if (imgitem != nullptr)
         {
-            loadcontext_->loader->QueueItem(imgitem, FALSE);
+            loadcontext_->loader->QueueItem(imgitem, FALSE, loadcontext_->CurrentGeneration());
+            NotifyChanged();
         }
     }
 }
@@ -746,7 +819,7 @@ void ImgBrowserCore::QueueFileForTargetSizes(const std::wstring& filepath, ImgIt
     const auto currentitem = GetOrCreateCachedItem(filepath, targetwidth_, targetheight_, imgformat);
     if (currentitem != nullptr)
     {
-        loadcontext_->loader->QueueItem(currentitem, next);
+        loadcontext_->loader->QueueItem(currentitem, next, loadcontext_->CurrentGeneration());
         next = FALSE;
     }
 
@@ -760,7 +833,7 @@ void ImgBrowserCore::QueueFileForTargetSizes(const std::wstring& filepath, ImgIt
         const auto imgitem = GetOrCreateCachedItem(filepath, target_size.width, target_size.height, imgformat);
         if (imgitem != nullptr)
         {
-            loadcontext_->loader->QueueItem(imgitem, next);
+            loadcontext_->loader->QueueItem(imgitem, next, loadcontext_->CurrentGeneration());
             next = FALSE;
         }
     }
@@ -788,23 +861,23 @@ void ImgBrowserCore::CleanupTargetQueueThreads()
 
 std::wstring ImgBrowserCore::GetCurrentFilePath()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto filepath = files_.CurrentPath();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return filepath;
 }
 
 std::shared_ptr<ImgItem> ImgBrowserCore::GetCurrentItem()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto filepath = files_.CurrentPath();
     const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : GetOrCreateCachedItem(filepath);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     if (imgitem != nullptr)
     {
         if (imgitem->status() == ImgItem::Status::Queued)
         {
-            loadcontext_->loader->QueueItem(imgitem, TRUE);
+            loadcontext_->loader->QueueItem(imgitem, TRUE, loadcontext_->CurrentGeneration());
         }
 
         return imgitem;
@@ -815,10 +888,10 @@ std::shared_ptr<ImgItem> ImgBrowserCore::GetCurrentItem()
 
 void ImgBrowserCore::ReloadCurrentItem()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto filepath = files_.CurrentPath();
     const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : GetOrCreateCachedItem(filepath);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     if (imgitem != nullptr)
     {
         if (imgitem->status() != ImgItem::Status::Queued)
@@ -826,7 +899,7 @@ void ImgBrowserCore::ReloadCurrentItem()
             imgitem->Unload();
         }
 
-        loadcontext_->loader->QueueItem(imgitem, TRUE);
+        loadcontext_->loader->QueueItem(imgitem, TRUE, loadcontext_->CurrentGeneration());
     }
 }
 
@@ -837,9 +910,9 @@ BOOL ImgBrowserCore::PreloadTargetSize(INT targetwidth, INT targetheight)
         return FALSE;
     }
 
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto added = AddPreloadTargetSize(targetwidth, targetheight);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     if (added)
     {
         QueueTargetSizeAsync(targetwidth, targetheight, FALSE);
@@ -851,9 +924,9 @@ BOOL ImgBrowserCore::PreloadTargetSize(INT targetwidth, INT targetheight)
 BOOL ImgBrowserCore::PreloadTargetSizes(const std::vector<SIZE>& target_sizes)
 {
     std::vector<TargetSize> added_sizes;
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto added = AddPreloadTargetSizes(target_sizes, &added_sizes);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     if (added)
     {
         QueueTargetSizesAsync(added_sizes, FALSE);
@@ -865,14 +938,14 @@ BOOL ImgBrowserCore::PreloadTargetSizes(const std::vector<SIZE>& target_sizes)
 ImgBrowserStats ImgBrowserCore::GetStats()
 {
     ImgBrowserStats stats;
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     stats.found_images = files_.Size();
     stats.sequential = files_.GetSequentialProgress();
     stats.random = files_.GetRandomProgress();
     stats.targetwidth = targetwidth_;
     stats.targetheight = targetheight_;
     stats.sizes = loadcontext_->cache->GetSizeStats();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     stats.loader = loadcontext_->loader->GetStats();
 
     return stats;
@@ -880,49 +953,49 @@ ImgBrowserStats ImgBrowserCore::GetStats()
 
 ImgFileListProgress ImgBrowserCore::GetSequentialProgress(const std::wstring& filepath)
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto progress = files_.GetSequentialProgress(filepath);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return progress;
 }
 
 BOOL ImgBrowserCore::MoveToNext()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto moveSuccess = files_.MoveToNext();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return moveSuccess;
 }
 
 BOOL ImgBrowserCore::MoveToPrevious()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto moveSuccess = files_.MoveToPrevious();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return moveSuccess;
 }
 
 BOOL ImgBrowserCore::MoveToFirst()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto moveSuccess = files_.MoveToFirst();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return moveSuccess;
 }
 
 BOOL ImgBrowserCore::MoveToLast()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto moveSuccess = files_.MoveToLast();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return moveSuccess;
 }
 
 BOOL ImgBrowserCore::MoveToItem(const std::wstring& filepath)
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto moveSuccess = files_.MoveTo(filepath);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return moveSuccess;
 }
 
@@ -934,14 +1007,14 @@ BOOL ImgBrowserCore::MoveToOrAddItem(const std::wstring& filepath)
         return FALSE;
     }
 
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     if (files_.Add(filepath))
     {
         QueueFileForTargetSizes(filepath, imgformat, FALSE);
     }
 
     const auto moveSuccess = files_.MoveTo(filepath);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     if (moveSuccess)
     {
         NotifyChanged();
@@ -952,49 +1025,51 @@ BOOL ImgBrowserCore::MoveToOrAddItem(const std::wstring& filepath)
 
 void ImgBrowserCore::BeginRandomCycle()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     files_.BeginRandomCycle();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 }
 
-void ImgBrowserCore::PreloadFrom(ImgBrowserCore& source)
+std::size_t ImgBrowserCore::PreloadFrom(ImgBrowserCore& source)
 {
     if (this == &source)
     {
-        return;
+        return 0;
     }
 
-    EnterCriticalSection(&source.browsecriticalsection_);
+    EnterCriticalSection(source.browsecriticalsection_.get());
     auto paths = source.files_.PathsFromCurrent();
-    LeaveCriticalSection(&source.browsecriticalsection_);
+    LeaveCriticalSection(source.browsecriticalsection_.get());
 
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto targetwidth = targetwidth_;
     const auto targetheight = targetheight_;
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 
+    const auto path_count = paths.size();
     QueuePathsAsync(std::move(paths), targetwidth, targetheight);
+    return path_count;
 }
 
 BOOL ImgBrowserCore::MoveToRandom()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto moveSuccess = files_.MoveToRandom();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return moveSuccess;
 }
 
 BOOL ImgBrowserCore::MoveToRandomExcluding(const std::vector<std::wstring>& excluded)
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto moveSuccess = files_.MoveToRandomExcluding(excluded);
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     return moveSuccess;
 }
 
 void ImgBrowserCore::RemoveCurrentItem()
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto filepath = files_.CurrentPath();
     if (!filepath.empty())
     {
@@ -1002,14 +1077,14 @@ void ImgBrowserCore::RemoveCurrentItem()
         files_.RemoveCurrent();
     }
 
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 }
 
 void ImgBrowserCore::CollectSubFolders(const std::shared_ptr<CollectionRequest>& request)
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     const auto folders = folders_;
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
     for (const auto& folder : folders)
     {
         if (request->cancellation->Cancelled())
@@ -1019,9 +1094,9 @@ void ImgBrowserCore::CollectSubFolders(const std::shared_ptr<CollectionRequest>&
         CollectFolder(request, folder);
     }
 
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
     folders_.clear();
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 }
 
 std::shared_ptr<ImgItem> ImgBrowserCore::GetOrCreateCachedItem(const std::wstring& filepath)
@@ -1047,14 +1122,19 @@ std::shared_ptr<ImgItem> ImgBrowserCore::GetOrCreateCachedItem(const std::wstrin
     return imgitem;
 }
 
-void ImgBrowserCore::NotifyChanged()
+void ImgBrowserCore::NotifyChanged(ULONG generation)
 {
-    EnterCriticalSection(&browsecriticalsection_);
+    EnterCriticalSection(browsecriticalsection_.get());
+    if (generation == 0)
+    {
+        generation = static_cast<ULONG>(InterlockedCompareExchange(&generation_, 0, 0));
+    }
     if (notificationhwnd_ != nullptr && notificationmessage_ != 0)
     {
-        PostMessage(notificationhwnd_, notificationmessage_, 0, 0);
+        PostMessage(notificationhwnd_, notificationmessage_, generation,
+                    static_cast<LPARAM>(ImgNotificationKind::BrowserState));
     }
-    LeaveCriticalSection(&browsecriticalsection_);
+    LeaveCriticalSection(browsecriticalsection_.get());
 }
 
 DWORD WINAPI ImgBrowserCore::StaticThreadCollect(void* context)
@@ -1084,10 +1164,14 @@ DWORD WINAPI ImgBrowserCore::StaticThreadCollect(void* context)
     {
         InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(GetLastError()), ERROR_SUCCESS);
     }
-    EnterCriticalSection(&request->browser->browsecriticalsection_);
-    request->browser->collection_error_ = static_cast<DWORD>(request->enumeration_error);
-    LeaveCriticalSection(&request->browser->browsecriticalsection_);
-    request->browser->NotifyChanged();
+    EnterCriticalSection(request->browser->browsecriticalsection_.get());
+    if (request->generation ==
+        static_cast<ULONG>(InterlockedCompareExchange(&request->browser->generation_, 0, 0)))
+    {
+        request->browser->collection_error_ = static_cast<DWORD>(request->enumeration_error);
+    }
+    LeaveCriticalSection(request->browser->browsecriticalsection_.get());
+    request->browser->NotifyChanged(request->generation);
 
     return 0;
 }
@@ -1118,6 +1202,13 @@ DWORD WINAPI ImgBrowserCore::StaticThreadQueuePaths(void* pathqueuerequest)
 }
 
 ImgBrowser::ImgBrowser() : core_(std::make_shared<ImgBrowserCore>()) {}
+
+#if defined(IMGVW_TESTING)
+ImgBrowser::ImgBrowser(const std::shared_ptr<ImgBrowserTestHooks>& test_hooks)
+    : core_(std::make_shared<ImgBrowserCore>(test_hooks))
+{
+}
+#endif
 
 ImgBrowser::~ImgBrowser()
 {
@@ -1152,6 +1243,21 @@ BOOL ImgBrowser::BrowseSubFoldersAsync()
 BOOL ImgBrowser::IsCollectingComplete() const
 {
     return core_->IsCollectingComplete();
+}
+
+ULONG ImgBrowser::generation() const
+{
+    return core_->generation();
+}
+
+ULONG ImgBrowser::loadgeneration() const
+{
+    return core_->loadgeneration();
+}
+
+bool ImgBrowser::IsCurrentNotification(WPARAM generation, LPARAM kind) const
+{
+    return core_->IsCurrentNotification(generation, kind);
 }
 
 DWORD ImgBrowser::GetCollectionError()
@@ -1219,9 +1325,9 @@ void ImgBrowser::BeginRandomCycle()
     core_->BeginRandomCycle();
 }
 
-void ImgBrowser::PreloadFrom(ImgBrowser& source)
+std::size_t ImgBrowser::PreloadFrom(ImgBrowser& source)
 {
-    core_->PreloadFrom(*source.core_);
+    return core_->PreloadFrom(*source.core_);
 }
 
 BOOL ImgBrowser::MoveToRandom()

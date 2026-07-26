@@ -1,18 +1,23 @@
 #include "BrowsePath.h"
 #include "ColorProfile.h"
 #include "ColorTransform.h"
+#include "CompatibleDeviceContext.h"
 #include "CriticalSection.h"
 #include "FileOperations.h"
 #include "FindHandle.h"
+#include "GdiObject.h"
 #include "ImageFormatDetector.h"
 #include "ImageFormatResolver.h"
-#include "ImgResampler.h"
-#include "ImgFileList.h"
+#include "ImgBrowser.h"
 #include "ImgCache.h"
+#include "ImgFileList.h"
 #include "ImgGDIItem.h"
+#include "ImgItemHelper.h"
 #include "ImgJPEGDecoder.h"
-#include "ImgRenderer.h"
 #include "ImgLoader.h"
+#include "ImgRenderer.h"
+#include "ImgResampler.h"
+#include "SelectedGdiObject.h"
 #include "Win32Handle.h"
 
 #include <lcms2.h>
@@ -46,11 +51,11 @@ class BlockingImgItem final : public ImgItem
     }
     void Load() override
     {
-        status_ = Status::Loading;
+        SetStatus(Status::Loading);
         SetEvent(started_.get());
         WaitForSingleObject(release_.get(), INFINITE);
-        status_ = Status::Ready;
-        SetEvent(loadedevent_);
+        SetStatus(Status::Ready);
+        SetEvent(loadedevent_.get());
     }
     bool WaitUntilStarted(DWORD timeout_milliseconds = 2000) const
     {
@@ -116,6 +121,36 @@ void TestCriticalSectionOwnership()
     }
 
     Check(guarded_value == 1, "critical section lock guards a scope");
+}
+
+void TestGdiOwnership()
+{
+    CompatibleDeviceContext dc(CreateCompatibleDC(nullptr));
+    Check(dc.valid(), "compatible DC owner creates a memory DC");
+
+    const auto raw_dc = dc.get();
+    CompatibleDeviceContext moved_dc(std::move(dc));
+    Check(!dc.valid() && moved_dc.get() == raw_dc, "compatible DC move transfers ownership");
+
+    GdiObject<HBITMAP> bitmap(CreateCompatibleBitmap(moved_dc.get(), 2, 2));
+    Check(bitmap.valid(), "GDI object owner creates a bitmap");
+    const auto raw_bitmap = bitmap.get();
+    GdiObject<HBITMAP> moved_bitmap(std::move(bitmap));
+    Check(!bitmap.valid() && moved_bitmap.get() == raw_bitmap, "GDI object move transfers ownership");
+
+    const auto original_bitmap = GetCurrentObject(moved_dc.get(), OBJ_BITMAP);
+    {
+        SelectedGdiObject selection(moved_dc.get(), moved_bitmap.get());
+        Check(selection.valid(), "selected GDI object guard selects a bitmap");
+        Check(GetCurrentObject(moved_dc.get(), OBJ_BITMAP) == moved_bitmap.get(),
+              "selected GDI object guard exposes the selected bitmap");
+
+        SelectedGdiObject moved_selection(std::move(selection));
+        Check(!selection.valid() && moved_selection.valid(), "selected GDI object move transfers restoration");
+    }
+
+    Check(GetCurrentObject(moved_dc.get(), OBJ_BITMAP) == original_bitmap,
+          "selected GDI object guard restores the previous bitmap");
 }
 
 void TestBrowsePathClassification()
@@ -637,6 +672,286 @@ void TestLoaderDiscardsQueuedItemsForTargetSize()
     Check(loader.StopLoading(2000).Stopped(), "target discard loader stops after workers are released");
 }
 
+bool WaitForBrowserCollection(ImgBrowser& browser, DWORD timeout_milliseconds = 3000)
+{
+    const auto started = GetTickCount();
+    while (!browser.IsCollectingComplete() && GetTickCount() - started < timeout_milliseconds)
+    {
+        Sleep(1);
+    }
+    return browser.IsCollectingComplete() != FALSE;
+}
+
+bool WaitForCachedImages(const std::shared_ptr<ImgBrowserLoadContext>& context,
+                         const std::vector<std::wstring>& paths, INT targetwidth, INT targetheight,
+                         DWORD timeout_milliseconds = 5000)
+{
+    const auto started = GetTickCount();
+    for (const auto& path : paths)
+    {
+        std::shared_ptr<ImgItem> item;
+        while (item == nullptr && GetTickCount() - started < timeout_milliseconds)
+        {
+            item = context->cache->Get(path, targetwidth, targetheight);
+            if (item == nullptr)
+            {
+                Sleep(1);
+            }
+        }
+        if (item == nullptr)
+        {
+            return false;
+        }
+
+        const auto elapsed = GetTickCount() - started;
+        const auto remaining = elapsed < timeout_milliseconds ? timeout_milliseconds - elapsed : 0;
+        if (WaitForSingleObject(item->loadedevent(), remaining) != WAIT_OBJECT_0 ||
+            item->status() != ImgItem::Status::Ready)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+void DrainWindowMessage(HWND window, UINT message)
+{
+    MSG pending{};
+    while (PeekMessageW(&pending, window, message, message, PM_REMOVE))
+    {
+    }
+}
+
+bool WaitForWindowMessage(HWND window, UINT message, MSG* received_message = nullptr,
+                          DWORD timeout_milliseconds = 3000)
+{
+    const auto started = GetTickCount();
+    MSG pending{};
+    while (GetTickCount() - started < timeout_milliseconds)
+    {
+        if (PeekMessageW(&pending, window, message, message, PM_REMOVE))
+        {
+            if (received_message != nullptr)
+            {
+                *received_message = pending;
+            }
+            return true;
+        }
+        Sleep(1);
+    }
+    return false;
+}
+
+void TestBrowserNotificationGenerations()
+{
+    const auto suffix = std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount());
+    const auto folder = TempPath((L"ImgVwGeneration-" + suffix).c_str());
+    Check(CreateDirectoryW(folder.c_str(), nullptr) != FALSE, "generation test folder is created");
+    const auto notification_window =
+        CreateWindowExW(0, L"STATIC", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, nullptr, nullptr);
+    Check(notification_window != nullptr, "generation test notification window is created");
+
+    ImgBrowser browser;
+    browser.SetNotificationWindow(notification_window, WM_APP + 3);
+    const auto previous_generation = browser.generation();
+    Check(browser.BrowseAsync(folder, 640, 480), "generation test browsing starts");
+    Check(WaitForBrowserCollection(browser), "generation test collection completes");
+
+    MSG notification{};
+    Check(WaitForWindowMessage(notification_window, WM_APP + 3, &notification),
+          "collection publishes a generation-bearing notification");
+    Check(notification.wParam == browser.generation() &&
+              notification.lParam == static_cast<LPARAM>(ImgNotificationKind::BrowserState),
+          "collection notification carries the current browser generation");
+    Check(!browser.IsCurrentNotification(previous_generation,
+                                         static_cast<LPARAM>(ImgNotificationKind::BrowserState)),
+          "browser rejects a notification from the previous session");
+    ImgBrowser other_browser;
+    Check(other_browser.generation() != browser.generation() &&
+              other_browser.loadgeneration() != browser.loadgeneration(),
+          "browser and load generations are unique across browser instances");
+
+    DrainWindowMessage(notification_window, WM_APP + 3);
+    const auto load_generation = browser.loadgeneration();
+    auto active = std::make_shared<BlockingImgItem>(L"generation-active.png", 640, 480);
+    browser.loadcontext()->loader->QueueItem(active, FALSE, load_generation);
+    Check(active->WaitUntilStarted(), "generation test worker starts");
+    browser.loadcontext()->Clear();
+    Check(browser.loadgeneration() != load_generation, "clearing the load context advances its generation");
+    active->Release();
+    Check(WaitForWindowMessage(notification_window, WM_APP + 3, &notification),
+          "old worker completion publishes its original generation");
+    Check(notification.wParam == load_generation &&
+              notification.lParam == static_cast<LPARAM>(ImgNotificationKind::LoadComplete),
+          "worker completion retains the generation captured when queued");
+    Check(!browser.IsCurrentNotification(notification.wParam, notification.lParam),
+          "browser rejects a completion from the cleared load context");
+
+    DestroyWindow(notification_window);
+    RemoveDirectoryW(folder.c_str());
+}
+
+void TestRandomToSequentialMultiMonitorPreloadContextReuse()
+{
+    const auto suffix = std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount());
+    const auto source_folder = TempPath((L"ImgVwPreloadSource-" + suffix).c_str());
+    const auto target_folder = TempPath((L"ImgVwPreloadTarget-" + suffix).c_str());
+    Check(CreateDirectoryW(source_folder.c_str(), nullptr) != FALSE, "preload source folder is created");
+    Check(CreateDirectoryW(target_folder.c_str(), nullptr) != FALSE, "preload target folder is created");
+
+    const auto jpeg = CreateJpeg(false, false);
+    std::vector<std::wstring> paths;
+    for (int index = 0; index < 6; ++index)
+    {
+        const auto path = source_folder + L"\\image-" + std::to_wstring(index) + L".jpg";
+        WriteBytes(path, jpeg);
+        paths.push_back(path);
+    }
+
+    struct TargetSession
+    {
+        INT width{};
+        INT height{};
+        std::shared_ptr<ImgBrowserLoadContext> context;
+    };
+    std::vector<TargetSession> targets{{800, 600, {}}, {1280, 720, {}}};
+
+    {
+        ImgBrowser source;
+        Check(source.BrowseAsync(source_folder, 640, 480), "preload source browsing starts");
+        Check(WaitForBrowserCollection(source), "preload source collection completes");
+        Check(source.GetStats().found_images == paths.size(), "preload source exposes every image path");
+        source.BeginRandomCycle();
+        Check(source.MoveToRandom(), "random multi-monitor preload selects its first slide");
+
+        for (auto& target : targets)
+        {
+            Win32Handle entered(CreateEvent(nullptr, TRUE, FALSE, nullptr));
+            Win32Handle resume(CreateEvent(nullptr, TRUE, FALSE, nullptr));
+            Win32Handle resumed(CreateEvent(nullptr, TRUE, FALSE, nullptr));
+            const auto hooks = std::make_shared<ImgBrowserTestHooks>();
+            hooks->path_queue_entered = entered.get();
+            hooks->path_queue_continue = resume.get();
+            hooks->path_queue_resumed = resumed.get();
+
+            const auto notification_window =
+                CreateWindowExW(0, L"STATIC", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, nullptr, nullptr);
+            Check(notification_window != nullptr, "preload target notification window is created");
+
+            auto browser = std::make_unique<ImgBrowser>(hooks);
+            browser->SetNotificationWindow(notification_window, WM_APP + 1);
+            Check(browser->BrowseAsync(target_folder, target.width, target.height),
+                  "preload target browsing starts");
+            Check(WaitForBrowserCollection(*browser), "preload target collection completes");
+            browser->PreloadFrom(source);
+            Check(WaitForSingleObject(entered.get(), 3000) == WAIT_OBJECT_0,
+                  "background path preloading reaches the deterministic pause");
+
+            target.context = browser->loadcontext();
+            browser.reset();
+            Check(WaitForSingleObject(resumed.get(), 0) == WAIT_OBJECT_0,
+                  "destroying a target browser cancels and joins its paused path queue");
+            Check(target.context->loader->GetStats().notifications == 0,
+                  "destroyed target browser removes its loader notification");
+            DestroyWindow(notification_window);
+        }
+
+        source.MoveToLast();
+        Check(source.MoveToFirst(), "sequential multi-monitor preload selects its first slide after the mode switch");
+
+        for (auto& target : targets)
+        {
+            const auto notification_window =
+                CreateWindowExW(0, L"STATIC", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, nullptr, nullptr);
+            Check(notification_window != nullptr, "replacement target notification window is created");
+
+            {
+                ImgBrowser replacement;
+                replacement.ShareLoadContext(target.context);
+                replacement.SetNotificationWindow(notification_window, WM_APP + 2);
+                Check(target.context->loader->GetStats().notifications == 1,
+                      "reused load context retains the replacement browser notification");
+                Check(replacement.BrowseAsync(target_folder, target.width, target.height),
+                      "replacement target browsing starts");
+                Check(WaitForBrowserCollection(replacement), "replacement target collection completes");
+                DrainWindowMessage(notification_window, WM_APP + 2);
+
+                auto active_first =
+                    std::make_shared<BlockingImgItem>(L"secondary-active-first.png", target.width, target.height);
+                auto active_second =
+                    std::make_shared<BlockingImgItem>(L"secondary-active-second.png", target.width, target.height);
+                target.context->loader->QueueItem(active_first);
+                target.context->loader->QueueItem(active_second);
+                Check(active_first->WaitUntilStarted() && active_second->WaitUntilStarted(),
+                      "secondary preload test occupies every loader slot");
+
+                replacement.PreloadFrom(source);
+                Check(WaitForWindowMessage(notification_window, WM_APP + 2),
+                      "secondary preload queue publishes a browser notification");
+                Check(target.context->loader->GetStats().queued > 0,
+                      "secondary preload queue is observable while loader slots are occupied");
+                active_first->Release();
+                active_second->Release();
+                Check(WaitForCachedImages(target.context, paths, target.width, target.height),
+                      "replacement target preloads every image into the reused context");
+            }
+
+            Check(target.context->loader->GetStats().notifications == 0,
+                  "replacement browser removes its notification at teardown");
+            DestroyWindow(notification_window);
+        }
+    }
+
+    for (const auto& path : paths)
+    {
+        DeleteFileW(path.c_str());
+    }
+    RemoveDirectoryW(source_folder.c_str());
+    RemoveDirectoryW(target_folder.c_str());
+}
+
+void TestMultiMonitorPreloadResynchronizesNewSourcePaths()
+{
+    const auto suffix = std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount());
+    const auto source_folder = TempPath((L"ImgVwGrowingPreloadSource-" + suffix).c_str());
+    const auto target_folder = TempPath((L"ImgVwGrowingPreloadTarget-" + suffix).c_str());
+    Check(CreateDirectoryW(source_folder.c_str(), nullptr) != FALSE, "growing preload source folder is created");
+    Check(CreateDirectoryW(target_folder.c_str(), nullptr) != FALSE, "growing preload target folder is created");
+
+    const auto jpeg = CreateJpeg(false, false);
+    std::vector<std::wstring> paths;
+    for (int index = 0; index < 2; ++index)
+    {
+        const auto path = source_folder + L"\\image-" + std::to_wstring(index) + L".jpg";
+        WriteBytes(path, jpeg);
+        paths.push_back(path);
+    }
+
+    ImgBrowser source;
+    ImgBrowser target;
+    Check(source.BrowseAsync(source_folder, 640, 480), "growing preload source browsing starts");
+    Check(target.BrowseAsync(target_folder, 1280, 720), "growing preload target browsing starts");
+    Check(WaitForBrowserCollection(source) && WaitForBrowserCollection(target),
+          "growing preload browser collections complete");
+    Check(target.PreloadFrom(source) == paths.size(), "initial preload reports every collected source path");
+    Check(WaitForCachedImages(target.loadcontext(), paths, 1280, 720), "initial preload caches every source path");
+
+    const auto added_path = source_folder + L"\\image-2.jpg";
+    WriteBytes(added_path, jpeg);
+    paths.push_back(added_path);
+    Check(source.MoveToOrAddItem(added_path), "source accepts a path discovered after initial preload");
+    Check(target.PreloadFrom(source) == paths.size(), "resynchronized preload observes the expanded source");
+    Check(WaitForCachedImages(target.loadcontext(), paths, 1280, 720),
+          "resynchronized preload caches the newly discovered path");
+
+    for (const auto& path : paths)
+    {
+        DeleteFileW(path.c_str());
+    }
+    RemoveDirectoryW(source_folder.c_str());
+    RemoveDirectoryW(target_folder.c_str());
+}
+
 void TestImageFormatDetectorSignatures()
 {
     const unsigned char jpeg[] = {0xFF, 0xD8, 0xFF, 0xE0};
@@ -714,21 +1029,28 @@ void TestGdiItemPreservesTopRowOrientation()
     item.Load();
     Check(item.status() == ImgItem::Status::Ready, "GDI item loads orientation test BMP");
 
-    if (item.status() == ImgItem::Status::Ready)
+    const auto display_state = item.GetDisplayState();
+    Check(display_state.status == ImgItem::Status::Ready && display_state.frame != nullptr,
+          "GDI item publishes a complete display frame");
+    if (display_state.frame != nullptr)
     {
-        const auto bitmap = item.GetDisplayBitmap();
-        const auto dc = CreateCompatibleDC(nullptr);
-        Check(dc != nullptr, "orientation test memory DC is created");
-        if (dc != nullptr)
+        Check(display_state.frame->width() == 1 && display_state.frame->height() == 2 &&
+                  display_state.frame->offsetx() == 0 && display_state.frame->offsety() == 0,
+              "published display frame contains coherent geometry");
+        item.Unload();
+        Check(item.status() == ImgItem::Status::Queued && item.GetDisplayState().frame == nullptr,
+              "unloading removes the published frame");
+
+        const auto bitmap = display_state.frame->GetBitmap();
+        CompatibleDeviceContext dc(CreateCompatibleDC(nullptr));
+        Check(dc.valid(), "orientation test memory DC is created");
+        if (dc.valid())
         {
-            const auto oldbitmap = SelectObject(dc, bitmap.bitmap());
-            Check(GetPixel(dc, 0, 0) == RGB(255, 0, 0), "GDI item top row remains the image top row");
-            if (oldbitmap != nullptr && oldbitmap != HGDI_ERROR)
-            {
-                SelectObject(dc, oldbitmap);
-            }
-            DeleteDC(dc);
+            SelectedGdiObject selected_bitmap(dc.get(), bitmap.bitmap());
+            Check(selected_bitmap.valid(), "orientation test bitmap is selected");
+            Check(GetPixel(dc.get(), 0, 0) == RGB(255, 0, 0), "GDI item top row remains the image top row");
         }
+        Check(display_state.frame->buffersize() > 0, "captured display frame remains valid after unload");
     }
 
     if (gdiplus_token != 0)
@@ -798,7 +1120,7 @@ void TestRendererInputValidation()
 
 void TestRendererDrawsImageAndBackground()
 {
-    const auto targetdc = CreateCompatibleDC(nullptr);
+    CompatibleDeviceContext targetdc(CreateCompatibleDC(nullptr));
     BITMAPINFO bitmapinfo{};
     bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bitmapinfo.bmiHeader.biWidth = 3;
@@ -808,47 +1130,49 @@ void TestRendererDrawsImageAndBackground()
     bitmapinfo.bmiHeader.biCompression = BI_RGB;
 
     void* targetbits = nullptr;
-    const auto targetbitmap = CreateDIBSection(targetdc, &bitmapinfo, DIB_RGB_COLORS, &targetbits, nullptr, 0);
-    const auto oldtarget = targetbitmap == nullptr ? nullptr : SelectObject(targetdc, targetbitmap);
+    GdiObject<HBITMAP> targetbitmap(
+        CreateDIBSection(targetdc.get(), &bitmapinfo, DIB_RGB_COLORS, &targetbits, nullptr, 0));
+    SelectedGdiObject selected_target(targetdc.get(), targetbitmap.get());
 
     bitmapinfo.bmiHeader.biWidth = 1;
     bitmapinfo.bmiHeader.biHeight = -1;
     void* sourcebits = nullptr;
-    const auto sourcebitmap = CreateDIBSection(targetdc, &bitmapinfo, DIB_RGB_COLORS, &sourcebits, nullptr, 0);
-    const auto background = CreateSolidBrush(RGB(0, 0, 0));
+    GdiObject<HBITMAP> sourcebitmap(
+        CreateDIBSection(targetdc.get(), &bitmapinfo, DIB_RGB_COLORS, &sourcebits, nullptr, 0));
+    GdiObject<HBRUSH> background(CreateSolidBrush(RGB(0, 0, 0)));
 
-    Check(targetdc != nullptr && targetbitmap != nullptr && sourcebitmap != nullptr && background != nullptr,
+    Check(targetdc.valid() && targetbitmap.valid() && selected_target.valid() && sourcebitmap.valid() &&
+              background.valid(),
           "renderer test GDI resources are created");
-    if (targetdc != nullptr && targetbitmap != nullptr && sourcebitmap != nullptr && background != nullptr)
+    if (targetdc.valid() && targetbitmap.valid() && selected_target.valid() && sourcebitmap.valid() &&
+        background.valid())
     {
         *static_cast<DWORD*>(sourcebits) = 0x00FFFFFF;
-        const ImgRenderInput input{targetdc, background, {0, 0, 3, 3}, sourcebitmap, 1, 1, 1, 1};
+        Check(IntersectClipRect(targetdc.get(), 0, 0, 2, 2) != RGN_ERROR,
+              "renderer test establishes a caller clip");
+        const ImgRenderInput input{
+            targetdc.get(), background.get(), {0, 0, 3, 3}, sourcebitmap.get(), 1, 1, 1, 1};
         const auto result = ImgRenderer().Render(input);
 
         Check(result.Succeeded(), "renderer draws valid input");
-        Check(GetPixel(targetdc, 1, 1) == RGB(255, 255, 255), "renderer copies the image bitmap");
-        Check(GetPixel(targetdc, 0, 0) == RGB(0, 0, 0), "renderer fills outside the image");
+        RECT clipbox{};
+        const RECT expectedclipbox{0, 0, 2, 2};
+        Check(GetClipBox(targetdc.get(), &clipbox) != ERROR && EqualRect(&clipbox, &expectedclipbox),
+              "renderer preserves the caller clip");
+        Check(GetPixel(targetdc.get(), 1, 1) == RGB(255, 255, 255), "renderer copies the image bitmap");
+        Check(GetPixel(targetdc.get(), 0, 0) == RGB(0, 0, 0), "renderer fills outside the image");
     }
 
-    if (oldtarget != nullptr && oldtarget != HGDI_ERROR)
+    ImgRenderInput invalid_bitmap_input{
+        targetdc.get(), background.get(), {0, 0, 3, 3}, reinterpret_cast<HBITMAP>(static_cast<ULONG_PTR>(1)),
+        1,              1,                1,            1};
+    const auto invalid_bitmap_result = ImgRenderer().Render(invalid_bitmap_input);
+    Check(invalid_bitmap_result.status == ImgRenderStatus::SelectBitmapFailed,
+          "renderer reports bitmap selection failure");
+    if (invalid_bitmap_result.win32_error != ERROR_SUCCESS)
     {
-        SelectObject(targetdc, oldtarget);
-    }
-    if (background != nullptr)
-    {
-        DeleteObject(background);
-    }
-    if (sourcebitmap != nullptr)
-    {
-        DeleteObject(sourcebitmap);
-    }
-    if (targetbitmap != nullptr)
-    {
-        DeleteObject(targetbitmap);
-    }
-    if (targetdc != nullptr)
-    {
-        DeleteDC(targetdc);
+        Check(invalid_bitmap_result.win32_error == ERROR_INVALID_HANDLE,
+              "renderer retains the native bitmap selection error");
     }
 }
 
@@ -938,6 +1262,23 @@ void TestImgResamplerValidatesInput()
           "area resampler rejects a short source stride");
 }
 
+void TestDisplaySizeCalculation()
+{
+    INT width{};
+    INT height{};
+    Check(ImgItemHelper::CalculateDisplaySize(4000, 2000, 1000, 1000, &width, &height) && width == 1000 &&
+              height == 500,
+          "display size fits a landscape image");
+    Check(ImgItemHelper::CalculateDisplaySize(2000, 4000, 1000, 1000, &width, &height) && width == 500 &&
+              height == 1000,
+          "display size fits a portrait image");
+    Check(ImgItemHelper::CalculateDisplaySize(320, 200, 1000, 1000, &width, &height) && width == 320 &&
+              height == 200,
+          "display size does not upscale");
+    Check(!ImgItemHelper::CalculateDisplaySize(0, 200, 1000, 1000, &width, &height),
+          "display size rejects invalid source dimensions");
+}
+
 void TestBundledCmykProfile()
 {
     std::ifstream stream("resources/color/CGATS21_CRPC5.icc", std::ios::binary | std::ios::ate);
@@ -1023,6 +1364,7 @@ int main()
     TestWin32HandleOwnership();
     TestFindHandleOwnership();
     TestCriticalSectionOwnership();
+    TestGdiOwnership();
     TestBrowsePathClassification();
     TestEmptyList();
     TestOrderedNavigation();
@@ -1044,6 +1386,9 @@ int main()
     TestLoaderActiveWorkerTimeout();
     TestLoaderDiscardsQueuedItems();
     TestLoaderDiscardsQueuedItemsForTargetSize();
+    TestBrowserNotificationGenerations();
+    TestRandomToSequentialMultiMonitorPreloadContextReuse();
+    TestMultiMonitorPreloadResynchronizesNewSourcePaths();
     TestImageFormatDetectorSignatures();
     TestImageFormatResolverUsesSupportedExtensionsOnly();
     TestGdiItemPreservesTopRowOrientation();
@@ -1058,6 +1403,7 @@ int main()
     TestImgResamplerAreaDownscale();
     TestImgResamplerPremultipliesAlpha();
     TestImgResamplerValidatesInput();
+    TestDisplaySizeCalculation();
     TestBundledCmykProfile();
 
     if (failures != 0)

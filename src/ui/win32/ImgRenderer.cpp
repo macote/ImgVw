@@ -1,5 +1,8 @@
 #include "ImgRenderer.h"
 
+#include "CompatibleDeviceContext.h"
+#include "SelectedGdiObject.h"
+
 namespace
 {
 ImgRenderResult Failure(ImgRenderStatus status)
@@ -33,19 +36,24 @@ ImgRenderResult ImgRenderer::Render(const ImgRenderInput& input) const
     }
 
     ClearLastError();
-    const auto memorydc = CreateCompatibleDC(input.target_dc);
-    if (memorydc == nullptr)
+    CompatibleDeviceContext memorydc(CreateCompatibleDC(input.target_dc));
+    if (!memorydc.valid())
     {
         return Failure(ImgRenderStatus::CreateMemoryDcFailed);
     }
 
     ClearLastError();
-    const auto replacedobject = SelectObject(memorydc, input.bitmap);
-    if (replacedobject == nullptr || replacedobject == HGDI_ERROR)
+    SelectedGdiObject selectedbitmap(memorydc.get(), input.bitmap);
+    if (!selectedbitmap.valid())
     {
-        const auto result = Failure(ImgRenderStatus::SelectBitmapFailed);
-        DeleteDC(memorydc);
-        return result;
+        return Failure(ImgRenderStatus::SelectBitmapFailed);
+    }
+
+    ClearLastError();
+    const auto backgroundsavedstate = SaveDC(input.target_dc);
+    if (backgroundsavedstate == 0)
+    {
+        return Failure(ImgRenderStatus::SaveDcFailed);
     }
 
     ImgRenderResult result{ImgRenderStatus::Succeeded, ERROR_SUCCESS};
@@ -63,29 +71,41 @@ ImgRenderResult ImgRenderer::Render(const ImgRenderInput& input) const
         {
             result = Failure(ImgRenderStatus::FillBackgroundFailed);
         }
+    }
 
+    ClearLastError();
+    if (!RestoreDC(input.target_dc, backgroundsavedstate))
+    {
+        result = Failure(ImgRenderStatus::RestoreDcFailed);
+    }
+    else if (result.Succeeded())
+    {
         ClearLastError();
-        if (SelectClipRgn(input.target_dc, nullptr) == RGN_ERROR)
+        const auto bitmapsavedstate = SaveDC(input.target_dc);
+        if (bitmapsavedstate == 0)
         {
-            result = Failure(ImgRenderStatus::ResetClipFailed);
+            result = Failure(ImgRenderStatus::SaveDcFailed);
         }
-        else if (result.Succeeded())
+        else
         {
             ClearLastError();
             if (!ExcludeProtectedRectangle(input.target_dc, input))
             {
                 result = Failure(ImgRenderStatus::ExcludeClipFailed);
             }
-            else if (!BitBlt(input.target_dc, input.x, input.y, input.width, input.height, memorydc, 0, 0, SRCCOPY))
+            else if (!BitBlt(input.target_dc, input.x, input.y, input.width, input.height, memorydc.get(), 0, 0,
+                             SRCCOPY))
             {
                 result = Failure(ImgRenderStatus::CopyBitmapFailed);
             }
 
-            SelectClipRgn(input.target_dc, nullptr);
+            ClearLastError();
+            if (!RestoreDC(input.target_dc, bitmapsavedstate))
+            {
+                result = Failure(ImgRenderStatus::RestoreDcFailed);
+            }
         }
     }
 
-    SelectObject(memorydc, replacedobject);
-    DeleteDC(memorydc);
     return result;
 }

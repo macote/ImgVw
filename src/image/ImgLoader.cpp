@@ -14,13 +14,23 @@ struct ImgLoaderNotification
     UINT message{};
 };
 
+struct ImgLoader::QueuedItem
+{
+    std::shared_ptr<ImgItem> imgitem;
+    ULONG generation{};
+};
+
 struct ImgLoader::State
 {
     struct LoaderItem
     {
-        explicit LoaderItem(std::shared_ptr<ImgItem> item) : imgitem(std::move(item)) {}
+        LoaderItem(std::shared_ptr<ImgItem> item, ULONG item_generation)
+            : imgitem(std::move(item)), generation(item_generation)
+        {
+        }
 
         std::shared_ptr<ImgItem> imgitem;
+        ULONG generation{};
         Win32Handle thread;
     };
 
@@ -70,7 +80,7 @@ struct ImgLoader::State
     Win32Handle workevent;
     Win32Handle cancelevent;
     CountingSemaphore loadersemaphore;
-    std::list<std::shared_ptr<ImgItem>> queue;
+    std::list<QueuedItem> queue;
     std::set<ImgItem*> pendingitems;
     std::list<std::shared_ptr<LoaderItem>> loaderitems;
     BOOL preferredtargetsizeset{FALSE};
@@ -201,9 +211,10 @@ DWORD ImgLoader::Loop(const std::shared_ptr<State>& state)
             break;
         }
 
-        auto imgitem = GetNextItem(state);
-        if (imgitem != nullptr)
+        auto queueditem = GetNextItem(state);
+        if (queueditem.imgitem != nullptr)
         {
+            const auto& imgitem = queueditem.imgitem;
             if (imgitem->status() == ImgItem::Status::Queued)
             {
                 const auto semaphore_wait = state->loadersemaphore.Wait(state->cancelevent.get());
@@ -213,7 +224,7 @@ DWORD ImgLoader::Loop(const std::shared_ptr<State>& state)
                 }
                 if (semaphore_wait == CountingSemaphoreWaitStatus::Failed)
                 {
-                    CompleteItem(state, imgitem, FALSE);
+                    CompleteItem(state, imgitem, queueditem.generation, FALSE);
                     break;
                 }
                 if (WaitForSingleObject(state->cancelevent.get(), 0) == WAIT_OBJECT_0)
@@ -222,13 +233,13 @@ DWORD ImgLoader::Loop(const std::shared_ptr<State>& state)
                     break;
                 }
 
-                auto loaderitem = std::make_shared<State::LoaderItem>(imgitem);
+                auto loaderitem = std::make_shared<State::LoaderItem>(imgitem, queueditem.generation);
                 const auto context = new State::WorkerContext{state, loaderitem};
                 loaderitem->thread.reset(CreateThread(nullptr, 0, StaticThreadLoad, context, 0, nullptr));
                 if (!loaderitem->thread.valid())
                 {
                     delete context;
-                    CompleteItem(state, imgitem, TRUE);
+                    CompleteItem(state, imgitem, queueditem.generation, TRUE);
                 }
                 else
                 {
@@ -238,7 +249,7 @@ DWORD ImgLoader::Loop(const std::shared_ptr<State>& state)
             }
             else
             {
-                CompleteItem(state, imgitem, FALSE);
+                CompleteItem(state, imgitem, queueditem.generation, FALSE);
             }
         }
 
@@ -275,7 +286,7 @@ void ImgLoader::CleanupItemThreadObjects(const std::shared_ptr<State>& state)
     }
 }
 
-void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext)
+void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext, ULONG generation)
 {
     if (imgitem == nullptr || !start_result_.Started() || imgitem->status() != ImgItem::Status::Queued)
     {
@@ -294,7 +305,7 @@ void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext
             {
                 const auto queueditem =
                     std::find_if(state_->queue.begin(), state_->queue.end(),
-                                 [&imgitem](const auto& item) { return item.get() == imgitem.get(); });
+                                 [&imgitem](const auto& item) { return item.imgitem.get() == imgitem.get(); });
                 if (queueditem != state_->queue.end() && queueditem != state_->queue.begin())
                 {
                     state_->queue.splice(state_->queue.begin(), state_->queue, queueditem);
@@ -306,21 +317,21 @@ void ImgLoader::QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext
         state_->pendingitems.insert(imgitem.get());
         if (loadnext)
         {
-            state_->queue.push_front(imgitem);
+            state_->queue.push_front({imgitem, generation});
         }
         else if (state_->preferredtargetsizeset && imgitem->targetwidth() == state_->preferredtargetwidth &&
                  imgitem->targetheight() == state_->preferredtargetheight)
         {
             const auto staleitem =
                 std::find_if(state_->queue.begin(), state_->queue.end(), [&state = state_](const auto& item) {
-                    return item->targetwidth() != state->preferredtargetwidth ||
-                           item->targetheight() != state->preferredtargetheight;
+                    return item.imgitem->targetwidth() != state->preferredtargetwidth ||
+                           item.imgitem->targetheight() != state->preferredtargetheight;
                 });
-            state_->queue.insert(staleitem, imgitem);
+            state_->queue.insert(staleitem, {imgitem, generation});
         }
         else
         {
-            state_->queue.push_back(imgitem);
+            state_->queue.push_back({imgitem, generation});
         }
     }
 
@@ -339,11 +350,11 @@ void ImgLoader::PrioritizeTargetSize(INT targetwidth, INT targetheight)
     state_->preferredtargetwidth = targetwidth;
     state_->preferredtargetheight = targetheight;
 
-    std::list<std::shared_ptr<ImgItem>> prioritized;
+    std::list<QueuedItem> prioritized;
     auto item = state_->queue.begin();
     while (item != state_->queue.end())
     {
-        if ((*item)->targetwidth() == targetwidth && (*item)->targetheight() == targetheight)
+        if (item->imgitem->targetwidth() == targetwidth && item->imgitem->targetheight() == targetheight)
         {
             prioritized.splice(prioritized.end(), state_->queue, item++);
         }
@@ -400,9 +411,9 @@ void ImgLoader::DiscardQueuedItems()
     }
 
     CriticalSectionLock lock(state_->queuecriticalsection);
-    for (const auto& imgitem : state_->queue)
+    for (const auto& item : state_->queue)
     {
-        state_->pendingitems.erase(imgitem.get());
+        state_->pendingitems.erase(item.imgitem.get());
     }
     state_->queue.clear();
     ResetEvent(state_->workevent.get());
@@ -419,9 +430,9 @@ void ImgLoader::DiscardQueuedItemsForTargetSize(INT targetwidth, INT targetheigh
     auto item = state_->queue.begin();
     while (item != state_->queue.end())
     {
-        if ((*item)->targetwidth() == targetwidth && (*item)->targetheight() == targetheight)
+        if (item->imgitem->targetwidth() == targetwidth && item->imgitem->targetheight() == targetheight)
         {
-            state_->pendingitems.erase(item->get());
+            state_->pendingitems.erase(item->imgitem.get());
             item = state_->queue.erase(item);
         }
         else
@@ -447,6 +458,7 @@ ImgLoaderStats ImgLoader::GetStats()
 
     CriticalSectionLock lock(state_->queuecriticalsection);
     stats.queued = state_->queue.size();
+    stats.notifications = state_->notifications.size();
     for (const auto& loaderitem : state_->loaderitems)
     {
         const auto status = loaderitem->imgitem->status();
@@ -459,13 +471,13 @@ ImgLoaderStats ImgLoader::GetStats()
     return stats;
 }
 
-std::shared_ptr<ImgItem> ImgLoader::GetNextItem(const std::shared_ptr<State>& state)
+ImgLoader::QueuedItem ImgLoader::GetNextItem(const std::shared_ptr<State>& state)
 {
-    std::shared_ptr<ImgItem> imgitem;
+    QueuedItem item;
     CriticalSectionLock lock(state->queuecriticalsection);
     if (!state->queue.empty())
     {
-        imgitem = state->queue.front();
+        item = state->queue.front();
         state->queue.pop_front();
     }
     else
@@ -473,11 +485,11 @@ std::shared_ptr<ImgItem> ImgLoader::GetNextItem(const std::shared_ptr<State>& st
         ResetEvent(state->workevent.get());
     }
 
-    return imgitem;
+    return item;
 }
 
 void ImgLoader::CompleteItem(const std::shared_ptr<State>& state, const std::shared_ptr<ImgItem>& imgitem,
-                             BOOL notifysemaphore)
+                             ULONG generation, BOOL notifysemaphore)
 {
     {
         CriticalSectionLock lock(state->queuecriticalsection);
@@ -489,10 +501,10 @@ void ImgLoader::CompleteItem(const std::shared_ptr<State>& state, const std::sha
         state->loadersemaphore.Notify();
     }
 
-    NotifyLoadComplete(state);
+    NotifyLoadComplete(state, generation);
 }
 
-void ImgLoader::NotifyLoadComplete(const std::shared_ptr<State>& state)
+void ImgLoader::NotifyLoadComplete(const std::shared_ptr<State>& state, ULONG generation)
 {
     std::vector<ImgLoaderNotification> notifications;
     {
@@ -504,7 +516,8 @@ void ImgLoader::NotifyLoadComplete(const std::shared_ptr<State>& state)
     {
         if (notification.hwnd != nullptr && notification.message != 0)
         {
-            PostMessage(notification.hwnd, notification.message, 0, 0);
+            PostMessage(notification.hwnd, notification.message, generation,
+                        static_cast<LPARAM>(ImgNotificationKind::LoadComplete));
         }
     }
 }
@@ -526,6 +539,6 @@ DWORD WINAPI ImgLoader::StaticThreadLoad(void* context)
     const auto state = worker_context->state;
     const auto loaderitem = worker_context->loaderitem;
     loaderitem->imgitem->Load();
-    CompleteItem(state, loaderitem->imgitem, TRUE);
+    CompleteItem(state, loaderitem->imgitem, loaderitem->generation, TRUE);
     return 0;
 }

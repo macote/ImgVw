@@ -10,16 +10,19 @@ EXE = ImgVw.exe
 WINDRES = windres
 
 arch ?= x86
+config ?= debug
 BINDIR = bin/${arch}
-OBJDIR = obj/${arch}
+OBJARCHDIR = obj/${arch}
+OBJDIR = ${OBJARCHDIR}/${config}
 SOURCE_DIRS = src/app src/browse src/image src/platform/win32 src/ui/win32
 
 vpath %.cpp ${SOURCE_DIRS}
 vpath %.rc resources
 
 OBJECTS = ${OBJDIR}/BrowsePath.o ${OBJDIR}/ColorProfile.o ${OBJDIR}/ColorTransform.o ${OBJDIR}/ExifOrientation.o ${OBJDIR}/FileOperations.o ${OBJDIR}/ImageDispatcher.o ${OBJDIR}/ImageFormatDetector.o ${OBJDIR}/ImageFormatResolver.o ${OBJDIR}/ImageHeaderProbe.o ${OBJDIR}/ImgResampler.o ${OBJDIR}/ImgFileList.o ${OBJDIR}/ImgRenderer.o ${OBJDIR}/ImgBrowser.o ${OBJDIR}/ImgBuffer.o ${OBJDIR}/ImgGDIItem.o ${OBJDIR}/ImgHEIFItem.o ${OBJDIR}/ImgItem.o ${OBJDIR}/ImgItemHelper.o ${OBJDIR}/ImgJPEGDecoder.o ${OBJDIR}/ImgJPEGItem.o ${OBJDIR}/ImgLoader.o ${OBJDIR}/ImgVwWindow.o ${OBJDIR}/PathPicker.o ${OBJDIR}/ProcessDpiAwareness.o ${OBJDIR}/Program.o ${OBJDIR}/Window.o ${OBJDIR}/ImgVw.o
+DEPENDENCIES = ${OBJECTS:.o=.d}
 
-CFLAGS = -std=c++17 -I. -Isrc/app -Isrc/browse -Isrc/image -Isrc/platform/win32 -Isrc/ui/win32 -Iresources -isystem 3rd-party/libjpeg-turbo -isystem 3rd-party/Little-CMS -isystem 3rd-party/libheif -isystem 3rd-party/libde265 -DWINVER=0x0501 -D_WIN32_WINNT=0x0501 -DUNICODE -D_UNICODE -DLIBHEIF_STATIC_BUILD -DLIBDE265_STATIC_BUILD -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -O2 ${WARNS} -fmessage-length=0 -fasynchronous-unwind-tables
+CFLAGS = -std=c++17 -I. -Isrc/app -Isrc/browse -Isrc/image -Isrc/platform/win32 -Isrc/ui/win32 -Iresources -isystem 3rd-party/libjpeg-turbo -isystem 3rd-party/Little-CMS -isystem 3rd-party/libheif -isystem 3rd-party/libde265 -DWINVER=0x0501 -D_WIN32_WINNT=0x0501 -DUNICODE -D_UNICODE -DLIBHEIF_STATIC_BUILD -DLIBDE265_STATIC_BUILD -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -O2 ${WARNS} -fmessage-length=0 -fasynchronous-unwind-tables -MMD -MP
 
 ifeq (${DUMPMACHINE},x86_64-w64-mingw32)
 	CFLAGS := -m64 ${CFLAGS}
@@ -41,7 +44,7 @@ else
 endif
 
     
-.PHONY: all clean test
+.PHONY: all clean force test
 
 all: ${BINDIR}/${EXE}
 
@@ -51,10 +54,10 @@ test:
 clean:
 ifneq (${SYS},)
 	@if [ -d "${BINDIR}" ]; then rm -r "${BINDIR}"; fi
-	@if [ -d "${OBJDIR}" ]; then rm -r "${OBJDIR}"; fi
+	@if [ -d "${OBJARCHDIR}" ]; then rm -r "${OBJARCHDIR}"; fi
 else
 	@if exist ${BINDIR}\* del /f /s /q ${BINDIR} 1>nul & rd /s /q ${BINDIR}
-	@if exist ${OBJDIR}\* del /f /s /q ${OBJDIR} 1>nul & rd /s /q ${OBJDIR}
+	@if exist ${OBJARCHDIR}\* del /f /s /q ${OBJARCHDIR} 1>nul & rd /s /q ${OBJARCHDIR}
 endif
 
 ${BINDIR} ${OBJDIR}:
@@ -70,5 +73,9 @@ ${OBJDIR}/ImgVw.o: ImgVw.rc | ${OBJDIR}
 ${OBJDIR}/%.o: %.cpp | ${OBJDIR}
 	${CC} ${CFLAGS} -c "$<" -o "$@"
 
-${BINDIR}/${EXE}: ${OBJECTS} | ${BINDIR}
+${BINDIR}/${EXE}: ${OBJECTS} force | ${BINDIR}
 	${CC} ${LDFLAGS} ${LDPATHS} -o "$@" ${OBJECTS} ${LDLIBS}
+
+force:
+
+-include ${DEPENDENCIES}

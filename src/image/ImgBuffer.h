@@ -1,7 +1,8 @@
 #pragma once
 
-#include "ImgSettings.h"
 #include "FileMapView.h"
+#include "ImgSettings.h"
+#include "Win32Handle.h"
 #include <Windows.h>
 #include <string>
 #include <iomanip>
@@ -35,8 +36,7 @@ class ImgBuffer
             buffersize_ = other.buffersize_;
             other.buffersize_ = 0;
             tempfilename_ = std::move(other.tempfilename_);
-            tempfile_ = other.tempfile_;
-            other.tempfile_ = INVALID_HANDLE_VALUE;
+            tempfile_ = std::move(other.tempfile_);
         }
 
         return *this;
@@ -67,8 +67,7 @@ class ImgBuffer
     PBYTE buffer_{nullptr};
     DWORD buffersize_{};
     std::wstring tempfilename_;
-    HANDLE heap_{INVALID_HANDLE_VALUE};
-    HANDLE tempfile_{INVALID_HANDLE_VALUE};
+    Win32Handle tempfile_;
 
   private:
     void CreateTempFile();

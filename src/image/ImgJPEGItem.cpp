@@ -66,7 +66,7 @@ void ImgJPEGItem::UpdateDecodeProgress(int percent, void* context)
 
 void ImgJPEGItem::Load()
 {
-    status_ = Status::Loading;
+    SetStatus(Status::Loading);
     ResetLoadingProgress();
     PBYTE buffer{nullptr};
 
@@ -75,7 +75,7 @@ void ImgJPEGItem::Load()
         FileMapView jpegfilemap(filepath_, FileMapView::Mode::Read);
         if (jpegfilemap.filesize().HighPart > 0)
         {
-            status_ = Status::Error;
+            SetError();
             goto done;
         }
 
@@ -89,7 +89,7 @@ void ImgJPEGItem::Load()
         if (!decoder.Initialize(jpegfilemap.data(), jpegfilemap.filesize().LowPart))
         {
             errorstring_ = decoder.error();
-            status_ = Status::Error;
+            SetError();
             goto done;
         }
 
@@ -153,7 +153,7 @@ void ImgJPEGItem::Load()
         if (!decoder.ConfigureOutput(scalingfactor.numerator, scalingfactor.denominator, decoder.is_cmyk()))
         {
             errorstring_ = decoder.error();
-            status_ = Status::Error;
+            SetError();
             goto done;
         }
 
@@ -165,14 +165,14 @@ void ImgJPEGItem::Load()
         if (buffer == nullptr)
         {
             errorstring_ = "Could not allocate JPEG output buffer.";
-            status_ = Status::Error;
+            SetError();
             goto done;
         }
 
         if (!decoder.Decode(buffer, stride, true, showprogress ? UpdateDecodeProgress : nullptr, this))
         {
             errorstring_ = decoder.error();
-            status_ = Status::Error;
+            SetError();
             goto done;
         }
 
@@ -181,7 +181,7 @@ void ImgJPEGItem::Load()
             const auto newstride = PaddedStride(decompresswidth, 3);
             if (!TranformCMYK8ColorsToBGR8(decompresswidth, decompressheight, stride, newstride, &buffer))
             {
-                status_ = Status::Error;
+                SetError();
                 goto done;
             }
 
@@ -190,27 +190,26 @@ void ImgJPEGItem::Load()
 
         if (resize)
         {
-            displaybuffer_ = ImgItemHelper::ResizeAndRotate24bppRGBImage(decompresswidth, decompressheight, buffer,
-                                                                         targetwidth, targetheight, rotateflip);
+            pending_displaybuffer_ = ImgItemHelper::ResizeAndRotate24bppRGBImage(
+                decompresswidth, decompressheight, buffer, targetwidth, targetheight, rotateflip);
         }
         else if (rotateflip != Gdiplus::RotateNoneFlipNone)
         {
-            displaybuffer_ = ImgItemHelper::Rotate24bppRGBImage(decompresswidth, decompressheight, buffer, rotateflip);
+            pending_displaybuffer_ =
+                ImgItemHelper::Rotate24bppRGBImage(decompresswidth, decompressheight, buffer, rotateflip);
         }
         else
         {
-            displaybuffer_.WriteData(decompresswidth, decompressheight, stride, buffer);
+            pending_displaybuffer_.WriteData(decompresswidth, decompressheight, stride, buffer);
         }
     }
     catch (...)
     {
-        status_ = Status::Error;
+        SetError();
         goto done;
     }
 
     SetupDisplayParameters();
-    status_ = Status::Ready;
-
 done:
     if (buffer != nullptr)
     {
@@ -218,5 +217,5 @@ done:
     }
 
     CloseICCProfile();
-    SetEvent(loadedevent_);
+    SetEvent(loadedevent_.get());
 }

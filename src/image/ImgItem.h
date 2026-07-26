@@ -1,14 +1,17 @@
 #pragma once
 
 #include "ColorProfile.h"
+#include "CriticalSection.h"
 #include "ImgBitmap.h"
 #include "ImgBuffer.h"
 #include "ImgSettings.h"
 #include "FileMapView.h"
+#include "Win32Handle.h"
 #include <Windows.h>
 #include <Shlwapi.h>
 #include <string>
 #include <iomanip>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 
@@ -42,22 +45,58 @@ class ImgItem
         BundledFallback
     };
 
+    class DisplayFrame final
+    {
+      public:
+        DisplayFrame(ImgBuffer buffer, INT targetwidth, INT targetheight, BOOL topdownbitmap);
+        DisplayFrame(const DisplayFrame&) = delete;
+        DisplayFrame& operator=(const DisplayFrame&) = delete;
+        INT width() const
+        {
+            return buffer_.width();
+        }
+        INT height() const
+        {
+            return buffer_.height();
+        }
+        INT offsetx() const
+        {
+            return offsetx_;
+        }
+        INT offsety() const
+        {
+            return offsety_;
+        }
+        DWORD buffersize() const
+        {
+            return buffer_.buffersize();
+        }
+        ImgBitmap GetBitmap() const;
+
+      private:
+        ImgBuffer buffer_;
+        BITMAPINFO bitmapinfo_{};
+        INT offsetx_{};
+        INT offsety_{};
+    };
+
+    struct DisplayState
+    {
+        Status status{Status::Queued};
+        std::shared_ptr<const DisplayFrame> frame;
+        std::wstring errormessage;
+    };
+
   public:
     ImgItem(std::wstring filepath, INT targetwidth, INT targetheight)
-        : filepath_(filepath), targetwidth_(targetwidth), targetheight_(targetheight)
+        : filepath_(filepath), targetwidth_(targetwidth), targetheight_(targetheight),
+          loadedevent_(CreateEvent(nullptr, TRUE, FALSE, nullptr))
     {
-        loadedevent_ = CreateEvent(NULL, TRUE, FALSE, NULL);
         heap_ = GetProcessHeap();
     }
     virtual ~ImgItem()
     {
-        if (pbitmapinfo_ != nullptr)
-        {
-            HeapFree(heap_, 0, pbitmapinfo_);
-        }
-
         CloseICCProfile();
-        CloseHandle(loadedevent_);
     }
     ImgItem(const ImgItem&) = delete;
     ImgItem& operator=(const ImgItem&) = delete;
@@ -65,7 +104,7 @@ class ImgItem
     virtual void Unload();
     Status status() const
     {
-        return status_;
+        return GetDisplayState().status;
     }
     BOOL iccprofileloadfailed() const
     {
@@ -73,23 +112,27 @@ class ImgItem
     }
     std::wstring errormessage() const
     {
-        return errormessage_;
+        return GetDisplayState().errormessage;
     }
     INT displaywidth() const
     {
-        return displaybuffer_.width();
+        const auto state = GetDisplayState();
+        return state.frame == nullptr ? 0 : state.frame->width();
     }
     INT displayheight() const
     {
-        return displaybuffer_.height();
+        const auto state = GetDisplayState();
+        return state.frame == nullptr ? 0 : state.frame->height();
     }
     INT offsetx() const
     {
-        return offsetx_;
+        const auto state = GetDisplayState();
+        return state.frame == nullptr ? 0 : state.frame->offsetx();
     }
     INT offsety() const
     {
-        return offsety_;
+        const auto state = GetDisplayState();
+        return state.frame == nullptr ? 0 : state.frame->offsety();
     }
     INT targetwidth() const
     {
@@ -101,7 +144,8 @@ class ImgItem
     }
     DWORD displaybuffersize() const
     {
-        return displaybuffer_.buffersize();
+        const auto state = GetDisplayState();
+        return state.frame == nullptr ? 0 : state.frame->buffersize();
     }
     INT loadingprogresspercent() const
     {
@@ -130,8 +174,9 @@ class ImgItem
     }
     HANDLE loadedevent() const
     {
-        return loadedevent_;
+        return loadedevent_.get();
     }
+    DisplayState GetDisplayState() const;
     ImgBitmap GetDisplayBitmap() const;
     static void LoadDefaultICCProfile();
     static void UnloadDefaultICCProfile();
@@ -148,13 +193,9 @@ class ImgItem
     INT targetheight_;
     INT width_{};
     INT height_{};
-    INT offsetx_{};
-    INT offsety_{};
-    ImgBuffer displaybuffer_;
-    Status status_{Status::Queued};
+    ImgBuffer pending_displaybuffer_;
     volatile LONG loadingprogresspercent_{-1};
-    std::wstring errormessage_;
-    HANDLE loadedevent_{NULL};
+    Win32Handle loadedevent_;
     HANDLE heap_{INVALID_HANDLE_VALUE};
 
   protected:
@@ -163,6 +204,8 @@ class ImgItem
         SetupDisplayParameters(FALSE);
     }
     void SetupDisplayParameters(BOOL topdownbitmap);
+    void SetStatus(Status status);
+    void SetError(std::wstring errormessage = {});
     void OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabytecount);
     BOOL IsICCProfileLoaded() const
     {
@@ -178,20 +221,13 @@ class ImgItem
   private:
     static ColorProfile DefaultICCProfile;
     static CmykProfileSource DefaultICCProfileSource;
-    static CRITICAL_SECTION DefaultICCProfileCriticalSection;
-    static struct DefaultICCProfileCriticalSectionInitializer
-    {
-        DefaultICCProfileCriticalSectionInitializer()
-        {
-            if (!InitializeCriticalSectionAndSpinCount(&DefaultICCProfileCriticalSection, 0x00000400))
-            {
-                // TODO: handle error
-            }
-        }
-    } defaultICCProfileCriticalSectionInitializer;
+    static CriticalSection DefaultICCProfileCriticalSection;
 
   private:
-    PBITMAPINFO pbitmapinfo_{nullptr};
+    mutable CriticalSection displaystatecriticalsection_;
+    Status status_{Status::Queued};
+    std::shared_ptr<const DisplayFrame> displayframe_;
+    std::wstring errormessage_;
     ColorProfile iccprofile_;
     BOOL iccprofileloadfailed_{};
     CmykProfileSource cmykprofilesource_{CmykProfileSource::None};

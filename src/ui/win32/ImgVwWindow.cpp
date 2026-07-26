@@ -1062,7 +1062,8 @@ void ImgVwWindow::FinishWindowDrag()
 
 bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
 {
-    if (item->status() != ImgItem::Status::Ready)
+    const auto displaystate = item->GetDisplayState();
+    if (displaystate.status != ImgItem::Status::Ready || displaystate.frame == nullptr)
     {
         return false;
     }
@@ -1073,15 +1074,15 @@ bool ImgVwWindow::DisplayImage(HDC dc, const ImgItem* item)
         return false;
     }
 
-    const auto imgbitmap = item->GetDisplayBitmap();
+    const auto imgbitmap = displaystate.frame->GetBitmap();
     const ImgRenderInput input{dc,
                                backgroundbrush_,
                                windowrectangle,
                                imgbitmap.bitmap(),
-                               item->offsetx(),
-                               item->offsety(),
-                               item->displaywidth(),
-                               item->displayheight(),
+                               displaystate.frame->offsetx(),
+                               displaystate.frame->offsety(),
+                               displaystate.frame->width(),
+                               displaystate.frame->height(),
                                IsInfoOverlayVisible() && !IsRectEmpty(&loaderstatsoverlayrect_),
                                loaderstatsoverlayrect_};
     return image_renderer_.Render(input).Succeeded();
@@ -1657,14 +1658,16 @@ void ImgVwWindow::DrawTextOverlay(HDC dc, const RECT& overlayrect, const std::ws
         DeleteObject(fallback_background);
     }
 
-    if (item != nullptr && item->status() == ImgItem::Status::Ready)
+    const auto displaystate = item == nullptr ? ImgItem::DisplayState{} : item->GetDisplayState();
+    if (displaystate.status == ImgItem::Status::Ready && displaystate.frame != nullptr)
     {
-        RECT imagerect{item->offsetx(), item->offsety(), item->offsetx() + item->displaywidth(),
-                       item->offsety() + item->displayheight()};
+        RECT imagerect{displaystate.frame->offsetx(), displaystate.frame->offsety(),
+                       displaystate.frame->offsetx() + displaystate.frame->width(),
+                       displaystate.frame->offsety() + displaystate.frame->height()};
         RECT intersection{};
         if (IntersectRect(&intersection, &overlayrect, &imagerect))
         {
-            const auto imgbitmap = item->GetDisplayBitmap();
+            const auto imgbitmap = displaystate.frame->GetBitmap();
             const auto sourcedc = CreateCompatibleDC(dc);
             if (sourcedc != nullptr)
             {
@@ -2011,20 +2014,7 @@ void ImgVwWindow::StartMultiMonitorSlideShow(BOOL slideshowrandom)
         ReleaseCapture();
     }
 
-    std::vector<std::shared_ptr<ImgBrowserLoadContext>> preloadedcontexts;
-    for (const auto window : slideshowwindows_)
-    {
-        if (window != nullptr)
-        {
-            window->UpdateInfoOverlayForWindow();
-            const auto context = window->browser_.loadcontext();
-            if (std::find(preloadedcontexts.begin(), preloadedcontexts.end(), context) == preloadedcontexts.end())
-            {
-                window->browser_.PreloadFrom(browser_);
-                preloadedcontexts.push_back(context);
-            }
-        }
-    }
+    multimonitorslideshowpreloadcount_ = PreloadMultiMonitorSlideShowContexts();
 
     for (std::size_t index = 0; index < MultiMonitorSlideShowWindowCount(); ++index)
     {
@@ -2055,6 +2045,7 @@ void ImgVwWindow::StopMultiMonitorSlideShow()
 
     multimonitorslideshowrunning_ = FALSE;
     multimonitorslideshowindex_ = 0;
+    multimonitorslideshowpreloadcount_ = 0;
     multimonitorslideshowcursorpath_.clear();
     StopSlideShow();
     DestroySlideShowWindows();
@@ -2085,6 +2076,34 @@ void ImgVwWindow::HandleMultiMonitorSlideShow()
     }
 
     RestartMultiMonitorSlideShowTimer();
+}
+
+std::size_t ImgVwWindow::PreloadMultiMonitorSlideShowContexts()
+{
+    std::vector<std::shared_ptr<ImgBrowserLoadContext>> preloadedcontexts;
+    std::size_t preloadedpathcount{};
+    bool firstcontext = true;
+    for (const auto window : slideshowwindows_)
+    {
+        if (window == nullptr)
+        {
+            continue;
+        }
+
+        window->UpdateInfoOverlayForWindow();
+        const auto context = window->browser_.loadcontext();
+        if (std::find(preloadedcontexts.begin(), preloadedcontexts.end(), context) != preloadedcontexts.end())
+        {
+            continue;
+        }
+
+        const auto contextpathcount = window->browser_.PreloadFrom(browser_);
+        preloadedpathcount = firstcontext ? contextpathcount : (std::min)(preloadedpathcount, contextpathcount);
+        firstcontext = false;
+        preloadedcontexts.push_back(context);
+    }
+
+    return preloadedpathcount;
 }
 
 ImgVwWindow* ImgVwWindow::MultiMonitorSlideShowWindowAt(std::size_t index)
@@ -2431,6 +2450,14 @@ void ImgVwWindow::HandleBrowserChanged()
         browseuistate_ = BrowseUiState::Viewing;
     }
     HandleStartupExitConditions();
+    if (owner_ == nullptr && multimonitorslideshowrunning_ && browser_.IsCollectingComplete())
+    {
+        const auto foundimages = browser_.GetStats().found_images;
+        if (foundimages > multimonitorslideshowpreloadcount_)
+        {
+            multimonitorslideshowpreloadcount_ = PreloadMultiMonitorSlideShowContexts();
+        }
+    }
     UpdateLoadingProgressOverlayTimer();
 
     if (slideshowwaitingforimage_)
@@ -2728,6 +2755,10 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg)
     {
     case kBrowserChangedMessage:
+        if (!browser_.IsCurrentNotification(wParam, lParam))
+        {
+            return 0;
+        }
         HandleBrowserChanged();
         return 0;
     case WM_ACTIVATE:
