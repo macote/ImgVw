@@ -860,6 +860,17 @@ BOOL ImgVwWindow::UpdateClientSize(INT width, INT height)
         return FALSE;
     }
 
+    if (clientwidth_ > 0 && clientheight_ > 0)
+    {
+        RememberTargetLoadContext(clientwidth_, clientheight_, browser_.loadcontext());
+    }
+
+    const auto target_context = FindTargetLoadContext(width, height);
+    if (target_context != nullptr && target_context != browser_.loadcontext())
+    {
+        browser_.ShareLoadContext(target_context);
+    }
+
     clientwidth_ = width;
     clientheight_ = height;
     const auto restorepath = paintedslidepath_.empty() ? displayslidepath_ : paintedslidepath_;
