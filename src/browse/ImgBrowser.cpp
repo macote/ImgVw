@@ -2,7 +2,7 @@
 #include "BrowsePath.h"
 #include "CriticalSection.h"
 #include "FindHandle.h"
-#include "ImageFormatResolver.h"
+#include "ImgFormatResolver.h"
 #include "Win32Handle.h"
 
 #include <algorithm>
@@ -293,7 +293,7 @@ void ImgBrowserCore::CollectFolder(const std::shared_ptr<CollectionRequest>& req
 
 ImgItem::Format ImgBrowserCore::ResolveFileFormat(const std::wstring& filepath)
 {
-    return ImageFormatResolver::Resolve(filepath);
+    return ImgFormatResolver::Resolve(filepath);
 }
 
 ImgBrowserStartResult ImgBrowserCore::StartBrowseAsync(const std::wstring& path, INT targetwidth, INT targetheight,

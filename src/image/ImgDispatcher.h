@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-class ImageDispatcher
+class ImgDispatcher
 {
   public:
     static std::shared_ptr<ImgItem> Create(const std::wstring& filepath, INT targetwidth, INT targetheight,

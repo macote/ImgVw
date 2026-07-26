@@ -2,13 +2,15 @@
 
 ## Status
 
+**Active.**
+
 The CMYK JPEG foundation is complete: the application extracts JPEG ICC data, uses the bundled CMYK fallback when
 needed, owns profiles through `ColorProfile`, performs the reversed-CMYK-to-BGR transform through `ColorTransform`,
 and covers the fallback profile and transform in native tests. RGB and grayscale JPEG ICC transforms, native PNG
 decoding, and consistent HEIF color handling are not implemented.
 
-This plan supersedes the remaining implementation work in `color_management_support_plan.md`; that document remains
-the detailed product and fixture reference.
+This plan supersedes the remaining implementation work in `archive/color_management_support_plan.md`; that document
+remains the detailed product and fixture reference.
 
 ## Scope
 

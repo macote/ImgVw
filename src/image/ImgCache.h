@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CriticalSection.h"
-#include "ImageDispatcher.h"
+#include "ImgDispatcher.h"
 #include <Windows.h>
 #include <algorithm>
 #include <cstddef>
@@ -82,7 +82,7 @@ inline std::shared_ptr<ImgItem> ImgCache::Add(std::wstring filepath, INT targetw
         return existing->second;
     }
 
-    const auto imgitem = ImageDispatcher::Create(filepath, targetwidth, targetheight, imgformat);
+        const auto imgitem = ImgDispatcher::Create(filepath, targetwidth, targetheight, imgformat);
     map_.emplace(std::make_pair(key, imgitem));
     return imgitem;
 }

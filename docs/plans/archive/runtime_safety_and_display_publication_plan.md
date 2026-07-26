@@ -2,17 +2,20 @@
 
 ## Status
 
+**Completed on 2026-07-26.**
+
 All three phases are implemented. Loader and collector state remains alive across bounded shutdown, Win32 resources
 use move-only ownership wrappers, and paint consumes a reference-counted immutable display frame published atomically
 with the ready state. Fit calculations are shared across JPEG, HEIF, and GDI-backed loading, and rendering preserves
 the caller's DC state. Process-unique browser and load-context generations allow the UI to reject late notifications,
 including after a context reset or window-handle reuse.
 
-Remaining work is the broader error-result and static-analysis pass, release validation, and the separate modularity
-plan.
+Broader error-result, static-analysis, and modularity work remains tracked in
+`imgvw_modularity_and_testability_refactor_plan.md`.
 
-This plan supersedes the remaining implementation items in `imgvw_stability_refactor_plan.md` and
-`windowing_display_improvement_plan.md`. Keep those documents as design history and acceptance-detail references.
+This plan supersedes the remaining implementation items in `archive/imgvw_stability_refactor_plan.md` and
+`archive/windowing_display_improvement_plan.md`. Those documents remain design-history and acceptance-detail
+references.
 
 ## Phase 1: Prove and Stabilize Loader Lifetime
 
@@ -45,7 +48,24 @@ This plan supersedes the remaining implementation items in `imgvw_stability_refa
 
 - [x] Add deterministic seams for idle double-stop, queued cancellation, active-worker cancellation, collection stop,
   timeout handling, and stale-notification suppression.
-- Add renderer tests for failed DC/bitmap selection where a seam is practical.
-- Manually close, resize, replace, and move the viewer between monitors while large files are loading.
+- [x] Decide whether a practical seam can cover failed renderer DC/bitmap selection; add the tests or record why the
+  seam would add more complexity than value.
+- [x] Manually close, resize, replace, and move the viewer between monitors while large files are loading, then record
+  the result.
 - [x] Run x86/x64 MSYS tests and release builds. Loader timeout tests retain reachable worker state, and paint reads only
   immutable completed display data.
+
+## Closeout Evidence
+
+The renderer keeps real-GDI tests for invalid input, successful drawing, caller-clip preservation, bitmap-selection
+failure, and compatible-DC creation failure. A complete injected GDI call table was rejected: it would add eight
+replaceable Win32 operations to production-facing test structure and would primarily test mock sequencing. An attempted
+invalid-brush `FillRect` case also proved non-deterministic because GDI accepted the pseudo-handle on the tested system.
+The remaining `SaveDC`, clip, restore, fill, and blit failures therefore retain defensive result paths without a broad
+injection seam.
+
+The loading smoke test used the x86 release build and the 345,978,692-byte panorama JPEG plus the 130,640,186-byte HEIC
+fixture. On a three-monitor desktop, the window was resized, given a replacement path through `WM_DROPFILES`, moved
+from the 1920x1200 primary display to 1920x1200 and 1440x900 secondary displays, captured directly in its stable loading
+state, and closed while decode work was active. Every window operation succeeded; the process exited normally with
+code 0 within the bounded wait, with no forced termination, partial frame, stale image, or crash.

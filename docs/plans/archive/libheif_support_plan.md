@@ -429,7 +429,7 @@ Do not add `.avif` in this change because the dependency build intentionally has
 Update `ImgItemFactory::Create()` to instantiate `ImgHEIFItem`.
 
 Content-based detection and decoder rerouting are owned by
-`artifacts/content_based_image_dispatch_plan.md`. HEIF integration must consume that dispatcher rather than adding a
+`content_based_image_dispatch_plan.md`. HEIF integration must consume that dispatcher rather than adding a
 HEIF-specific header exception. `ImgHEIFItem` remains responsible for full validation after a file is routed to it.
 
 ## Project and Build Integration
@@ -575,7 +575,7 @@ The release verification matrix must include:
 3. Complete the Windows XP import/runtime compatibility gate.
 4. Vendor only verified headers, archives, notices, and version markers.
 5. Add HEIF extension fallback mapping and `ImgHEIFItem` project wiring; integrate with the general content-based
-   dispatcher defined in `artifacts/content_based_image_dispatch_plan.md`.
+   dispatcher defined in `content_based_image_dispatch_plan.md`.
 6. Implement process-wide libheif initialization and RAII wrappers.
 7. Implement primary-image decode with container transformations and security limits.
 8. Implement checked RGB/RGBA-to-bottom-up-BGR24 conversion and resizing.

@@ -1,4 +1,4 @@
-#include "ImageFormatDetector.h"
+#include "ImgFormatDetector.h"
 
 #include <cstring>
 
@@ -58,7 +58,7 @@ bool HasHeifBrand(const BYTE* bytes, std::size_t byte_count)
 }
 } // namespace
 
-DetectedImageFormat ImageFormatDetector::Detect(const BYTE* bytes, std::size_t byte_count)
+DetectedImageFormat ImgFormatDetector::Detect(const BYTE* bytes, std::size_t byte_count)
 {
     if (bytes == nullptr || byte_count == 0)
     {
@@ -114,7 +114,7 @@ DetectedImageFormat ImageFormatDetector::Detect(const BYTE* bytes, std::size_t b
     return DetectedImageFormat::Unknown;
 }
 
-ImgItem::Format ImageFormatDetector::ToImgItemFormat(DetectedImageFormat format)
+ImgItem::Format ImgFormatDetector::ToImgItemFormat(DetectedImageFormat format)
 {
     switch (format)
     {

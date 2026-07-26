@@ -1,5 +1,11 @@
 # ImgVw Windowing and Display Improvement Plan
 
+## Status
+
+**Archived on 2026-07-26.** The viewport, immutable-publication, notification-lifetime, and renderer ownership work is
+implemented and summarized by `runtime_safety_and_display_publication_plan.md`. Remaining `ImgVwWindow` decomposition
+is tracked by `../imgvw_modularity_and_testability_refactor_plan.md`.
+
 ## Summary
 
 ImgVw's current Win32 display path is intentionally small: `ImgVwWindow` owns window messages, browser commands,
@@ -159,7 +165,7 @@ Move toward separate concepts:
 3. Carry enough detail in browser/loader notifications for the UI to ignore stale completions if the current item has
    changed.
 4. Clear or disable notification targets before window destruction.
-5. Coordinate this work with `artifacts/imgvw_stability_refactor_plan.md`, especially loader shutdown ownership.
+5. Coordinate this work with `imgvw_stability_refactor_plan.md`, especially loader shutdown ownership.
 
 ### Acceptance Criteria
 
@@ -212,7 +218,7 @@ Manual display checks should include:
 
 ## Relationship To Other Plans
 
-- This plan complements `artifacts/imgvw_stability_refactor_plan.md`.
+- This plan complements `imgvw_stability_refactor_plan.md`.
 - The stability plan should own thread lifetime and general Win32 RAII work.
 - This plan should own viewport, paint, renderer, and display-state behavior.
 - If the two plans conflict, prefer the stability plan for shutdown ownership and this plan for presentation semantics.

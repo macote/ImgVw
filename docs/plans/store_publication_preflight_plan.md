@@ -2,12 +2,14 @@
 
 ## Status
 
+**Active; requires external release and Partner Center work.**
+
 The Store product identity, Windows 10 1809 minimum, packaging script, manifest, x86/x64 packages, bundle, hashes,
 listing draft, and initial visual assets are present. Publication, Partner Center validation, release-specific LGPL
 materials, screenshots, public support/privacy pages, and certification remain external or unverified.
 
-This plan replaces the remaining delivery work in `microsoft_store_publication_plan.md`; that document is retained as
-the long-form packaging and policy record.
+This plan replaces the remaining delivery work in `archive/microsoft_store_publication_plan.md`; that document is
+retained as the long-form packaging and policy record.
 
 ## Release-Ready Inputs
 

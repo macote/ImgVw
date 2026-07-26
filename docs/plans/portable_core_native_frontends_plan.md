@@ -2,6 +2,12 @@
 
 Date: 2026-06-21
 
+## Status
+
+**Pending; not started.** The proposed portable-core directories, interfaces, non-Windows build targets, and native
+frontends do not exist yet. Start only after the active Win32 modularity work has produced stable core boundaries and
+the current image pipeline plans have settled.
+
 ## Goal
 
 Evolve ImgVw into a cross-platform application with:
@@ -100,7 +106,7 @@ src/
     ImageBuffer.*
     ImageFrame.*
     ImageLoader.*
-    ImageFormatDetector.*
+    ImgFormatDetector.*
     ImageItemFactory.*
     ImageTransform.*
     ColorTransform.*
@@ -454,7 +460,7 @@ Refactor `ImgJPEGItem` to:
 
 ### PNG
 
-Implement `artifacts/libpng_support_plan.md`. Native libpng support is a prerequisite for Linux parity because PNG
+Implement `libpng_support_plan.md`. Native libpng support is a prerequisite for Linux parity because PNG
 currently routes through GDI+.
 
 ### HEIF

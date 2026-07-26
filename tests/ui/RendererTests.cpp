@@ -60,6 +60,13 @@ void TestRendererDrawsImageAndBackground()
               "renderer preserves the caller clip");
         Check(GetPixel(targetdc.get(), 1, 1) == RGB(255, 255, 255), "renderer copies the image bitmap");
         Check(GetPixel(targetdc.get(), 0, 0) == RGB(0, 0, 0), "renderer fills outside the image");
+
+        ImgRenderInput invalid_target_dc_input{
+            reinterpret_cast<HDC>(static_cast<ULONG_PTR>(1)), background.get(), {0, 0, 3, 3}, sourcebitmap.get(),
+            1,                                                1,                1,            1};
+        const auto invalid_target_dc_result = ImgRenderer().Render(invalid_target_dc_input);
+        Check(invalid_target_dc_result.status == ImgRenderStatus::CreateMemoryDcFailed,
+              "renderer reports compatible DC creation failure");
     }
 
     ImgRenderInput invalid_bitmap_input{

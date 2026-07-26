@@ -1,8 +1,13 @@
 # ImgVw Stability and Ownership Refactor Plan
 
+## Status
+
+**Archived on 2026-07-26.** Its safety implementation is complete and summarized by
+`runtime_safety_and_display_publication_plan.md`.
+
 ## Summary
 
-This plan supersedes the forward-looking parts of `artifacts/imgvw_architecture_refactor_plan.md`. The broad folder
+This plan supersedes the forward-looking parts of `imgvw_architecture_refactor_plan.md`. The broad folder
 reorganization, formatting setup, first test target, renderer result object, file operation result object, and initial
 async image loading fixes are already in place. The remaining work should focus on correctness, lifetime safety, and
 test coverage rather than another large architecture reshuffle.
@@ -173,4 +178,3 @@ Avoid large mechanical churn until shutdown and ownership risks are under contro
 - Raw handles are reduced in the highest-risk paths without broad formatting churn.
 - Existing Visual Studio and MSYS build entrypoints remain in sync.
 - Tests cover the behavior that motivated each safety change.
-

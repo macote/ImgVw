@@ -7,7 +7,7 @@ currently supported image format. Route recognized image content to the correct 
 extension is wrong or belongs to another supported format.
 
 This plan owns general format detection and rerouting. Format-specific plans, including
-`artifacts/libheif_support_plan.md`, should register their decoder with this dispatcher instead of adding local
+`libheif_support_plan.md`, should register their decoder with this dispatcher instead of adding local
 extension exceptions.
 
 ## Confirmed Cases
@@ -61,11 +61,11 @@ choices.
 
 Add three explicit layers:
 
-1. `ImageFormatDetector`
+1. `ImgFormatDetector`
    - Pure classification of a `(bytes, byte_count)` prefix.
    - No filesystem access and no decoder construction.
    - Returns `DetectedImageFormat` plus a confidence/result state such as `Recognized`, `Unknown`, or `NeedMoreData`.
-2. `ImageHeaderProbe`
+2. `ImgHeaderProbe`
    - Win32 file wrapper that opens a path and reads at most the configured prefix size.
    - Returns bytes and a status without throwing through folder collection.
 3. `ImgItemDispatcher`

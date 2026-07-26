@@ -1,5 +1,5 @@
-#include "ImageFormatDetector.h"
-#include "ImageFormatResolver.h"
+#include "ImgFormatDetector.h"
+#include "ImgFormatResolver.h"
 #include "ImgItemHelper.h"
 #include "ImgResampler.h"
 #include "../support/TempFile.h"
@@ -14,32 +14,32 @@ namespace
 void TestImageFormatDetectorSignatures()
 {
     const unsigned char jpeg[] = {0xFF, 0xD8, 0xFF, 0xE0};
-    Check(ImageFormatDetector::Detect(jpeg, sizeof(jpeg)) == DetectedImageFormat::JPEG, "JPEG signature is detected");
+    Check(ImgFormatDetector::Detect(jpeg, sizeof(jpeg)) == DetectedImageFormat::JPEG, "JPEG signature is detected");
 
     const unsigned char png[] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
-    Check(ImageFormatDetector::Detect(png, sizeof(png)) == DetectedImageFormat::PNG, "PNG signature is detected");
+    Check(ImgFormatDetector::Detect(png, sizeof(png)) == DetectedImageFormat::PNG, "PNG signature is detected");
 
     const unsigned char gif[] = {'G', 'I', 'F', '8', '9', 'a'};
-    Check(ImageFormatDetector::Detect(gif, sizeof(gif)) == DetectedImageFormat::GIF, "GIF signature is detected");
+    Check(ImgFormatDetector::Detect(gif, sizeof(gif)) == DetectedImageFormat::GIF, "GIF signature is detected");
 
     const unsigned char bmp[] = {'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    Check(ImageFormatDetector::Detect(bmp, sizeof(bmp)) == DetectedImageFormat::BMP, "BMP signature is detected");
+    Check(ImgFormatDetector::Detect(bmp, sizeof(bmp)) == DetectedImageFormat::BMP, "BMP signature is detected");
 
     const unsigned char tiff[] = {'I', 'I', 0x2A, 0x00};
-    Check(ImageFormatDetector::Detect(tiff, sizeof(tiff)) == DetectedImageFormat::TIFF, "TIFF signature is detected");
+    Check(ImgFormatDetector::Detect(tiff, sizeof(tiff)) == DetectedImageFormat::TIFF, "TIFF signature is detected");
 
     const unsigned char ico[] = {0, 0, 1, 0, 1, 0};
-    Check(ImageFormatDetector::Detect(ico, sizeof(ico)) == DetectedImageFormat::ICO, "ICO header is detected");
+    Check(ImgFormatDetector::Detect(ico, sizeof(ico)) == DetectedImageFormat::ICO, "ICO header is detected");
 
     const unsigned char heif[] = {0, 0, 0, 24, 'f', 't', 'y', 'p', 'h', 'e', 'i', 'c', 0, 0, 0, 0, 'm', 'i', 'f', '1'};
-    Check(ImageFormatDetector::Detect(heif, sizeof(heif)) == DetectedImageFormat::HEIF, "HEIF brand is detected");
+    Check(ImgFormatDetector::Detect(heif, sizeof(heif)) == DetectedImageFormat::HEIF, "HEIF brand is detected");
 
     const unsigned char mp4[] = {0, 0, 0, 24, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0, 0, 0, 0, 'm', 'p', '4', '2'};
-    Check(ImageFormatDetector::Detect(mp4, sizeof(mp4)) == DetectedImageFormat::Unknown,
+    Check(ImgFormatDetector::Detect(mp4, sizeof(mp4)) == DetectedImageFormat::Unknown,
           "generic MP4 is not detected as HEIF");
 
     const unsigned char short_png[] = {0x89, 'P', 'N'};
-    Check(ImageFormatDetector::Detect(short_png, sizeof(short_png)) == DetectedImageFormat::Unknown,
+    Check(ImgFormatDetector::Detect(short_png, sizeof(short_png)) == DetectedImageFormat::Unknown,
           "truncated signatures are unknown");
 }
 
@@ -55,13 +55,13 @@ void TestImageFormatResolverUsesSupportedExtensionsOnly()
     WriteBytes(random_named_jpg, {1, 2, 3, 4});
     WriteBytes(jpeg_named_bin, {0xFF, 0xD8, 0xFF, 0xE0});
 
-    Check(ImageFormatResolver::Resolve(png_named_heic) == ImgItem::Format::PNG,
+    Check(ImgFormatResolver::Resolve(png_named_heic) == ImgItem::Format::PNG,
           "PNG bytes with supported HEIC extension route to GDI PNG path");
-    Check(ImageFormatResolver::Resolve(jpeg_named_png) == ImgItem::Format::JPEG,
+    Check(ImgFormatResolver::Resolve(jpeg_named_png) == ImgItem::Format::JPEG,
           "JPEG bytes with supported PNG extension route to JPEG path");
-    Check(ImageFormatResolver::Resolve(random_named_jpg) == ImgItem::Format::JPEG,
+    Check(ImgFormatResolver::Resolve(random_named_jpg) == ImgItem::Format::JPEG,
           "unknown bytes with supported extension use extension fallback");
-    Check(ImageFormatResolver::Resolve(jpeg_named_bin) == ImgItem::Format::Unsupported,
+    Check(ImgFormatResolver::Resolve(jpeg_named_bin) == ImgItem::Format::Unsupported,
           "supported bytes with unsupported extension are not probed");
 
     DeleteFileW(png_named_heic.c_str());

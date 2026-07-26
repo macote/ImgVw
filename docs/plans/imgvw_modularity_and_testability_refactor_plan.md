@@ -1,5 +1,13 @@
 # ImgVw Modularity and Testability Refactor Plan
 
+## Status
+
+**Active.** The ownership, immutable-display, notification-generation, buffer-boundary, and focused-test prerequisites
+are complete. Track 3 (test division) is complete. The remaining work is the production modularity portion: extract
+cohesive UI policy and presentation helpers from `ImgVwWindow`, finish separating `ImgBrowser` responsibilities, close
+the remaining explicit-error and static-analysis gaps, and reduce `ImgVwWindow` to a message adapter and composition
+root.
+
 ## Summary
 
 `ImgVwWindow.cpp` has grown into the main concentration of application behavior. It currently combines Win32 message
@@ -11,9 +19,10 @@ This plan incrementally reduces `ImgVwWindow` to a Win32 adapter and composition
 robustness of the remaining first-party code, and divides the current monolithic test target into focused, independently
 runnable units. Refactoring should preserve current behavior and the Windows XP compatibility target.
 
-This plan complements `imgvw_stability_refactor_plan.md` and `windowing_display_improvement_plan.md`. Those plans remain
-authoritative for worker lifetime and display-publication correctness. Complete their relevant safety work before
-extracting the most coupled slideshow and presentation code.
+The completed safety prerequisites are recorded in
+`archive/runtime_safety_and_display_publication_plan.md`; the superseded detail plans remain under `archive/`. Their
+ownership and display-publication rules remain authoritative while the coupled slideshow and presentation code is
+extracted.
 
 ## Test Refactor Status
 
@@ -63,8 +72,8 @@ completed test split.
   overlays, slideshow timing, multi-monitor windows, and browser/display paths.
 - Its `HandleMessage()` function performs both message adaptation and application command policy.
 - `ImgBrowser`, `ImgLoader`, `ImgRenderer`, `PathPicker`, and `FileOperations` already provide useful subsystem seams.
-- `ImgBrowser` remains the next major concentration of responsibilities: enumeration, cancellation, navigation,
-  preloading, cache coordination, and notifications.
+- `ImgBrowser` is now a lifetime-safe facade over `ImgBrowserCore`, but the core remains a large concentration of
+  enumeration, cancellation, navigation, preloading, cache coordination, and notifications.
 - `tests/ImgVwTests.cpp` is now a small all-suite aggregator. Shared support is under `tests/support/`, and focused test
   translation units are grouped by subsystem under `tests/unit/`, `tests/platform/`, `tests/image/`,
   `tests/concurrency/`, and `tests/ui/`.
@@ -229,7 +238,8 @@ a reasonable outcome. Avoid replacing the current large class with a single equa
 
 ### Priority 1: Loader and Browser Lifetime Safety
 
-Follow `imgvw_stability_refactor_plan.md`:
+Follow the completed prerequisites in `archive/runtime_safety_and_display_publication_plan.md` and the detailed
+history in `archive/imgvw_stability_refactor_plan.md`:
 
 - replace unsynchronized cancellation flags with event-backed or otherwise synchronized state;
 - ensure worker input outlives each worker, including after bounded wait timeouts;
@@ -450,11 +460,9 @@ Manual verification for UI-affecting PRs should cover:
 
 ## Relationship to Existing Plans
 
-- `imgvw_stability_refactor_plan.md` owns loader/browser shutdown safety, cancellation, and general Win32 RAII
-  priorities.
-- `windowing_display_improvement_plan.md` owns viewport correctness, display publication, and renderer/DC behavior.
-- `runtime_safety_and_display_publication_plan.md` should be consulted for any overlapping lifetime or publication work.
+- `archive/runtime_safety_and_display_publication_plan.md` records completed loader/browser shutdown safety,
+  cancellation, viewport publication, and high-risk Win32 RAII work.
+- `archive/windowing_display_improvement_plan.md` retains the detailed viewport, renderer, and display-state rationale.
 - This plan owns the modular decomposition of `ImgVwWindow`, the broader responsibility split, and the test-suite
   organization.
-- If plans conflict, prefer the stability plan for lifetime and shutdown behavior and the windowing/display plans for
-  presentation semantics.
+- If plans conflict, preserve the completed lifetime, shutdown, and immutable-publication contracts.

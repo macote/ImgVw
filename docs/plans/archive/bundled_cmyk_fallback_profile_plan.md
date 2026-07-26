@@ -203,7 +203,7 @@ dependency tracking in both build systems.
 ## Code Architecture
 
 Implement this with the shared color-management refactor described in
-`artifacts/color_management_support_plan.md`.
+`color_management_support_plan.md`.
 
 Preferred ownership:
 
@@ -247,7 +247,7 @@ cmsCreateTransform(cmyk_profile, TYPE_CMYK_8_REV, srgb_profile, TYPE_BGR_8, INTE
 
 Do not expose rendering-intent selection in the UI for this feature.
 
-The separate CMYK inversion verification in `artifacts/color_management_support_plan.md` remains mandatory. A correct
+The separate CMYK inversion verification in `color_management_support_plan.md` remains mandatory. A correct
 profile cannot compensate for incorrectly inverted CMYK samples.
 
 ## Implementation Steps
@@ -355,4 +355,4 @@ The feature is complete when:
   <https://registry.color.org/profile-registry/>
 - ICC CMYK characterization registry:
   <https://registry.color.org/cmyk-registry/>
-- Shared color-management plan: `artifacts/color_management_support_plan.md`
+- Shared color-management plan: `color_management_support_plan.md`

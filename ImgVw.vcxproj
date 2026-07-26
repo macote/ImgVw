@@ -180,9 +180,9 @@
     <ClInclude Include="src\browse\ImgBrowser.h" />
     <ClInclude Include="src\image\ColorProfile.h" />
     <ClInclude Include="src\image\ColorTransform.h" />
-    <ClInclude Include="src\image\ImageDispatcher.h" />
-    <ClInclude Include="src\image\ImageFormatDetector.h" />
-    <ClInclude Include="src\image\ImageFormatResolver.h" />
+    <ClInclude Include="src\image\ImgDispatcher.h" />
+    <ClInclude Include="src\image\ImgFormatDetector.h" />
+    <ClInclude Include="src\image\ImgFormatResolver.h" />
     <ClInclude Include="src\image\ExifOrientation.h" />
     <ClInclude Include="src\image\ImgResampler.h" />
     <ClInclude Include="src\image\ImgBitmap.h" />
@@ -202,7 +202,7 @@
     <ClInclude Include="src\platform\win32\FileMapView.h" />
     <ClInclude Include="src\platform\win32\FindHandle.h" />
     <ClInclude Include="src\platform\win32\GdiObject.h" />
-    <ClInclude Include="src\platform\win32\ImageHeaderProbe.h" />
+    <ClInclude Include="src\platform\win32\ImgHeaderProbe.h" />
     <ClInclude Include="src\platform\win32\ImgSettings.h" />
     <ClInclude Include="src\platform\win32\PathPicker.h" />
     <ClInclude Include="src\platform\win32\ProcessDpiAwareness.h" />
@@ -219,9 +219,9 @@
     <ClCompile Include="src\browse\ImgBrowser.cpp" />
     <ClCompile Include="src\image\ColorProfile.cpp" />
     <ClCompile Include="src\image\ColorTransform.cpp" />
-    <ClCompile Include="src\image\ImageDispatcher.cpp" />
-    <ClCompile Include="src\image\ImageFormatDetector.cpp" />
-    <ClCompile Include="src\image\ImageFormatResolver.cpp" />
+    <ClCompile Include="src\image\ImgDispatcher.cpp" />
+    <ClCompile Include="src\image\ImgFormatDetector.cpp" />
+    <ClCompile Include="src\image\ImgFormatResolver.cpp" />
     <ClCompile Include="src\image\ExifOrientation.cpp" />
     <ClCompile Include="src\image\ImgResampler.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />
@@ -233,7 +233,7 @@
     <ClCompile Include="src\image\ImgJPEGItem.cpp" />
     <ClCompile Include="src\image\ImgLoader.cpp" />
     <ClCompile Include="src\platform\win32\FileOperations.cpp" />
-    <ClCompile Include="src\platform\win32\ImageHeaderProbe.cpp" />
+    <ClCompile Include="src\platform\win32\ImgHeaderProbe.cpp" />
     <ClCompile Include="src\platform\win32\PathPicker.cpp" />
     <ClCompile Include="src\platform\win32\ProcessDpiAwareness.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />

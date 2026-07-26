@@ -123,9 +123,9 @@
     <ClInclude Include="src\browse\ImgFileList.h" />
     <ClInclude Include="src\image\ColorProfile.h" />
     <ClInclude Include="src\image\ColorTransform.h" />
-    <ClInclude Include="src\image\ImageDispatcher.h" />
-    <ClInclude Include="src\image\ImageFormatDetector.h" />
-    <ClInclude Include="src\image\ImageFormatResolver.h" />
+    <ClInclude Include="src\image\ImgDispatcher.h" />
+    <ClInclude Include="src\image\ImgFormatDetector.h" />
+    <ClInclude Include="src\image\ImgFormatResolver.h" />
     <ClInclude Include="src\image\ImgBuffer.h" />
     <ClInclude Include="src\image\ImgGDIItem.h" />
     <ClInclude Include="src\image\ImgHEIFItem.h" />
@@ -136,7 +136,7 @@
     <ClInclude Include="src\image\ImgResampler.h" />
     <ClInclude Include="src\image\ImgJPEGDecoder.h" />
     <ClInclude Include="src\platform\win32\FileOperations.h" />
-    <ClInclude Include="src\platform\win32\ImageHeaderProbe.h" />
+    <ClInclude Include="src\platform\win32\ImgHeaderProbe.h" />
     <ClInclude Include="src\ui\win32\ImgRenderer.h" />
   </ItemGroup>
   <ItemGroup>
@@ -146,9 +146,9 @@
     <ClCompile Include="src\image\ColorProfile.cpp" />
     <ClCompile Include="src\image\ColorTransform.cpp" />
     <ClCompile Include="src\image\ExifOrientation.cpp" />
-    <ClCompile Include="src\image\ImageFormatDetector.cpp" />
-    <ClCompile Include="src\image\ImageDispatcher.cpp" />
-    <ClCompile Include="src\image\ImageFormatResolver.cpp" />
+    <ClCompile Include="src\image\ImgFormatDetector.cpp" />
+    <ClCompile Include="src\image\ImgDispatcher.cpp" />
+    <ClCompile Include="src\image\ImgFormatResolver.cpp" />
     <ClCompile Include="src\image\ImgBuffer.cpp" />
     <ClCompile Include="src\image\ImgGDIItem.cpp" />
     <ClCompile Include="src\image\ImgHEIFItem.cpp" />
@@ -159,19 +159,19 @@
     <ClCompile Include="src\image\ImgJPEGDecoder.cpp" />
     <ClCompile Include="src\image\ImgJPEGItem.cpp" />
     <ClCompile Include="src\platform\win32\FileOperations.cpp" />
-    <ClCompile Include="src\platform\win32\ImageHeaderProbe.cpp" />
+    <ClCompile Include="src\platform\win32\ImgHeaderProbe.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
     <ClCompile Include="tests\ImgVwTests.cpp" Condition="'$(TestSuite)'=='All'" />
     <ClCompile Include="tests\concurrency\ConcurrencyTests.cpp"
                Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Concurrency'" />
-    <ClCompile Include="tests\image\ImageTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Image'" />
+    <ClCompile Include="tests\image\ImgTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Image'" />
     <ClCompile Include="tests\support\JpegFixture.cpp" />
     <ClCompile Include="tests\support\TestHarness.cpp" />
     <ClCompile Include="tests\support\TestMain.cpp" />
     <ClCompile Include="tests\support\TempFile.cpp" />
     <ClCompile Include="tests\platform\PlatformTests.cpp"
                Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Platform'" />
-    <ClCompile Include="tests\unit\ImagePolicyTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
+    <ClCompile Include="tests\unit\ImgPolicyTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
     <ClCompile Include="tests\unit\CoreTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
     <ClCompile Include="tests\unit\ImgFileListTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Core'" />
     <ClCompile Include="tests\ui\RendererTests.cpp" Condition="'$(TestSuite)'=='All' Or '$(TestSuite)'=='Ui'" />

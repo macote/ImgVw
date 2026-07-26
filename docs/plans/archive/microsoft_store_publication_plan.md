@@ -1,5 +1,10 @@
 # Microsoft Store Publication Plan
 
+## Status
+
+**Archived on 2026-07-26.** The packaging foundation is present; the remaining release, certification, and publication
+work is tracked by `../store_publication_preflight_plan.md`.
+
 ## Objective
 
 Publish ImgVw in the Microsoft Store as a free, packaged Win32 desktop application with Store-managed installation,

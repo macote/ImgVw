@@ -16,7 +16,7 @@ enum class DetectedImageFormat
     HEIF
 };
 
-class ImageFormatDetector
+class ImgFormatDetector
 {
   public:
     static DetectedImageFormat Detect(const BYTE* bytes, std::size_t byte_count);

@@ -1,12 +1,12 @@
-#include "ImageDispatcher.h"
+#include "ImgDispatcher.h"
 
 #include "ImgGDIItem.h"
 #include "ImgHEIFItem.h"
 #include "ImgJPEGItem.h"
 #include <stdexcept>
 
-std::shared_ptr<ImgItem> ImageDispatcher::Create(const std::wstring& filepath, INT targetwidth, INT targetheight,
-                                                 ImgItem::Format format)
+std::shared_ptr<ImgItem> ImgDispatcher::Create(const std::wstring& filepath, INT targetwidth, INT targetheight,
+                                               ImgItem::Format format)
 {
     switch (format)
     {
@@ -18,6 +18,6 @@ std::shared_ptr<ImgItem> ImageDispatcher::Create(const std::wstring& filepath, I
     case ImgItem::Format::Other:
         return std::make_shared<ImgGDIItem>(filepath, targetwidth, targetheight);
     default:
-        throw std::runtime_error("ImageDispatcher::Create(): the specified image format is not supported.");
+        throw std::runtime_error("ImgDispatcher::Create(): the specified image format is not supported.");
     }
 }

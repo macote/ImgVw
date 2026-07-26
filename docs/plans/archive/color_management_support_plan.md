@@ -1,5 +1,10 @@
 # JPEG, PNG, and HEIF Color Management Plan
 
+## Status
+
+**Archived on 2026-07-26.** The implemented CMYK foundation and remaining SDR work are now tracked by
+`../color_management_follow_up_plan.md`; native PNG work is tracked by `../libpng_support_plan.md`.
+
 ## Summary
 
 Add one explicit color-management policy for every image decoder:
@@ -26,7 +31,7 @@ output, and a higher-precision display pipeline are separate future features.
   handling, and BGR output.
 - Current HEIF embedded ICC conversion happens after resizing. This is acceptable as a known interim behavior, but the
   target policy remains color conversion before resize where practical.
-- `artifacts/libheif_support_plan.md` remains useful as historical context for dependency integration, decode flow,
+- `libheif_support_plan.md` remains useful as historical context for dependency integration, decode flow,
   transforms, alpha, and build wiring. This plan supplies the shared color policy used by follow-up HEIF color work.
 
 ## Product Decisions
@@ -331,10 +336,10 @@ For performance, operations may be fused, but tests must demonstrate equivalent 
 - `src/image/ImgJPEGDecoder.cpp`
 - `src/image/ImgJPEGItem.cpp`
 - `src/image/ImgGDIItem.cpp` or its PNG replacement
-- `src/image/ImageDispatcher.h`
+- `src/image/ImgDispatcher.h`
 - new shared color-management files under `src/image/`
 - new PNG decoder/item files under `src/image/`
-- HEIF files listed in `artifacts/libheif_support_plan.md`
+- HEIF files listed in `libheif_support_plan.md`
 - `ImgVw.vcxproj`
 - `ImgVw.vcxproj.filters`
 - `Makefile`
@@ -488,4 +493,4 @@ criteria:
   <https://learn.microsoft.com/en-us/windows/win32/api/wincodec/nn-wincodec-iwiccolortransform>
 - Windows `SetICMMode`:
   <https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-seticmmode>
-- Existing HEIF plan: `artifacts/libheif_support_plan.md`
+- Existing HEIF plan: `libheif_support_plan.md`

@@ -2,6 +2,11 @@
 
 Date: 2026-06-20
 
+## Status
+
+**Pending.** No libpng dependency, dependency-build script, or `ImgPNGItem` implementation is present. Begin this plan
+after the shared SDR colour-transform boundary is stable enough for PNG to reuse it.
+
 ## Goal
 
 Replace PNG decoding through `ImgGDIItem`/GDI+ with a dedicated, read-only libpng decoder while preserving the
@@ -58,7 +63,7 @@ Do not depend on the libpng or zlib packages installed in MSYS2, vcpkg, or the d
 PNG already has a distinct `ImgItem::Format::PNG`, but it currently routes to `ImgGDIItem`:
 
 - `ImgItemHelper::GetImgFormatFromExtension()` maps `.png` to `PNG`.
-- `ImageDispatcher::Create()` constructs `ImgGDIItem` for `PNG`.
+- `ImgDispatcher::Create()` constructs `ImgGDIItem` for `PNG`.
 - `ImgGDIItem` uses GDI+ for decode, resize, conversion, and buffer extraction.
 - `ImgLoader` invokes `ImgItem::Load()` on worker threads.
 - `ImgResampler` can downscale RGBA8 pixels independently of GDI+.
@@ -359,9 +364,9 @@ Do not vendor an APNG-patched libpng or add a second animation decoder in this c
 
 Keep `ImgItem::Format::PNG`.
 
-Update `ImageDispatcher::Create()` so `PNG` constructs `ImgPNGItem` rather than `ImgGDIItem`.
+Update `ImgDispatcher::Create()` so `PNG` constructs `ImgPNGItem` rather than `ImgGDIItem`.
 
-The planned content dispatcher in `artifacts/content_based_image_dispatch_plan.md` currently routes PNG content to
+The content dispatcher documented in `archive/content_based_image_dispatch_plan.md` currently routes PNG content to
 `ImgGDIItem`; update that plan and implementation to route recognized PNG signatures to `ImgPNGItem`.
 
 Content detection must continue to override extensions:

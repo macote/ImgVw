@@ -1,10 +1,10 @@
-#include "ImageFormatResolver.h"
+#include "ImgFormatResolver.h"
 
-#include "ImageFormatDetector.h"
-#include "ImageHeaderProbe.h"
+#include "ImgFormatDetector.h"
+#include "ImgHeaderProbe.h"
 #include "ImgItemHelper.h"
 
-ImgItem::Format ImageFormatResolver::Resolve(const std::wstring& filepath)
+ImgItem::Format ImgFormatResolver::Resolve(const std::wstring& filepath)
 {
     const auto extensionformat = ImgItemHelper::GetImgFormatFromExtension(filepath);
     if (extensionformat == ImgItem::Format::Unsupported)
@@ -12,11 +12,11 @@ ImgItem::Format ImageFormatResolver::Resolve(const std::wstring& filepath)
         return ImgItem::Format::Unsupported;
     }
 
-    const auto probe = ImageHeaderProbe::ReadPrefix(filepath);
+    const auto probe = ImgHeaderProbe::ReadPrefix(filepath);
     if (probe.Succeeded())
     {
         const auto detectedformat =
-            ImageFormatDetector::ToImgItemFormat(ImageFormatDetector::Detect(probe.bytes.data(), probe.bytes.size()));
+            ImgFormatDetector::ToImgItemFormat(ImgFormatDetector::Detect(probe.bytes.data(), probe.bytes.size()));
         if (detectedformat != ImgItem::Format::Unsupported)
         {
             return detectedformat;

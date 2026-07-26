@@ -157,7 +157,7 @@ The longer-term design should stop requiring file reloads for simple viewport ch
 3. Publish completed display state immutably to the UI thread.
 4. Keep memory limits explicit so large images do not unexpectedly remain fully decoded in memory.
 
-This overlaps with `docs/plans/windowing_display_improvement_plan.md`; that plan should remain the broader display
+This overlaps with `windowing_display_improvement_plan.md`; that plan should remain the broader display
 architecture reference.
 
 ## Implementation Notes

@@ -15,37 +15,37 @@ UITARGET = $(TARGETDIR)/ImgVwUiTests.exe
 HEADERS = $(wildcard *.h support/*.h unit/*.h ../src/app/*.h ../src/browse/*.h ../src/image/*.h \
 	../src/platform/win32/*.h ../src/ui/win32/*.h)
 TESTMAIN = support/TestHarness.cpp support/TestMain.cpp
-SOURCES = ImgVwTests.cpp concurrency/ConcurrencyTests.cpp image/ImageTests.cpp platform/PlatformTests.cpp \
+SOURCES = ImgVwTests.cpp concurrency/ConcurrencyTests.cpp image/ImgTests.cpp platform/PlatformTests.cpp \
 	ui/RendererTests.cpp \
-	unit/ImagePolicyTests.cpp unit/ImgFileListTests.cpp \
+	unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp \
 	support/JpegFixture.cpp support/TempFile.cpp support/TestHarness.cpp support/TestMain.cpp \
 	../src/browse/BrowsePath.cpp ../src/browse/ImgBrowser.cpp ../src/browse/ImgFileList.cpp \
 	../src/image/ColorProfile.cpp \
 	../src/image/ColorTransform.cpp ../src/image/ExifOrientation.cpp ../src/image/ImgResampler.cpp \
-	../src/image/ImageDispatcher.cpp ../src/image/ImgLoader.cpp ../src/image/ImageFormatDetector.cpp \
-	../src/image/ImageFormatResolver.cpp ../src/image/ImgBuffer.cpp ../src/image/ImgGDIItem.cpp \
+	../src/image/ImgDispatcher.cpp ../src/image/ImgLoader.cpp ../src/image/ImgFormatDetector.cpp \
+	../src/image/ImgFormatResolver.cpp ../src/image/ImgBuffer.cpp ../src/image/ImgGDIItem.cpp \
 	../src/image/ImgHEIFItem.cpp ../src/image/ImgItem.cpp ../src/image/ImgItemHelper.cpp \
 	../src/image/ImgJPEGDecoder.cpp ../src/image/ImgJPEGItem.cpp ../src/platform/win32/FileOperations.cpp \
-	../src/platform/win32/ImageHeaderProbe.cpp \
+	../src/platform/win32/ImgHeaderProbe.cpp \
 	../src/ui/win32/ImgRenderer.cpp
-CORESOURCES = unit/CoreTests.cpp unit/ImagePolicyTests.cpp unit/ImgFileListTests.cpp support/TempFile.cpp $(TESTMAIN) \
+CORESOURCES = unit/CoreTests.cpp unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp support/TempFile.cpp $(TESTMAIN) \
 	../src/browse/ImgFileList.cpp ../src/image/ExifOrientation.cpp ../src/image/ImgResampler.cpp \
-	../src/image/ImageFormatDetector.cpp ../src/image/ImageFormatResolver.cpp ../src/image/ImgBuffer.cpp \
-	../src/image/ImgItemHelper.cpp ../src/platform/win32/ImageHeaderProbe.cpp
+	../src/image/ImgFormatDetector.cpp ../src/image/ImgFormatResolver.cpp ../src/image/ImgBuffer.cpp \
+	../src/image/ImgItemHelper.cpp ../src/platform/win32/ImgHeaderProbe.cpp
 PLATFORMSOURCES = platform/PlatformTests.cpp support/TempFile.cpp $(TESTMAIN) \
 	../src/browse/BrowsePath.cpp ../src/image/ImgBuffer.cpp ../src/platform/win32/FileOperations.cpp
-IMAGESOURCES = image/ImageTests.cpp support/JpegFixture.cpp support/TempFile.cpp $(TESTMAIN) \
+IMAGESOURCES = image/ImgTests.cpp support/JpegFixture.cpp support/TempFile.cpp $(TESTMAIN) \
 	../src/image/ColorProfile.cpp ../src/image/ColorTransform.cpp ../src/image/ExifOrientation.cpp \
 	../src/image/ImgResampler.cpp ../src/image/ImgBuffer.cpp ../src/image/ImgGDIItem.cpp ../src/image/ImgItem.cpp \
 	../src/image/ImgItemHelper.cpp ../src/image/ImgJPEGDecoder.cpp
 CONCURRENCYSOURCES = concurrency/ConcurrencyTests.cpp support/JpegFixture.cpp support/TempFile.cpp $(TESTMAIN) \
 	../src/browse/BrowsePath.cpp ../src/browse/ImgBrowser.cpp ../src/browse/ImgFileList.cpp \
 	../src/image/ColorProfile.cpp ../src/image/ColorTransform.cpp ../src/image/ExifOrientation.cpp \
-	../src/image/ImgResampler.cpp ../src/image/ImageDispatcher.cpp ../src/image/ImgLoader.cpp \
-	../src/image/ImageFormatDetector.cpp ../src/image/ImageFormatResolver.cpp ../src/image/ImgBuffer.cpp \
+	../src/image/ImgResampler.cpp ../src/image/ImgDispatcher.cpp ../src/image/ImgLoader.cpp \
+	../src/image/ImgFormatDetector.cpp ../src/image/ImgFormatResolver.cpp ../src/image/ImgBuffer.cpp \
 	../src/image/ImgGDIItem.cpp ../src/image/ImgHEIFItem.cpp ../src/image/ImgItem.cpp \
 	../src/image/ImgItemHelper.cpp ../src/image/ImgJPEGDecoder.cpp ../src/image/ImgJPEGItem.cpp \
-	../src/platform/win32/ImageHeaderProbe.cpp
+	../src/platform/win32/ImgHeaderProbe.cpp
 UISOURCES = ui/RendererTests.cpp $(TESTMAIN) ../src/ui/win32/ImgRenderer.cpp
 
 ifeq ($(DUMPMACHINE),x86_64-w64-mingw32)

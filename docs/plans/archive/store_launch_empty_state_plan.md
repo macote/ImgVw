@@ -4,7 +4,7 @@
 
 Implemented and archived. No-argument startup, empty-state recovery, image/folder pickers, command access,
 drag-and-drop, recursive search, and resizable welcome-window behaviour are present. Broader loader lifetime work is
-tracked by `docs/plans/runtime_safety_and_display_publication_plan.md`.
+tracked by `runtime_safety_and_display_publication_plan.md`.
 
 Date: 2026-07-17
 
@@ -278,7 +278,7 @@ Add an explicit operation such as `ImgBrowser::OpenPath()` or harden `BrowseAsyn
 9. Return an explicit result that distinguishes invalid path, inaccessible path, startup failure, and successful
    asynchronous collection.
 
-Coordinate this work with `docs/plans/imgvw_stability_refactor_plan.md`. Do not add a second ad hoc cancellation scheme
+Coordinate this work with `imgvw_stability_refactor_plan.md`. Do not add a second ad hoc cancellation scheme
 that worsens the existing lifetime risks. If safe session replacement depends on the planned browser cancellation
 hardening, implement that prerequisite first or keep path selection limited to the initial empty state until it exists.
 
@@ -547,5 +547,5 @@ The work is complete when:
   <https://learn.microsoft.com/windows/msix/msix-containerization-overview>
 - Microsoft: `SHBrowseForFolder` and the recommendation to use `IFileDialog` on Vista and later:
   <https://learn.microsoft.com/windows/win32/api/shlobj_core/nf-shlobj_core-shbrowseforfolderw>
-- Existing Store publication plan: `docs/plans/microsoft_store_publication_plan.md`
-- Existing browser/thread lifetime plan: `docs/plans/imgvw_stability_refactor_plan.md`
+- Existing Store publication plan: `microsoft_store_publication_plan.md`
+- Existing browser/thread lifetime plan: `imgvw_stability_refactor_plan.md`
