@@ -115,7 +115,7 @@ class ImgLoader
     explicit ImgLoader(WorkEventSignal workeventsignal);
     ImgLoader(WorkEventSignal workeventsignal, NotificationPost notificationpost);
 #endif
-    ~ImgLoader();
+    ~ImgLoader() noexcept;
     ImgLoader(const ImgLoader&) = delete;
     ImgLoader& operator=(const ImgLoader&) = delete;
     ImgLoaderQueueResult QueueItem(const std::shared_ptr<ImgItem>& imgitem, BOOL loadnext = FALSE,

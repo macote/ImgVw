@@ -60,6 +60,7 @@ $compileArgs = @(
     "-isystem", "$(Join-Path $repoRoot '3rd-party\libde265')",
     "-DWINVER=0x0501",
     "-D_WIN32_WINNT=0x0501",
+    "-DNOMINMAX",
     "-DUNICODE",
     "-D_UNICODE",
     "-DLIBHEIF_STATIC_BUILD",

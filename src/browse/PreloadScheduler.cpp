@@ -1,6 +1,7 @@
 #include "PreloadScheduler.h"
 
 #include <algorithm>
+#include <exception>
 #include <memory>
 
 void PreloadScheduler::Reset()
@@ -30,7 +31,8 @@ bool PreloadScheduler::Queue(Work work)
         return false;
     }
 
-    request.release();
+    const auto thread_request = request.release();
+    static_cast<void>(thread_request);
     threads_.emplace_back(thread);
     return true;
 }
@@ -149,7 +151,20 @@ DWORD WINAPI PreloadScheduler::StaticThreadQueue(void* context)
     std::unique_ptr<WorkRequest> request(reinterpret_cast<WorkRequest*>(context));
     if (request != nullptr && request->work)
     {
-        request->work(request->cancellation);
+        try
+        {
+            request->work(request->cancellation);
+        }
+        catch (const std::exception& error)
+        {
+            OutputDebugStringA("ImgVw preload worker failed: ");
+            OutputDebugStringA(error.what());
+            OutputDebugStringA("\n");
+        }
+        catch (...)
+        {
+            OutputDebugStringA("ImgVw preload worker failed with an unknown exception.\n");
+        }
     }
 
     return 0;

@@ -180,65 +180,68 @@ void ImgItem::OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabyte
     }
 }
 
-void ImgItem::LoadDefaultICCProfile()
+ImgItem::DefaultICCProfileLoadResult ImgItem::LoadDefaultICCProfile()
 {
     CriticalSectionLock lock(DefaultICCProfileCriticalSection);
-    if (!DefaultICCProfile.IsValid())
+    if (DefaultICCProfile.IsValid())
     {
-        try
+        return {DefaultICCProfileLoadStatus::AlreadyLoaded, ERROR_SUCCESS};
+    }
+
+    TCHAR appdatapath[MAX_PATH]{};
+    if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath)))
+    {
+        TCHAR imgvwappdatapath[MAX_PATH]{};
+        TCHAR iccpath[MAX_PATH]{};
+        if (PathCombine(imgvwappdatapath, appdatapath, ImgSettings::kAppDataPath) != nullptr &&
+            PathCombine(iccpath, imgvwappdatapath, kDefaultICCProfileFilename) != nullptr && PathFileExists(iccpath))
         {
-            TCHAR appdatapath[MAX_PATH]{};
-            if (SUCCEEDED(SHGetFolderPath(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appdatapath)))
+            const auto validation = ValidateCMYKICCProfile(iccpath);
+            if (validation.Succeeded())
             {
-                TCHAR imgvwappdatapath[MAX_PATH]{};
-                TCHAR iccpath[MAX_PATH]{};
-                if (PathCombine(imgvwappdatapath, appdatapath, ImgSettings::kAppDataPath) != nullptr &&
-                    PathCombine(iccpath, imgvwappdatapath, kDefaultICCProfileFilename) != nullptr &&
-                    PathFileExists(iccpath))
+                FileMapView iccfilemap;
+                if (iccfilemap.TryOpen(iccpath, FileMapView::Mode::Read).Succeeded())
                 {
-                    FileMapView iccfilemap(std::wstring(iccpath), FileMapView::Mode::Read);
-                    if (iccfilemap.filesize().HighPart == 0)
-                    {
-                        DefaultICCProfile =
-                            ColorProfile::OpenFromMemory(iccfilemap.data(), iccfilemap.filesize().LowPart);
-                    }
+                    DefaultICCProfile = ColorProfile::OpenFromMemory(iccfilemap.data(), iccfilemap.filesize().LowPart);
                 }
 
-                if (DefaultICCProfile.IsValid() && !DefaultICCProfile.IsCmyk())
-                {
-                    DefaultICCProfile.Reset();
-                }
-                else if (DefaultICCProfile.IsValid())
+                if (DefaultICCProfile.IsValid())
                 {
                     DefaultICCProfileSource = CmykProfileSource::UserDefault;
-                }
-            }
-        }
-        catch (...)
-        {
-            DefaultICCProfile.Reset();
-        }
-
-        if (!DefaultICCProfile.IsValid())
-        {
-            const auto resource = FindResource(nullptr, MAKEINTRESOURCE(IDR_DEFAULT_CMYK_ICC), RT_RCDATA);
-            const auto resource_size = resource == nullptr ? 0 : SizeofResource(nullptr, resource);
-            const auto resource_handle = resource == nullptr ? nullptr : LoadResource(nullptr, resource);
-            const auto resource_data = resource_handle == nullptr ? nullptr : LockResource(resource_handle);
-            if (resource_data != nullptr && resource_size > 0)
-            {
-                DefaultICCProfile = ColorProfile::OpenFromMemory(resource_data, resource_size);
-                if (DefaultICCProfile.IsValid() && !DefaultICCProfile.IsCmyk())
-                {
-                    DefaultICCProfile.Reset();
-                }
-                else if (DefaultICCProfile.IsValid())
-                {
-                    DefaultICCProfileSource = CmykProfileSource::BundledFallback;
+                    return {DefaultICCProfileLoadStatus::UserDefaultLoaded, ERROR_SUCCESS};
                 }
             }
         }
     }
+
+    const auto resource = FindResource(nullptr, MAKEINTRESOURCE(IDR_DEFAULT_CMYK_ICC), RT_RCDATA);
+    if (resource == nullptr)
+    {
+        return {DefaultICCProfileLoadStatus::BundledResourceUnavailable, GetLastError()};
+    }
+
+    const auto resource_size = SizeofResource(nullptr, resource);
+    const auto resource_handle = LoadResource(nullptr, resource);
+    const auto resource_data = resource_handle == nullptr ? nullptr : LockResource(resource_handle);
+    if (resource_data == nullptr || resource_size == 0)
+    {
+        return {DefaultICCProfileLoadStatus::BundledResourceUnavailable,
+                resource_data == nullptr ? GetLastError() : ERROR_RESOURCE_DATA_NOT_FOUND};
+    }
+
+    DefaultICCProfile = ColorProfile::OpenFromMemory(resource_data, resource_size);
+    if (!DefaultICCProfile.IsValid())
+    {
+        return {DefaultICCProfileLoadStatus::BundledProfileInvalid, ERROR_SUCCESS};
+    }
+    if (!DefaultICCProfile.IsCmyk())
+    {
+        DefaultICCProfile.Reset();
+        return {DefaultICCProfileLoadStatus::BundledProfileWrongColorSpace, ERROR_SUCCESS};
+    }
+
+    DefaultICCProfileSource = CmykProfileSource::BundledFallback;
+    return {DefaultICCProfileLoadStatus::BundledFallbackLoaded, ERROR_SUCCESS};
 }
 
 void ImgItem::UnloadDefaultICCProfile()
@@ -284,38 +287,36 @@ ImgItem::DefaultICCProfileResetResult ImgItem::ResetDefaultICCProfile()
 
 ImgItem::CmykProfileValidationResult ImgItem::ValidateCMYKICCProfile(const std::wstring& filepath)
 {
-    try
+    FileMapView iccfilemap;
+    const auto map_result = iccfilemap.TryOpen(filepath, FileMapView::Mode::Read);
+    if (!map_result.Succeeded())
     {
-        FileMapView iccfilemap(filepath, FileMapView::Mode::Read);
-        if (iccfilemap.filesize().HighPart != 0)
-        {
-            return {CmykProfileValidationStatus::FileSizeUnsupported, ERROR_FILE_TOO_LARGE};
-        }
-
-        const auto profile = ColorProfile::OpenFromMemory(iccfilemap.data(), iccfilemap.filesize().LowPart);
-        if (!profile.IsValid())
-        {
-            return {CmykProfileValidationStatus::InvalidProfile, ERROR_SUCCESS};
-        }
-
-        if (!profile.IsCmyk())
-        {
-            return {CmykProfileValidationStatus::WrongColorSpace, ERROR_SUCCESS};
-        }
-
-        return {CmykProfileValidationStatus::Valid, ERROR_SUCCESS};
+        return {CmykProfileValidationStatus::FileAccessFailed, map_result.win32_error};
     }
-    catch (const FileMapError& error)
+    if (iccfilemap.filesize().HighPart != 0)
     {
-        return {CmykProfileValidationStatus::FileAccessFailed, error.win32_error()};
+        return {CmykProfileValidationStatus::FileSizeUnsupported, ERROR_FILE_TOO_LARGE};
     }
+
+    const auto profile = ColorProfile::OpenFromMemory(iccfilemap.data(), iccfilemap.filesize().LowPart);
+    if (!profile.IsValid())
+    {
+        return {CmykProfileValidationStatus::InvalidProfile, ERROR_SUCCESS};
+    }
+
+    if (!profile.IsCmyk())
+    {
+        return {CmykProfileValidationStatus::WrongColorSpace, ERROR_SUCCESS};
+    }
+
+    return {CmykProfileValidationStatus::Valid, ERROR_SUCCESS};
 }
 
 BOOL ImgItem::TranformCMYK8ColorsToBGR8(INT width, INT height, INT stride, INT newstride, PBYTE* buffer)
 {
     if (!iccprofile_.IsValid())
     {
-        LoadDefaultICCProfile();
+        static_cast<void>(LoadDefaultICCProfile());
     }
 
     ColorTransformResult result;

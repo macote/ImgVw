@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <limits>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -68,7 +69,7 @@ std::wstring Utf8ToWide(const std::string& text)
     }
 
     std::wstring wide_text(static_cast<std::size_t>(length), L'\0');
-    if (MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), wide_text.data(), length) == 0)
+    if (MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), &wide_text[0], length) == 0)
     {
         return L"JPEG loading failed.";
     }
@@ -78,7 +79,7 @@ std::wstring Utf8ToWide(const std::string& text)
 } // namespace
 
 ImgJPEGItem::ImgJPEGItem(std::wstring filepath, INT targetwidth, INT targetheight)
-    : ImgItem(filepath, targetwidth, targetheight)
+    : ImgItem(std::move(filepath), targetwidth, targetheight)
 {
     SetSupportsLoadingProgress(TRUE);
 }

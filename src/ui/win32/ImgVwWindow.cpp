@@ -2076,6 +2076,8 @@ LRESULT ImgVwWindow::HandleCommand(UINT command, UINT notification, LPARAM lpara
     case IDR_ESCAPE:
         CloseWindow();
         break;
+    default:
+        break;
     }
 
     return FALSE;
@@ -2218,6 +2220,8 @@ LRESULT ImgVwWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         return 0;
+    default:
+        break;
     }
 
     return Window::HandleMessage(uMsg, wParam, lParam);

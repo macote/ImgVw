@@ -646,6 +646,8 @@ void ImgBrowserCore::QueueTargetSizeAsync(INT targetwidth, INT targetheight, BOO
 void ImgBrowserCore::QueueTargetSizesAsync(const std::vector<TargetSize>& target_sizes, BOOL loadnext)
 {
     preload_scheduler_.Queue(
+        // Capturing the target-size snapshot can only throw synchronously before the callback is queued.
+        // NOLINTNEXTLINE(bugprone-exception-escape)
         [browser = shared_from_this(), target_sizes, loadnext](const std::shared_ptr<CancellationState>& cancellation) {
             browser->QueueTargetSizes(cancellation, target_sizes, loadnext);
         });
@@ -736,7 +738,7 @@ std::shared_ptr<ImgItem> ImgBrowserCore::GetCurrentItem()
 {
     EnterCriticalSection(browsecriticalsection_.get());
     const auto filepath = files_.CurrentPath();
-    const auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : GetOrCreateCachedItem(filepath);
+    auto imgitem = filepath.empty() ? std::shared_ptr<ImgItem>() : GetOrCreateCachedItem(filepath);
     LeaveCriticalSection(browsecriticalsection_.get());
     if (imgitem != nullptr)
     {
@@ -957,7 +959,10 @@ void ImgBrowserCore::CollectSubFolders(const std::shared_ptr<CollectionRequest>&
                                           CollectFile(request, filepath, format);
                                       },
                                       {}});
-    InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(result.win32_error), ERROR_SUCCESS);
+    if (result.status == FolderScanStatus::EnumerationFailed)
+    {
+        InterlockedCompareExchange(&request->enumeration_error, static_cast<LONG>(result.win32_error), ERROR_SUCCESS);
+    }
 
     EnterCriticalSection(browsecriticalsection_.get());
     folders_.clear();

@@ -13,8 +13,8 @@ This document turns `imgvw_stability_refactor_plan.md` into an implementation se
 current source tree. The work is intentionally incremental: each phase should compile and test independently, avoid
 unrelated formatting churn, and preserve the Windows XP target (`WINVER` and `_WIN32_WINNT` set to `0x0501`).
 
-The implementation branch was `codex/stability-ownership-refactor`. Production modularity and test division are tracked
-separately by `../imgvw_modularity_and_testability_refactor_plan.md`.
+The implementation branch was `codex/stability-ownership-refactor`. Completed production modularity and test division
+are recorded separately by `imgvw_modularity_and_testability_refactor_plan.md`.
 
 ## Baseline
 

@@ -3,6 +3,7 @@
 #include "CountingSemaphore.h"
 #include "CriticalSection.h"
 #include <algorithm>
+#include <array>
 #include <deque>
 #include <list>
 #include <set>
@@ -194,7 +195,7 @@ ImgLoader::ImgLoader(WorkEventSignal workeventsignal, NotificationPost notificat
     }
 }
 
-ImgLoader::~ImgLoader()
+ImgLoader::~ImgLoader() noexcept
 {
     StopLoading();
 }
@@ -227,22 +228,23 @@ ImgLoaderStopResult ImgLoader::StopLoading(DWORD timeout_milliseconds)
         return {ImgLoaderStopStatus::WaitFailed, GetLastError()};
     }
 
-    std::vector<HANDLE> worker_threads;
+    std::array<HANDLE, kMaximumLoaderCount> worker_threads{};
+    std::size_t worker_count{};
     {
         CriticalSectionLock lock(state_->queuecriticalsection);
         for (const auto& loaderitem : state_->loaderitems)
         {
-            if (loaderitem->thread.valid())
+            if (loaderitem->thread.valid() && worker_count < worker_threads.size())
             {
-                worker_threads.push_back(loaderitem->thread.get());
+                worker_threads[worker_count++] = loaderitem->thread.get();
             }
         }
     }
 
-    for (const auto worker_thread : worker_threads)
+    for (std::size_t index = 0; index < worker_count; ++index)
     {
         const auto worker_wait =
-            WaitForSingleObject(worker_thread, RemainingTimeout(wait_started, timeout_milliseconds));
+            WaitForSingleObject(worker_threads[index], RemainingTimeout(wait_started, timeout_milliseconds));
         if (worker_wait == WAIT_TIMEOUT)
         {
             return {ImgLoaderStopStatus::TimedOut, ERROR_TIMEOUT};

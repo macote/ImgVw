@@ -3,8 +3,8 @@
 ## Status
 
 **Archived on 2026-07-26.** The viewport, immutable-publication, notification-lifetime, and renderer ownership work is
-implemented and summarized by `runtime_safety_and_display_publication_plan.md`. Remaining `ImgVwWindow` decomposition
-is tracked by `../imgvw_modularity_and_testability_refactor_plan.md`.
+implemented and summarized by `runtime_safety_and_display_publication_plan.md`. The completed `ImgVwWindow`
+decomposition is recorded by `imgvw_modularity_and_testability_refactor_plan.md`.
 
 ## Summary
 

@@ -165,9 +165,17 @@ ImgBuffer ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targe
         throw std::invalid_argument("ImgItemHelper.ResizeAndRotateImage() received a null bitmap.");
     }
 
+    const auto width = bitmap->GetWidth();
+    const auto height = bitmap->GetHeight();
+    if (width == 0 || height == 0 || width > static_cast<UINT>((std::numeric_limits<INT>::max)()) ||
+        height > static_cast<UINT>((std::numeric_limits<INT>::max)()))
+    {
+        throw std::runtime_error("ImgItemHelper.ResizeAndRotateImage() received invalid bitmap dimensions.");
+    }
+
     INT newwidth{};
     INT newheight{};
-    if (!CalculateDisplaySize(bitmap->GetWidth(), bitmap->GetHeight(), targetwidth, targetheight, &newwidth,
+    if (!CalculateDisplaySize(static_cast<INT>(width), static_cast<INT>(height), targetwidth, targetheight, &newwidth,
                               &newheight))
     {
         throw std::runtime_error("ImgItemHelper.ResizeAndRotateImage() received invalid dimensions.");
@@ -276,7 +284,7 @@ ImgBuffer ImgItemHelper::GetBuffer(Gdiplus::Bitmap* bitmap)
     }
 
     ImgBuffer buffer;
-    buffer.WriteData(data.Width, data.Height, stride, bottom_up_buffer.data());
+    buffer.WriteData(static_cast<INT>(data.Width), static_cast<INT>(data.Height), stride, bottom_up_buffer.data());
 
     return buffer;
 }

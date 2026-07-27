@@ -255,6 +255,13 @@ void TestJpegDecoderValidatesOutputBuffer()
 
 void TestBundledCmykProfile()
 {
+    ImgItem::UnloadDefaultICCProfile();
+    const auto default_profile_load = ImgItem::LoadDefaultICCProfile();
+    Check(default_profile_load.Succeeded() ||
+              (default_profile_load.status == ImgItem::DefaultICCProfileLoadStatus::BundledResourceUnavailable &&
+               default_profile_load.win32_error != ERROR_SUCCESS),
+          "default CMYK profile loading reports either its source or a resource failure explicitly");
+
     const auto profile_path = GetFileAttributesW(L"resources/color/CGATS21_CRPC5.icc") != INVALID_FILE_ATTRIBUTES
                                   ? L"resources/color/CGATS21_CRPC5.icc"
                                   : L"../resources/color/CGATS21_CRPC5.icc";

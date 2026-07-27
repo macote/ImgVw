@@ -4,149 +4,122 @@
 #include <shlobj.h>
 #include <iomanip>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 
 enum class ImgSettingsStatus
 {
+    Succeeded,
     TempPathFailed,
     GuidCreationFailed,
     TempDirectoryCreationFailed
 };
 
-class ImgSettingsError final : public std::runtime_error
+struct ImgSettingsInitializationResult
 {
-  public:
-    ImgSettingsError(ImgSettingsStatus status, HRESULT system_error)
-        : std::runtime_error(BuildMessage(status, system_error)), status_(status), system_error_(system_error)
+    ImgSettingsStatus status{ImgSettingsStatus::Succeeded};
+    HRESULT system_error{S_OK};
+    std::wstring temp_path;
+
+    bool Succeeded() const
     {
+        return status == ImgSettingsStatus::Succeeded;
+    }
+};
+
+struct ImgSettingsOperations
+{
+    using GetTempPathFunction = DWORD(WINAPI*)(DWORD, LPWSTR);
+    using CreateGuidFunction = HRESULT(WINAPI*)(GUID*);
+    using CreateDirectoryFunction = BOOL(WINAPI*)(LPCWSTR, LPSECURITY_ATTRIBUTES);
+    using GetLastErrorFunction = DWORD(WINAPI*)();
+
+    GetTempPathFunction get_temp_path{GetTempPathW};
+    CreateGuidFunction create_guid{CoCreateGuid};
+    CreateDirectoryFunction create_directory{CreateDirectoryW};
+    GetLastErrorFunction get_last_error{GetLastError};
+};
+
+inline ImgSettingsInitializationResult InitializeImgSettingsTempDirectory(const ImgSettingsOperations& operations)
+{
+    wchar_t temp_path_buffer[MAX_PATH + 1]{};
+
+    const auto path_length = operations.get_temp_path(MAX_PATH, temp_path_buffer);
+    if (path_length == 0)
+    {
+        const auto error = operations.get_last_error();
+        return {ImgSettingsStatus::TempPathFailed,
+                HRESULT_FROM_WIN32(error == ERROR_SUCCESS ? ERROR_PATH_NOT_FOUND : error),
+                {}};
+    }
+    if (path_length >= MAX_PATH)
+    {
+        return {ImgSettingsStatus::TempPathFailed, HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER), {}};
     }
 
-    ImgSettingsStatus status() const
+    std::wstring temp_path = temp_path_buffer;
+    if (temp_path.back() != L'\\')
     {
-        return status_;
+        temp_path += L'\\';
     }
 
-    HRESULT system_error() const
+    constexpr unsigned int kMaximumDirectoryNameAttempts = 64;
+    for (unsigned int attempt = 0; attempt < kMaximumDirectoryNameAttempts; ++attempt)
     {
-        return system_error_;
-    }
-
-  private:
-    static std::string BuildMessage(ImgSettingsStatus status, HRESULT system_error)
-    {
-        const char* operation = "Unknown";
-        switch (status)
+        GUID guid{};
+        const auto guid_result = operations.create_guid(&guid);
+        if (FAILED(guid_result))
         {
-        case ImgSettingsStatus::TempPathFailed:
-            operation = "GetTempPath";
-            break;
-        case ImgSettingsStatus::GuidCreationFailed:
-            operation = "CoCreateGuid";
-            break;
-        case ImgSettingsStatus::TempDirectoryCreationFailed:
-            operation = "CreateDirectory";
-            break;
+            return {ImgSettingsStatus::GuidCreationFailed, guid_result, {}};
         }
 
-        std::stringstream message;
-        message << "ImgSettings." << operation << "() failed with error 0x" << std::hex << std::setw(8)
-                << std::setfill('0') << std::uppercase << static_cast<unsigned long>(system_error);
-        return message.str();
+        std::wstringstream name;
+        name << std::setw(8) << std::setfill(L'0') << std::uppercase << std::hex << guid.Data1;
+        const auto candidate = temp_path + name.str();
+        if (operations.create_directory(candidate.c_str(), nullptr))
+        {
+            return {ImgSettingsStatus::Succeeded, S_OK, candidate};
+        }
+
+        const auto error = operations.get_last_error();
+        if (error != ERROR_ALREADY_EXISTS)
+        {
+            return {ImgSettingsStatus::TempDirectoryCreationFailed, HRESULT_FROM_WIN32(error), {}};
+        }
     }
 
-    ImgSettingsStatus status_;
-    HRESULT system_error_;
-};
+    return {ImgSettingsStatus::TempDirectoryCreationFailed, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), {}};
+}
 
 class ImgSettings
 {
   public:
     static constexpr auto kAppDataPath = L"A611FF5773EC43EC\\ImgVw";
 
-  public:
     static ImgSettings& GetInstance()
     {
         static ImgSettings settings;
-
         return settings;
     }
-    std::wstring temppath() const
+    const std::wstring& temppath() const
     {
-        return temppath_;
+        return initialization_result_.temp_path;
+    }
+    const ImgSettingsInitializationResult& initialization_result() const
+    {
+        return initialization_result_;
     }
     ~ImgSettings()
     {
-        DeleteTempPath();
+        if (!initialization_result_.temp_path.empty())
+        {
+            RemoveDirectoryW(initialization_result_.temp_path.c_str());
+        }
     }
     ImgSettings(const ImgSettings&) = delete;
     ImgSettings& operator=(const ImgSettings&) = delete;
 
   private:
-    std::wstring temppath_;
+    ImgSettings() : initialization_result_(InitializeImgSettingsTempDirectory(ImgSettingsOperations{})) {}
 
-  private:
-    ImgSettings()
-    {
-        InitializeTempPath();
-    }
-    void InitializeTempPath();
-    void DeleteTempPath();
+    ImgSettingsInitializationResult initialization_result_;
 };
-
-inline void ImgSettings::InitializeTempPath()
-{
-    TCHAR temppathbuffer[MAX_PATH + 1]{};
-
-    const auto pathlen = GetTempPath(MAX_PATH, temppathbuffer);
-    if (pathlen == 0)
-    {
-        const auto error = GetLastError();
-        throw ImgSettingsError(ImgSettingsStatus::TempPathFailed,
-                               HRESULT_FROM_WIN32(error == ERROR_SUCCESS ? ERROR_PATH_NOT_FOUND : error));
-    }
-    if (pathlen >= MAX_PATH)
-    {
-        throw ImgSettingsError(ImgSettingsStatus::TempPathFailed, HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER));
-    }
-
-    std::wstring temppath = temppathbuffer;
-
-    if (pathlen > 0 && temppathbuffer[pathlen - 1] != L'\\')
-    {
-        temppath += L'\\';
-    }
-
-    for (;;)
-    {
-        GUID guid{};
-        const auto guidresult = CoCreateGuid(&guid);
-        if (FAILED(guidresult))
-        {
-            throw ImgSettingsError(ImgSettingsStatus::GuidCreationFailed, guidresult);
-        }
-
-        std::wstringstream wss;
-        wss << std::setw(8) << std::setfill(L'0') << std::uppercase << std::hex << guid.Data1;
-        const auto testpath = temppath + wss.str();
-        if (CreateDirectory(testpath.c_str(), nullptr))
-        {
-            temppath_ = testpath;
-            return;
-        }
-
-        const auto error = GetLastError();
-        if (error != ERROR_ALREADY_EXISTS)
-        {
-            throw ImgSettingsError(ImgSettingsStatus::TempDirectoryCreationFailed, HRESULT_FROM_WIN32(error));
-        }
-    }
-}
-
-inline void ImgSettings::DeleteTempPath()
-{
-    if (!temppath_.empty())
-    {
-        RemoveDirectory(temppath_.c_str());
-    }
-}

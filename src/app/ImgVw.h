@@ -1,6 +1,11 @@
 #pragma once
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "ImgVwWindow.h"
+#include "ImgSettings.h"
 #include "ProcessDpiAwareness.h"
 #include "resource.h"
 #include <Windows.h>
@@ -19,6 +24,17 @@ class ImgVw
 inline INT ImgVw::Run(HINSTANCE hInstance, INT nShowCmd)
 {
     ProcessDpiAwareness::EnableNativeMonitorPixels();
+
+    const auto& settings_result = ImgSettings::GetInstance().initialization_result();
+    if (!settings_result.Succeeded())
+    {
+        std::wstringstream message;
+        message << L"ImgVw could not initialize its temporary image directory (error 0x" << std::hex << std::setw(8)
+                << std::setfill(L'0') << std::uppercase << static_cast<unsigned long>(settings_result.system_error)
+                << L").";
+        MessageBoxW(nullptr, message.str().c_str(), L"ImgVw", MB_OK | MB_ICONERROR);
+        return 1;
+    }
 
     INT argscount;
     const auto args = CommandLineToArgvW(GetCommandLine(), &argscount);

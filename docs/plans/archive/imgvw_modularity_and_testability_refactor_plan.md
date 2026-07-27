@@ -2,10 +2,8 @@
 
 ## Status
 
-**Active.** The ownership, immutable-display, notification-generation, buffer-boundary, and focused-test prerequisites
-are complete. Track 1 (`ImgVwWindow` modularity) and Track 3 (test division) are complete. The remaining work is Track
-2 production hardening: finish buffer/decode arithmetic, extend the remaining explicit-error boundaries, and close the
-layering and static-analysis gaps.
+**Complete.** All modularity, ownership, error-boundary, layering, analysis, test-division, build, and Win32 regression
+work in this plan is complete.
 
 ## Progress Checklist
 
@@ -52,18 +50,25 @@ with checked children is in progress.
   - [x] Validate GDI+ bitmap dimensions, locked-buffer layouts, and unlock ownership.
   - [x] Limit HEIF decode dimensions and validate RGBA-to-BGR conversion storage.
   - [x] Validate CMYK transform layouts and transformed display-buffer size.
-- [ ] Extend explicit result/error boundaries for enumeration, ICC handling, mappings, settings, and temporary paths.
-- [ ] Run focused layering and static-analysis cleanup.
+- [x] Extend explicit result/error boundaries for enumeration, ICC handling, mappings, settings, and temporary paths.
+  - [x] Distinguish completed, cancelled, and failed folder enumeration while preserving native errors.
+  - [x] Return explicit outcomes for default CMYK ICC profile selection and bundled fallback loading.
+  - [x] Add a non-throwing file-mapping result for explicit validation boundaries.
+- [x] Run focused layering and static-analysis cleanup.
 
 ### Track 3: Tests and Final Validation
 
 - [x] Split shared test support and subsystem test sources.
 - [x] Add independently runnable core, platform, image, concurrency, and UI shards to MSYS and Visual Studio builds.
 - [x] Add tests alongside each remaining production component extraction.
-- [ ] Complete final x86/x64 MSYS and Visual Studio builds, formatting/static analysis, and manual regression checks.
+- [x] Complete final x86/x64 MSYS and Visual Studio builds, formatting/static analysis, and manual regression checks.
+  - [x] Run the complete MSYS test suite on x86 and x64.
+  - [x] Build the release application through MSYS on x86 and x64.
+  - [x] Build Release through Visual Studio for Win32 and x64.
+  - [x] Run formatting/static-analysis checks.
+  - [x] Complete the manual Win32 regression checklist.
 
-Current next item: extend explicit result/error boundaries for enumeration, ICC handling, mappings, settings, and
-temporary paths.
+Current next item: none; the plan is complete.
 
 ## Review Update (2026-07-26)
 
@@ -88,8 +93,21 @@ lower-risk RAII work. The remaining work is production hardening, not further re
 - Move-only wrappers now own the remaining registry, COM interface/task-memory, global-memory, acquired-DC, and UI GDI
   resources. Platform ownership tests cover move and teardown behavior, and both MSYS architectures build successfully.
 
-The next implementation slice is buffer and decode-boundary hardening. Keep arithmetic/validation changes separate
-from the subsequent explicit-error-boundary work where practical.
+The buffer and decode-boundary work is complete. Explicit result boundaries cover folder enumeration, default ICC
+selection, non-throwing file mapping, and settings/temporary-directory initialization. The final layering audit found
+no lower-layer UI-header dependency. The analysis pass removed high-confidence narrowing, lifetime, allocation, and
+thread-boundary findings; the remaining Win32 integer/pointer ABI conversions are excluded from the inapplicable
+performance check.
+
+Final validation completed on 2026-07-27:
+
+- all MSYS tests passed on x86 and x64;
+- MSYS Release and Visual Studio Release builds succeeded on x86/Win32 and x64;
+- `scripts/format.ps1 -Check` passed;
+- `scripts/tidy.ps1` completed with no first-party findings; and
+- Win32 smoke checks covered empty, image, folder, and invalid-path launch; x86 and x64 rendering; navigation, overlay,
+  wheel, drag, resize, minimize/restore, theme updates, sequential/random slideshow, three-monitor slideshow
+  start/stop, responsiveness, and clean shutdown.
 
 ## Summary
 
@@ -103,7 +121,7 @@ robustness of the remaining first-party code, and divides the current monolithic
 runnable units. Refactoring should preserve current behavior and the Windows XP compatibility target.
 
 The completed safety prerequisites are recorded in
-`archive/runtime_safety_and_display_publication_plan.md`; the superseded detail plans remain under `archive/`. Their
+`runtime_safety_and_display_publication_plan.md`; the superseded detail plans remain alongside this plan. Their
 ownership and display-publication rules remain authoritative while the coupled slideshow and presentation code is
 extracted.
 
@@ -336,8 +354,8 @@ hidden in a broad replacement controller.
 
 ### Priority 1: Loader and Browser Lifetime Safety
 
-Follow the completed prerequisites in `archive/runtime_safety_and_display_publication_plan.md` and the detailed
-history in `archive/imgvw_stability_refactor_plan.md`. These requirements are complete for the current loader and
+Follow the completed prerequisites in `runtime_safety_and_display_publication_plan.md` and the detailed
+history in `imgvw_stability_refactor_plan.md`. These requirements are complete for the current loader and
 browser implementation. Preserve them during further work:
 
 - cancellation remains synchronized and independent from state reset/storage destruction;
@@ -566,9 +584,9 @@ Manual verification for UI-affecting PRs should cover:
 
 ## Relationship to Existing Plans
 
-- `archive/runtime_safety_and_display_publication_plan.md` records completed loader/browser shutdown safety,
+- `runtime_safety_and_display_publication_plan.md` records completed loader/browser shutdown safety,
   cancellation, viewport publication, and high-risk Win32 RAII work.
-- `archive/windowing_display_improvement_plan.md` retains the detailed viewport, renderer, and display-state rationale.
+- `windowing_display_improvement_plan.md` retains the detailed viewport, renderer, and display-state rationale.
 - This plan owns the modular decomposition of `ImgVwWindow`, the broader responsibility split, and the test-suite
   organization.
 - If plans conflict, preserve the completed lifetime, shutdown, and immutable-publication contracts.

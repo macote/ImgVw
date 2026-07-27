@@ -10,7 +10,8 @@ Checks: >
   readability-inconsistent-declaration-parameter-name,
   readability-redundant-access-specifiers,
   -bugprone-easily-swappable-parameters,
-  -bugprone-reserved-identifier
+  -bugprone-reserved-identifier,
+  -performance-no-int-to-ptr
 WarningsAsErrors: ''
 HeaderFilterRegex: '^(src|tests|resources).*'
 CheckOptions:

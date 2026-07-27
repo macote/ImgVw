@@ -5,7 +5,7 @@
 class CriticalSection final
 {
   public:
-    explicit CriticalSection(DWORD spin_count = 0x00000400)
+    explicit CriticalSection(DWORD spin_count = 0x00000400) noexcept
         : initialized_(InitializeCriticalSectionAndSpinCount(&critical_section_, spin_count) != FALSE)
     {
     }

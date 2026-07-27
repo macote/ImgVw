@@ -63,6 +63,8 @@ LRESULT Window::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_PRINTCLIENT:
         OnPrintClient(reinterpret_cast<HDC>(wParam));
         return 0;
+    default:
+        break;
     }
 
     return DefWindowProc(hwnd_, uMsg, wParam, lParam);

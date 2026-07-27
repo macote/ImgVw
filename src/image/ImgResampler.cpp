@@ -10,7 +10,7 @@ namespace
 constexpr std::uint32_t kWeightOne = 1U << 14U;
 constexpr std::uint32_t kHorizontalFractionBits = 8U;
 constexpr int kMaximumDimension = 32768;
-constexpr std::size_t kMaximumWorkingSetBytes = 512U * 1024U * 1024U;
+constexpr std::size_t kMaximumWorkingSetBytes = std::size_t{512} * 1024U * 1024U;
 
 bool TryMultiply(std::size_t left, std::size_t right, std::size_t* result)
 {

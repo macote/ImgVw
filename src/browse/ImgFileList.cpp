@@ -92,7 +92,8 @@ bool ImgFileList::Add(const std::wstring& filepath)
     {
         random_order_.push_back(filepath);
         std::uniform_int_distribution<std::size_t> insertion(random_index_, random_order_.size() - 1);
-        std::iter_swap(random_order_.begin() + insertion(random_engine_), std::prev(random_order_.end()));
+        const auto insertion_index = static_cast<std::vector<std::wstring>::difference_type>(insertion(random_engine_));
+        std::iter_swap(random_order_.begin() + insertion_index, std::prev(random_order_.end()));
     }
     if (current_ == files_.end() || !current_pinned_)
     {
@@ -245,13 +246,16 @@ bool ImgFileList::MoveToRandomExcluding(const std::vector<std::wstring>& exclude
         if (random_order_.size() > 1 && last == random_order_.front())
         {
             std::uniform_int_distribution<std::size_t> replacement(1, random_order_.size() - 1);
-            std::iter_swap(random_order_.begin(), random_order_.begin() + replacement(random_engine_));
+            const auto replacement_index =
+                static_cast<std::vector<std::wstring>::difference_type>(replacement(random_engine_));
+            std::iter_swap(random_order_.begin(), random_order_.begin() + replacement_index);
         }
 
         random_index_ = 0;
     }
 
-    const auto next = std::find_if(random_order_.begin() + random_index_, random_order_.end(),
+    const auto current_random_index = static_cast<std::vector<std::wstring>::difference_type>(random_index_);
+    const auto next = std::find_if(random_order_.begin() + current_random_index, random_order_.end(),
                                    [&excluded](const std::wstring& filepath) {
                                        return std::find(excluded.begin(), excluded.end(), filepath) == excluded.end();
                                    });
@@ -260,7 +264,7 @@ bool ImgFileList::MoveToRandomExcluding(const std::vector<std::wstring>& exclude
         return false;
     }
 
-    std::iter_swap(random_order_.begin() + random_index_, next);
+    std::iter_swap(random_order_.begin() + current_random_index, next);
     current_ = files_.find(random_order_[random_index_]);
     ++random_index_;
     if (current_ == files_.end())

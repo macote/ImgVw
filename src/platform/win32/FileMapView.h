@@ -9,10 +9,22 @@
 
 enum class FileMapStatus
 {
+    Opened,
     OpenFailed,
     SizeFailed,
     MappingFailed,
     ViewFailed
+};
+
+struct FileMapOpenResult
+{
+    FileMapStatus status{FileMapStatus::OpenFailed};
+    DWORD win32_error{ERROR_SUCCESS};
+
+    bool Succeeded() const
+    {
+        return status == FileMapStatus::Opened;
+    }
 };
 
 class FileMapError final : public std::runtime_error
@@ -39,6 +51,9 @@ class FileMapError final : public std::runtime_error
         const char* operation = "Unknown";
         switch (status)
         {
+        case FileMapStatus::Opened:
+            operation = "Open";
+            break;
         case FileMapStatus::OpenFailed:
             operation = "CreateFile";
             break;
@@ -73,6 +88,7 @@ class FileMapView final
     };
 
   public:
+    FileMapView() = default;
     FileMapView(const std::wstring& filepath, Mode mode) : filepath_(filepath), mode_(mode)
     {
         OpenFile();
@@ -114,6 +130,7 @@ class FileMapView final
         return data_;
     }
     void Open(const std::wstring& filepath, Mode mode);
+    FileMapOpenResult TryOpen(const std::wstring& filepath, Mode mode);
     void Close();
 
   private:
@@ -143,6 +160,19 @@ inline void FileMapView::Open(const std::wstring& filepath, Mode mode)
     mode_ = mode;
     OpenFile();
     InitializeMapping();
+}
+
+inline FileMapOpenResult FileMapView::TryOpen(const std::wstring& filepath, Mode mode)
+{
+    try
+    {
+        Open(filepath, mode);
+        return {FileMapStatus::Opened, ERROR_SUCCESS};
+    }
+    catch (const FileMapError& error)
+    {
+        return {error.status(), error.win32_error()};
+    }
 }
 
 inline void FileMapView::Close()

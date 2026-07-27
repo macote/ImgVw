@@ -104,12 +104,12 @@ void TestFolderScanner()
                                                     cancelled = true;
                                                 },
                                                 {}});
-    Check(cancelled_result.Succeeded() && files.size() == 1,
-          "folder scanner stops after its cancellation callback is signalled");
+    Check(cancelled_result.Cancelled() && cancelled_result.win32_error == ERROR_SUCCESS && files.size() == 1,
+          "folder scanner reports callback cancellation without inventing an enumeration error");
 
     const auto missing_result = scanner.Scan(folder + L"\\missing\\", false, {});
-    Check(!missing_result.Succeeded() && missing_result.win32_error != ERROR_SUCCESS,
-          "folder scanner preserves an enumeration failure");
+    Check(missing_result.status == FolderScanStatus::EnumerationFailed && missing_result.win32_error != ERROR_SUCCESS,
+          "folder scanner preserves an enumeration failure distinctly from cancellation");
 
     DeleteFileW(top_level_image.c_str());
     DeleteFileW(child_image.c_str());

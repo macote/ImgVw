@@ -10,11 +10,11 @@ with the ready state. Fit calculations are shared across JPEG, HEIF, and GDI-bac
 the caller's DC state. Process-unique browser and load-context generations allow the UI to reject late notifications,
 including after a context reset or window-handle reuse.
 
-Broader error-result, static-analysis, and modularity work remains tracked in
+Broader error-result, static-analysis, and modularity work is completed and recorded in
 `imgvw_modularity_and_testability_refactor_plan.md`.
 
-This plan supersedes the remaining implementation items in `archive/imgvw_stability_refactor_plan.md` and
-`archive/windowing_display_improvement_plan.md`. Those documents remain design-history and acceptance-detail
+This plan supersedes the remaining implementation items in `imgvw_stability_refactor_plan.md` and
+`windowing_display_improvement_plan.md`. Those documents remain design-history and acceptance-detail
 references.
 
 ## Phase 1: Prove and Stabilize Loader Lifetime

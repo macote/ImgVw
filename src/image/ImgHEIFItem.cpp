@@ -11,11 +11,12 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
 {
-constexpr std::size_t kMaximumIccProfileSize = 16U * 1024U * 1024U;
+constexpr std::size_t kMaximumIccProfileSize = std::size_t{16} * 1024U * 1024U;
 constexpr int kMaximumHeifDimension = 8192;
 
 bool TryMultiply(std::size_t left, std::size_t right, std::size_t* result)
@@ -372,7 +373,7 @@ void EndDecodeProgress(heif_progress_step step, void* context)
 } // namespace
 
 ImgHEIFItem::ImgHEIFItem(std::wstring filepath, INT targetwidth, INT targetheight)
-    : ImgItem(filepath, targetwidth, targetheight)
+    : ImgItem(std::move(filepath), targetwidth, targetheight)
 {
     SetSupportsLoadingProgress(TRUE);
 }

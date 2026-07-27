@@ -80,6 +80,27 @@ class ImgItem
             return status == CmykProfileValidationStatus::Valid;
         }
     };
+    enum class DefaultICCProfileLoadStatus
+    {
+        AlreadyLoaded,
+        UserDefaultLoaded,
+        BundledFallbackLoaded,
+        BundledResourceUnavailable,
+        BundledProfileInvalid,
+        BundledProfileWrongColorSpace
+    };
+    struct DefaultICCProfileLoadResult
+    {
+        DefaultICCProfileLoadStatus status{DefaultICCProfileLoadStatus::BundledResourceUnavailable};
+        DWORD win32_error{ERROR_SUCCESS};
+
+        bool Succeeded() const
+        {
+            return status == DefaultICCProfileLoadStatus::AlreadyLoaded ||
+                   status == DefaultICCProfileLoadStatus::UserDefaultLoaded ||
+                   status == DefaultICCProfileLoadStatus::BundledFallbackLoaded;
+        }
+    };
     enum class DefaultICCProfileResetStatus
     {
         Succeeded,
@@ -227,7 +248,7 @@ class ImgItem
     LoadCompletionResult loadcompletionresult() const;
     DisplayState GetDisplayState() const;
     ImgBitmap GetDisplayBitmap() const;
-    static void LoadDefaultICCProfile();
+    static DefaultICCProfileLoadResult LoadDefaultICCProfile();
     static void UnloadDefaultICCProfile();
     static DefaultICCProfileResetResult ResetDefaultICCProfile();
     static CmykProfileValidationResult ValidateCMYKICCProfile(const std::wstring& filepath);

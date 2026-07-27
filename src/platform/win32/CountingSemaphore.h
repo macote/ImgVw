@@ -14,8 +14,8 @@ enum class CountingSemaphoreWaitStatus
 class CountingSemaphore final
 {
   public:
-    CountingSemaphore() {}
-    CountingSemaphore(LONG maximumcount)
+    CountingSemaphore() noexcept {}
+    CountingSemaphore(LONG maximumcount) noexcept
     {
         SetupSemaphore(maximumcount);
     }

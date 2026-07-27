@@ -12,8 +12,9 @@ bool Cancelled(const FolderScanCallbacks& callbacks)
 
 void PreserveError(FolderScanResult* result, DWORD error)
 {
-    if (result->win32_error == ERROR_SUCCESS)
+    if (result->status == FolderScanStatus::Completed)
     {
+        result->status = FolderScanStatus::EnumerationFailed;
         result->win32_error = error;
     }
 }
@@ -33,11 +34,22 @@ FolderScanResult FolderScanner::ScanFolders(const std::vector<std::wstring>& fol
     {
         if (Cancelled(callbacks))
         {
+            if (result.status == FolderScanStatus::Completed)
+            {
+                result.status = FolderScanStatus::Cancelled;
+            }
             break;
         }
 
         const auto folder_result = ScanFolder(folderpath, true, callbacks);
-        PreserveError(&result, folder_result.win32_error);
+        if (folder_result.status == FolderScanStatus::EnumerationFailed)
+        {
+            PreserveError(&result, folder_result.win32_error);
+        }
+        else if (folder_result.Cancelled() && result.status == FolderScanStatus::Completed)
+        {
+            result.status = FolderScanStatus::Cancelled;
+        }
     }
     return result;
 }
@@ -46,6 +58,12 @@ FolderScanResult FolderScanner::ScanFolder(const std::wstring& folderpath, bool 
                                            const FolderScanCallbacks& callbacks) const
 {
     FolderScanResult result;
+    if (Cancelled(callbacks))
+    {
+        result.status = FolderScanStatus::Cancelled;
+        return result;
+    }
+
     WIN32_FIND_DATA findfiledata{};
     const std::wstring pattern = folderpath + L"*";
     FindHandle findhandle(FindFirstFile(pattern.c_str(), &findfiledata));
@@ -54,6 +72,7 @@ FolderScanResult FolderScanner::ScanFolder(const std::wstring& folderpath, bool 
         const auto error = GetLastError();
         if (error != ERROR_FILE_NOT_FOUND)
         {
+            result.status = FolderScanStatus::EnumerationFailed;
             result.win32_error = error;
         }
         return result;
@@ -63,6 +82,10 @@ FolderScanResult FolderScanner::ScanFolder(const std::wstring& folderpath, bool 
     {
         if (Cancelled(callbacks))
         {
+            if (result.status == FolderScanStatus::Completed)
+            {
+                result.status = FolderScanStatus::Cancelled;
+            }
             break;
         }
 
@@ -74,7 +97,14 @@ FolderScanResult FolderScanner::ScanFolder(const std::wstring& folderpath, bool 
                 if (recursive)
                 {
                     const auto nested_result = ScanFolder(currentpath, true, callbacks);
-                    PreserveError(&result, nested_result.win32_error);
+                    if (nested_result.status == FolderScanStatus::EnumerationFailed)
+                    {
+                        PreserveError(&result, nested_result.win32_error);
+                    }
+                    else if (nested_result.Cancelled() && result.status == FolderScanStatus::Completed)
+                    {
+                        result.status = FolderScanStatus::Cancelled;
+                    }
                 }
                 else if (callbacks.folder_found)
                 {
@@ -94,7 +124,7 @@ FolderScanResult FolderScanner::ScanFolder(const std::wstring& folderpath, bool 
     } while (FindNextFile(findhandle.get(), &findfiledata));
 
     const auto error = GetLastError();
-    if (!Cancelled(callbacks) && error != ERROR_NO_MORE_FILES)
+    if (result.status != FolderScanStatus::Cancelled && error != ERROR_NO_MORE_FILES)
     {
         PreserveError(&result, error);
     }

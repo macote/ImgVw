@@ -15,13 +15,26 @@ struct FolderScanCallbacks
     std::function<void(const std::wstring&)> folder_found;
 };
 
+enum class FolderScanStatus
+{
+    Completed,
+    Cancelled,
+    EnumerationFailed
+};
+
 struct FolderScanResult
 {
+    FolderScanStatus status{FolderScanStatus::Completed};
     DWORD win32_error{ERROR_SUCCESS};
 
     bool Succeeded() const
     {
-        return win32_error == ERROR_SUCCESS;
+        return status == FolderScanStatus::Completed;
+    }
+
+    bool Cancelled() const
+    {
+        return status == FolderScanStatus::Cancelled;
     }
 };
 

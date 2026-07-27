@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 
 namespace
 {
@@ -157,13 +158,16 @@ void EmptyStateView::UpdateLayout(UINT dpi) const
         return;
     }
 
-    const EmptyStateLayout::Input layout_input{client_rect.right,
-                                               client_rect.bottom,
-                                               dpi,
-                                               IsNoImages(),
-                                               IsSearchingSubfolders(),
-                                               logo_ != nullptr ? static_cast<INT>(logo_->GetWidth()) : 0,
-                                               logo_ != nullptr ? static_cast<INT>(logo_->GetHeight()) : 0};
+    const auto logo_width =
+        logo_ != nullptr && logo_->GetWidth() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
+            ? static_cast<INT>(logo_->GetWidth())
+            : 0;
+    const auto logo_height =
+        logo_ != nullptr && logo_->GetHeight() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
+            ? static_cast<INT>(logo_->GetHeight())
+            : 0;
+    const EmptyStateLayout::Input layout_input{client_rect.right,       client_rect.bottom, dpi,        IsNoImages(),
+                                               IsSearchingSubfolders(), logo_width,         logo_height};
     const auto layout = EmptyStateLayout::Calculate(layout_input);
     const auto button_width = WindowGeometry::ScaleForDpi(150, dpi);
     const auto button_height = WindowGeometry::ScaleForDpi(28, dpi);
@@ -207,13 +211,16 @@ void EmptyStateView::Paint(HDC dc, UINT dpi, bool light_theme)
         FillRect(dc, &client_rect, background.get());
     }
 
-    const EmptyStateLayout::Input layout_input{client_rect.right,
-                                               client_rect.bottom,
-                                               dpi,
-                                               IsNoImages(),
-                                               IsSearchingSubfolders(),
-                                               logo_ != nullptr ? static_cast<INT>(logo_->GetWidth()) : 0,
-                                               logo_ != nullptr ? static_cast<INT>(logo_->GetHeight()) : 0};
+    const auto logo_width =
+        logo_ != nullptr && logo_->GetWidth() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
+            ? static_cast<INT>(logo_->GetWidth())
+            : 0;
+    const auto logo_height =
+        logo_ != nullptr && logo_->GetHeight() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
+            ? static_cast<INT>(logo_->GetHeight())
+            : 0;
+    const EmptyStateLayout::Input layout_input{client_rect.right,       client_rect.bottom, dpi,        IsNoImages(),
+                                               IsSearchingSubfolders(), logo_width,         logo_height};
     const auto layout = EmptyStateLayout::Calculate(layout_input);
     const auto panel_left = (client_rect.right - layout.panel_width) / 2;
     const auto panel_top = layout.buttons_top - WindowGeometry::ScaleForDpi(20, dpi) - layout.panel_height;
@@ -236,7 +243,7 @@ void EmptyStateView::Paint(HDC dc, UINT dpi, bool light_theme)
         Gdiplus::ImageAttributes image_attributes;
         image_attributes.SetWrapMode(Gdiplus::WrapModeTileFlipXY);
         const Gdiplus::Rect destination(logo_left, logo_top, layout.logo_width, layout.logo_height);
-        graphics.DrawImage(logo_.get(), destination, 0, 0, logo_->GetWidth(), logo_->GetHeight(), Gdiplus::UnitPixel,
+        graphics.DrawImage(logo_.get(), destination, 0, 0, logo_width, logo_height, Gdiplus::UnitPixel,
                            &image_attributes);
     }
 }

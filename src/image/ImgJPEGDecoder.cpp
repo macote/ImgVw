@@ -200,7 +200,7 @@ void ImgJPEGDecoder::ReadIccProfile()
 
 void ImgJPEGDecoder::DeleteRowPointers()
 {
-    std::free(row_pointers_);
+    std::free(static_cast<void*>(row_pointers_));
     row_pointers_ = nullptr;
 }
 

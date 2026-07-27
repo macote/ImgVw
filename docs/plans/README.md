@@ -5,18 +5,6 @@ complete or a smaller follow-up plan has replaced its remaining work.
 
 ## Active
 
-### Modularity and testability
-
-`imgvw_modularity_and_testability_refactor_plan.md`
-
-The focused-test split and ownership prerequisites are complete. Remaining work:
-
-1. Split `ImgVwWindow::HandleMessage()` into focused dispatch helpers.
-2. Extract geometry, empty-state layout/view, overlay text/presentation, interaction, and slideshow policy.
-3. Reduce `ImgVwWindow` to Win32 adaptation and composition.
-4. Split the large `ImgBrowserCore` implementation by enumeration, navigation, preload/cache, and notification concerns.
-5. Finish narrow result boundaries, high-confidence static-analysis fixes, and layering checks.
-
 ### Colour-management follow-up
 
 `color_management_follow_up_plan.md`
@@ -54,11 +42,10 @@ add Linux adapters and GTK4. The macOS portion remains a future phase.
 
 ## Recommended Order
 
-1. Continue the production modularity work, starting with pure `ImgVwWindow` helpers and dispatch.
-2. Complete shared JPEG/HEIF SDR colour transforms.
-3. Implement native PNG and integrate its colour metadata.
-4. Perform Store release preflight when a release candidate and external publishing inputs are available.
-5. Begin the portable-core migration only after the Win32 and image-pipeline boundaries are stable.
+1. Complete shared JPEG/HEIF SDR colour transforms.
+2. Implement native PNG and integrate its colour metadata.
+3. Perform Store release preflight when a release candidate and external publishing inputs are available.
+4. Begin the portable-core migration only after the Win32 and image-pipeline boundaries are stable.
 
 Store publication preparation can proceed in parallel with internal refactors, but final packaging must use a frozen,
 fully validated release candidate.

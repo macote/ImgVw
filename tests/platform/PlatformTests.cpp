@@ -32,6 +32,41 @@ SHFILEOPSTRUCTW captured_file_operation{};
 std::vector<wchar_t> captured_paths;
 int shell_result = 0;
 BOOL shell_aborted = FALSE;
+DWORD settings_error = ERROR_SUCCESS;
+DWORD settings_path_length = 0;
+HRESULT settings_guid_result = S_OK;
+BOOL settings_directory_result = TRUE;
+
+DWORD WINAPI MockGetTempPath(DWORD buffer_length, LPWSTR buffer)
+{
+    const wchar_t path[] = L"C:\\Temp\\";
+    if (settings_path_length != 0)
+    {
+        return settings_path_length;
+    }
+    if (buffer_length < sizeof(path) / sizeof(path[0]))
+    {
+        return sizeof(path) / sizeof(path[0]);
+    }
+    std::memcpy(buffer, path, sizeof(path));
+    return static_cast<DWORD>((sizeof(path) / sizeof(path[0])) - 1);
+}
+
+HRESULT WINAPI MockCreateGuid(GUID* guid)
+{
+    guid->Data1 = 0x1234ABCD;
+    return settings_guid_result;
+}
+
+BOOL WINAPI MockCreateDirectory(LPCWSTR, LPSECURITY_ATTRIBUTES)
+{
+    return settings_directory_result;
+}
+
+DWORD WINAPI MockGetLastError()
+{
+    return settings_error;
+}
 
 int WINAPI MockShellFileOperation(LPSHFILEOPSTRUCTW operation)
 {
@@ -164,11 +199,47 @@ void TestRegistryAndComOwnership()
 
 void TestImgSettingsTempDirectory()
 {
-    const auto temp_path = ImgSettings::GetInstance().temppath();
+    const auto& settings = ImgSettings::GetInstance();
+    const auto& initialization = settings.initialization_result();
+    Check(initialization.Succeeded(), "image settings reports successful initialization");
+    const auto temp_path = settings.temppath();
     Check(!temp_path.empty(), "image settings creates a temporary path");
     const auto attributes = GetFileAttributesW(temp_path.c_str());
     Check(attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0,
           "image settings temporary path is an existing directory");
+}
+
+void TestImgSettingsInitializationResults()
+{
+    const ImgSettingsOperations operations{MockGetTempPath, MockCreateGuid, MockCreateDirectory, MockGetLastError};
+
+    settings_path_length = 0;
+    settings_error = ERROR_SUCCESS;
+    settings_guid_result = S_OK;
+    settings_directory_result = TRUE;
+    auto result = InitializeImgSettingsTempDirectory(operations);
+    Check(result.Succeeded() && result.temp_path == L"C:\\Temp\\1234ABCD",
+          "settings initialization returns its created temporary directory");
+
+    settings_path_length = MAX_PATH;
+    result = InitializeImgSettingsTempDirectory(operations);
+    Check(result.status == ImgSettingsStatus::TempPathFailed &&
+              result.system_error == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER),
+          "settings initialization reports an oversized temporary path");
+
+    settings_path_length = 0;
+    settings_guid_result = E_FAIL;
+    result = InitializeImgSettingsTempDirectory(operations);
+    Check(result.status == ImgSettingsStatus::GuidCreationFailed && result.system_error == E_FAIL,
+          "settings initialization preserves a GUID creation failure");
+
+    settings_guid_result = S_OK;
+    settings_directory_result = FALSE;
+    settings_error = ERROR_ACCESS_DENIED;
+    result = InitializeImgSettingsTempDirectory(operations);
+    Check(result.status == ImgSettingsStatus::TempDirectoryCreationFailed &&
+              result.system_error == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED),
+          "settings initialization preserves a directory creation failure");
 }
 
 void TestBrowsePathClassification()
@@ -305,6 +376,12 @@ void TestImgBufferValidationAndMapping()
         rejected = error.status() == FileMapStatus::OpenFailed && error.win32_error() == ERROR_FILE_NOT_FOUND;
     }
     Check(rejected, "file mapping preserves its open status and native error");
+
+    FileMapView missing_mapping;
+    const auto map_result = missing_mapping.TryOpen(missing_path, FileMapView::Mode::Read);
+    Check(!map_result.Succeeded() && map_result.status == FileMapStatus::OpenFailed &&
+              map_result.win32_error == ERROR_FILE_NOT_FOUND,
+          "file mapping provides a non-throwing open result with the native error");
 }
 
 void TestFileOperationPathList()
@@ -366,6 +443,7 @@ void RunPlatformTests()
     TestGdiOwnership();
     TestRegistryAndComOwnership();
     TestImgSettingsTempDirectory();
+    TestImgSettingsInitializationResults();
     TestBrowsePathClassification();
     TestImgBufferValidationAndMapping();
     TestFileOperationPathList();
