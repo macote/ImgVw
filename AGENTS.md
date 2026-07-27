@@ -12,11 +12,12 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - `src/app/`: application startup and top-level app types.
 - `src/ui/win32/`: Win32 windows, message handling, rendering integration, and UI command dispatch.
 - `src/browse/`: image list state, folder enumeration, and navigation behavior.
-- `src/image/`: image item abstractions, JPEG loading, image buffers, cache, and decode helpers.
+- `src/image/`: image item abstractions, format detection and decoding, image buffers, cache, and color helpers.
 - `src/platform/win32/`: Win32 platform helpers and RAII wrappers.
 - `resources/`: Windows resources, manifest, icons, and `resource.h`.
 - `3rd-party/`: vendored dependencies. Do not reformat or refactor these files.
-- `artifacts/`: planning/reference material. Use it for context, but prefer the current source tree when it disagrees.
+- `docs/plans/`: active, pending, and archived implementation plans. Use them for context, but prefer the current
+  source tree when it disagrees.
 
 ## Build and Verification
 
@@ -32,8 +33,9 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
   For example:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-msys.ps1 -Arch x86 -Clean`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-msys.ps1 -Arch x64 -Clean`
-- Dependency build scripts are `scripts/build-libjpeg-turbo.ps1` and `scripts/build-little-cms.ps1`. Use them when
-  rebuilding vendored library artifacts instead of invoking dependency build systems manually.
+- Dependency build scripts are `scripts/build-libjpeg-turbo.ps1`, `scripts/build-libheif.ps1`, and
+  `scripts/build-little-cms.ps1`. Use them when rebuilding vendored library artifacts instead of invoking dependency
+  build systems manually.
 - Useful Makefile variants:
   - `make`
   - `make config=release`
@@ -94,8 +96,9 @@ documented Windows XP compatibility target unless the user explicitly asks to ch
 - Do not make broad formatting-only changes unless the user asks for them.
 - Do not edit vendored code under `3rd-party/` unless the task specifically requires a dependency patch.
 - Keep Visual Studio project files, filters, and the Makefile in sync when adding, moving, or removing source files.
-- Treat `artifacts/imgvw_architecture_refactor_plan.md` as useful direction for larger refactors, especially around
-  ownership, async loading, navigation safety, and tests.
+- Treat `docs/plans/archive/imgvw_architecture_refactor_plan.md` as useful historical direction for larger refactors,
+  especially around ownership, async loading, navigation safety, and tests. Check `docs/plans/README.md` for active
+  plans first.
 - Before staging or committing, inspect staged and unstaged changes separately. Preserve user-made staged changes unless
   the user explicitly asks to replace them.
 - Use the repository's existing plain, imperative commit-message style; do not use Conventional Commit prefixes.

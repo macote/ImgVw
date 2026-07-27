@@ -12,6 +12,12 @@
 - Disable navigation, deletion, slideshow, and slideshow-speed commands until at least one supported image is found
 - Move the persistent filename-overlay shortcut from Enter to Space while retaining Enter and Space activation for
   focused empty-state buttons
+- Refresh contributor guidance and user documentation to reflect the current plan layout, dependency build scripts,
+  and filename-overlay shortcut
+- Improve reliability when moving the viewer between monitors by retaining compatible image caches
+- Harden JPEG decoding and image-buffer validation for malformed, oversized, or unsafe image data
+- Fix a startup race when opening empty folders
+- Improve image-loader shutdown and general resource ownership safety
 
 ## 1.10.0 (2026-07-17)
 

@@ -42,10 +42,10 @@ or folder into the window.
 |           Ctrl + Alt            | Display diagnostics                            |
 |             Delete              | Move to recycle bin if possible or delete      |
 |         Shift + Delete          | Delete                                         |
-|              Enter              | Toggle persistent current file path overlay    |
+|              Space              | Toggle persistent current file path overlay    |
 |             Escape              | Exit                                           |
 
-Enter shows the current file path persistently as images change. In multi-monitor slideshow mode, each monitor shows
+Space shows the current file path persistently as images change. In multi-monitor slideshow mode, each monitor shows
 the path for its own image. Holding Ctrl + Alt temporarily shows diagnostics on every monitor and clears the persistent
 file path toggle; releasing the keys hides the diagnostics without restoring the path overlay.
 
