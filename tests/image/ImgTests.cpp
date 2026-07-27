@@ -3,7 +3,9 @@
 #include "CompatibleDeviceContext.h"
 #include "ImgCache.h"
 #include "ImgGDIItem.h"
+#include "ImgItemHelper.h"
 #include "ImgJPEGDecoder.h"
+#include "ImgJPEGItem.h"
 #include "SelectedGdiObject.h"
 #include "../support/JpegFixture.h"
 #include "../support/TempFile.h"
@@ -194,6 +196,63 @@ void TestJpegDecoderRejectsInvalidData()
     Check(!decoder.error().empty(), "JPEG decoder reports invalid-input error");
 }
 
+void TestJpegItemPreservesLoadError()
+{
+    const auto missing_path = TempPath(L"imgvw-missing-image.jpg");
+    DeleteFileW(missing_path.c_str());
+
+    ImgJPEGItem item(missing_path, 64, 64);
+    item.Load();
+    Check(item.status() == ImgItem::Status::Error && !item.errormessage().empty(),
+          "JPEG item preserves a file-access failure for presentation");
+}
+
+void TestGdiBufferValidation()
+{
+    bool rejected = false;
+    try
+    {
+        ImgItemHelper::GetBuffer(nullptr);
+    }
+    catch (const std::invalid_argument&)
+    {
+        rejected = true;
+    }
+    Check(rejected, "GDI buffer extraction rejects a null bitmap");
+
+    rejected = false;
+    try
+    {
+        ImgItemHelper::Get24bppRGBBitmap(0, 1, reinterpret_cast<PBYTE>(static_cast<UINT_PTR>(1)));
+    }
+    catch (const std::invalid_argument&)
+    {
+        rejected = true;
+    }
+    Check(rejected, "GDI bitmap creation rejects invalid dimensions before reading pixel data");
+}
+
+void TestJpegDecoderValidatesOutputBuffer()
+{
+    const auto jpeg = CreateJpeg(false, false);
+    ImgJPEGDecoder decoder;
+
+    Check(decoder.Initialize(jpeg.data(), jpeg.size()) && decoder.ConfigureOutput(1, 1, false),
+          "JPEG decoder configures output for buffer validation");
+    const auto short_stride = decoder.output_width() * 3 - 1;
+    std::vector<unsigned char> pixels(static_cast<std::size_t>(short_stride) * decoder.output_height());
+    Check(!decoder.Decode(pixels.data(), short_stride, true), "JPEG decoder rejects a short output stride");
+
+    if ((std::numeric_limits<std::size_t>::max)() > (std::numeric_limits<unsigned long>::max)())
+    {
+        const auto oversized_size = static_cast<std::size_t>((std::numeric_limits<unsigned long>::max)()) + 1U;
+        const auto* non_null_data = reinterpret_cast<const unsigned char*>(static_cast<UINT_PTR>(1));
+        ImgJPEGDecoder oversized_input;
+        Check(!oversized_input.Initialize(non_null_data, oversized_size),
+              "JPEG decoder rejects input too large for libjpeg's size argument");
+    }
+}
+
 void TestBundledCmykProfile()
 {
     const auto profile_path = GetFileAttributesW(L"resources/color/CGATS21_CRPC5.icc") != INVALID_FILE_ATTRIBUTES
@@ -276,6 +335,18 @@ void TestBundledCmykProfile()
         const auto transform_result = ColorTransform::TransformCmyk8ReversedToBgr8(
             color_profile, 1, 1, source_stride, destination_stride, &transform_source, heap);
         Check(transform_result.Succeeded(), "ColorTransform converts reversed CMYK to BGR");
+        Check(ColorTransform::TransformCmyk8ReversedToBgr8(color_profile, 1, 1, 3, destination_stride,
+                                                           &transform_source, heap)
+                      .status == ColorTransformStatus::InvalidInput,
+              "ColorTransform rejects a short CMYK source stride");
+        Check(
+            ColorTransform::TransformCmyk8ReversedToBgr8(color_profile, 1, 1, source_stride, 2, &transform_source, heap)
+                    .status == ColorTransformStatus::InvalidInput,
+            "ColorTransform rejects a short BGR destination stride");
+        Check(ColorTransform::TransformCmyk8ReversedToBgr8(color_profile, 1, (std::numeric_limits<INT>::max)(),
+                                                           source_stride, destination_stride, &transform_source, heap)
+                      .status == ColorTransformStatus::InvalidInput,
+              "ColorTransform rejects a transformed buffer beyond the Win32 display limit");
         HeapFree(heap, 0, transform_source);
     }
 
@@ -297,8 +368,7 @@ void TestBundledCmykProfile()
         DeleteFileW(srgb_profile_path.c_str());
     }
 
-    const auto transform =
-        cmsCreateTransform(profile, TYPE_CMYK_8_REV, srgb_profile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
+    const auto transform = cmsCreateTransform(profile, TYPE_CMYK_8_REV, srgb_profile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
     Check(transform != nullptr, "bundled profile creates the required CMYK-to-BGR transform");
 
     if (transform != nullptr)
@@ -321,5 +391,8 @@ void RunImageTests()
     TestJpegDecoderMetadataAndScaling();
     TestJpegDecoderCmyk();
     TestJpegDecoderRejectsInvalidData();
+    TestJpegItemPreservesLoadError();
+    TestGdiBufferValidation();
+    TestJpegDecoderValidatesOutputBuffer();
     TestBundledCmykProfile();
 }

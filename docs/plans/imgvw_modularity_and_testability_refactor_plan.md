@@ -4,8 +4,8 @@
 
 **Active.** The ownership, immutable-display, notification-generation, buffer-boundary, and focused-test prerequisites
 are complete. Track 1 (`ImgVwWindow` modularity) and Track 3 (test division) are complete. The remaining work is Track
-2 production hardening: separate `ImgBrowser` responsibilities, finish lower-risk RAII and arithmetic work, and close
-the remaining explicit-error and static-analysis gaps.
+2 production hardening: finish buffer/decode arithmetic, extend the remaining explicit-error boundaries, and close the
+layering and static-analysis gaps.
 
 ## Progress Checklist
 
@@ -42,11 +42,16 @@ with checked children is in progress.
 - [x] Finish lower-risk Win32 RAII conversions beyond the completed high-risk prerequisites.
   - [x] Convert remaining registry-key and COM interface/allocation ownership.
   - [x] Convert remaining lower-risk UI GDI and acquired-DC ownership.
-- [ ] Split `ImgBrowserCore`.
+- [x] Split `ImgBrowserCore`.
   - [x] Extract `FolderScanner`.
   - [x] Extract `BrowseSession`.
   - [x] Extract `PreloadScheduler`.
-- [ ] Finish buffer and decode-boundary hardening beyond the completed foundational checks.
+- [x] Finish buffer and decode-boundary hardening beyond the completed foundational checks.
+  - [x] Validate JPEG output strides, pointer arithmetic, and libjpeg input-size conversion.
+  - [x] Bound RGBA resampling dimensions, intermediate storage, and allocation failures.
+  - [x] Validate GDI+ bitmap dimensions, locked-buffer layouts, and unlock ownership.
+  - [x] Limit HEIF decode dimensions and validate RGBA-to-BGR conversion storage.
+  - [x] Validate CMYK transform layouts and transformed display-buffer size.
 - [ ] Extend explicit result/error boundaries for enumeration, ICC handling, mappings, settings, and temporary paths.
 - [ ] Run focused layering and static-analysis cleanup.
 
@@ -54,20 +59,22 @@ with checked children is in progress.
 
 - [x] Split shared test support and subsystem test sources.
 - [x] Add independently runnable core, platform, image, concurrency, and UI shards to MSYS and Visual Studio builds.
-- [ ] Add tests alongside each remaining production component extraction.
+- [x] Add tests alongside each remaining production component extraction.
 - [ ] Complete final x86/x64 MSYS and Visual Studio builds, formatting/static analysis, and manual regression checks.
 
-Current next item: finish buffer and decode-boundary hardening beyond the completed foundational checks.
+Current next item: extend explicit result/error boundaries for enumeration, ICC handling, mappings, settings, and
+temporary paths.
 
 ## Review Update (2026-07-26)
 
-The plan was reviewed against the current source tree and history after the completed safety and test-split work. The
-remaining work is correctly concentrated in production modularity, not in redoing the already-completed prerequisites.
+The plan was reconciled with the current source tree and history after the completed browser decomposition and
+lower-risk RAII work. The remaining work is production hardening, not further responsibility extraction.
 
-- `ImgVwWindow.cpp` is approximately 2,300 lines. Browser-stat collection and several platform/application
-  orchestration responsibilities are still owned directly by the window.
-- `ImgBrowser` is a small lifetime-safe facade, but its approximately 1,500-line `ImgBrowserCore` still combines folder
-  collection, session/cancellation state, navigation, preload scheduling, cache access, and notifications.
+- `ImgVwWindow.cpp` remains approximately 2,200 lines, but the remaining methods are Win32 adaptation and explicit
+  subsystem orchestration after the completed composition audit.
+- `ImgBrowser` is a lifetime-safe facade over a core that now delegates folder enumeration to `FolderScanner`,
+  collection/generation state to `BrowseSession`, and target/path worker-queue ownership to `PreloadScheduler`.
+  Navigation, cache/load-context coordination, and notification adaptation remain intentionally visible in the core.
 - `WindowGeometry`, `EmptyStateLayout`, and `OverlayText` now provide the first pure helper boundaries and core tests.
   `EmptyStateView` owns empty/searching state, its message, logo image and backing stream, caption and text fonts,
   control windows, layout, painting, and focus/dialog behavior. `DisplayPresenter` consumes an immutable display
@@ -78,11 +85,11 @@ remaining work is correctly concentrated in production modularity, not in redoin
   `SlideShowStateMachine` owns single-window timing/navigation state, and `MultiMonitorSlideShowCoordinator` owns
   stable secondary-window registrations, deterministic target rotation, shared sequential cursor/preload state, and
   target-size load-context reuse.
-- The working-branch Phase 1 change routes `WM_COMMAND`, `WM_TIMER`, and mouse messages through dedicated helpers while
-  retaining the top-level Win32 message switch and preserving the original message parameters for forwarded commands.
+- Move-only wrappers now own the remaining registry, COM interface/task-memory, global-memory, acquired-DC, and UI GDI
+  resources. Platform ownership tests cover move and teardown behavior, and both MSYS architectures build successfully.
 
-Phases 6 and 7 are complete. The next implementation slice should begin the separately scoped `ImgBrowserCore`
-decomposition with `FolderScanner`; do not combine that ownership change with unrelated window cleanup.
+The next implementation slice is buffer and decode-boundary hardening. Keep arithmetic/validation changes separate
+from the subsequent explicit-error-boundary work where practical.
 
 ## Summary
 
@@ -354,6 +361,10 @@ Add small, move-only, XP-compatible wrappers for:
 Convert loader and browser thread/event/find handles first, followed by renderer resources, image buffers, and window UI
 resources. Capture `GetLastError()` before cleanup can alter it.
 
+Completion status: loader/browser handles and synchronization primitives use the established wrappers. Registry keys,
+COM interfaces and task memory, global memory, acquired DCs, selected GDI objects, and remaining UI GDI resources now
+have deterministic move-only ownership.
+
 ### Priority 3: Split `ImgBrowser` by Responsibility
 
 Extract cohesive collaborators without changing the public browsing workflow:
@@ -365,6 +376,10 @@ Extract cohesive collaborators without changing the public browsing workflow:
 
 Keep cache and loader sharing explicit in `ImgBrowserLoadContext`. Enumeration threads should not directly own
 navigation policy or top-level UI behavior.
+
+Completion status: `FolderScanner`, `BrowseSession`, and `PreloadScheduler` own the responsibilities listed above.
+`PreloadScheduler` owns its worker handles and shared cancellation lifetime while browser callbacks retain cache,
+loader, generation, and notification behavior.
 
 ### Priority 4: Harden Buffers and Decode Boundaries
 

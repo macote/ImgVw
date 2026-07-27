@@ -225,6 +225,10 @@ void TestBrowsePathClassification()
 
 void TestImgBufferValidationAndMapping()
 {
+    const ImgBufferError write_error(ImgBufferStatus::WriteFailed, ERROR_WRITE_FAULT);
+    Check(write_error.status() == ImgBufferStatus::WriteFailed && write_error.win32_error() == ERROR_WRITE_FAULT,
+          "image buffer errors preserve the failed operation and native error");
+
     const BYTE pixels[] = {1, 2, 3, 4, 5, 6, 0, 0};
     ImgBuffer buffer;
     buffer.WriteData(2, 1, 8, pixels);

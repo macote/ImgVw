@@ -54,7 +54,28 @@ ColorTransformResult ColorTransform::TransformCmyk8ReversedToBgr8(const ColorPro
         return {ColorTransformStatus::MissingSourceProfile};
     }
 
-    if (static_cast<std::size_t>(new_stride) > (std::numeric_limits<std::size_t>::max)() / height)
+    std::size_t minimum_source_stride{};
+    std::size_t minimum_destination_stride{};
+    std::size_t source_size{};
+    std::size_t new_buffer_size{};
+    const auto dimensions = static_cast<std::size_t>(width);
+    if (dimensions > (std::numeric_limits<std::size_t>::max)() / 4U ||
+        dimensions > (std::numeric_limits<std::size_t>::max)() / 3U)
+    {
+        return {ColorTransformStatus::InvalidInput};
+    }
+    minimum_source_stride = dimensions * 4U;
+    minimum_destination_stride = dimensions * 3U;
+    if (static_cast<std::size_t>(stride) < minimum_source_stride ||
+        static_cast<std::size_t>(new_stride) < minimum_destination_stride ||
+        static_cast<std::size_t>(stride) > (std::numeric_limits<std::size_t>::max)() / height ||
+        static_cast<std::size_t>(new_stride) > (std::numeric_limits<std::size_t>::max)() / height)
+    {
+        return {ColorTransformStatus::InvalidInput};
+    }
+    source_size = static_cast<std::size_t>(stride) * height;
+    new_buffer_size = static_cast<std::size_t>(new_stride) * height;
+    if (source_size == 0 || new_buffer_size > (std::numeric_limits<DWORD>::max)())
     {
         return {ColorTransformStatus::InvalidInput};
     }
@@ -71,7 +92,6 @@ ColorTransformResult ColorTransform::TransformCmyk8ReversedToBgr8(const ColorPro
         return {ColorTransformStatus::CreateTransformFailed};
     }
 
-    const auto new_buffer_size = static_cast<std::size_t>(new_stride) * height;
     auto new_buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap, 0, new_buffer_size));
     if (new_buffer == nullptr)
     {

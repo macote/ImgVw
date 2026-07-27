@@ -7,6 +7,7 @@
 
 #include <Windows.h>
 
+#include <limits>
 #include <vector>
 
 namespace
@@ -73,10 +74,9 @@ void TestImageFormatResolverUsesSupportedExtensionsOnly()
 void TestImgResamplerAreaDownscale()
 {
     const std::vector<unsigned char> source = {
-        0,   0,   0,   255, 100, 0,   0,   255, 0,   0,   0,   255, 100, 0,   0,   255,
-        0,   100, 0,   255, 100, 100, 0,   255, 0,   100, 0,   255, 100, 100, 0,   255,
-        0,   0,   0,   255, 100, 0,   0,   255, 0,   0,   0,   255, 100, 0,   0,   255,
-        0,   100, 0,   255, 100, 100, 0,   255, 0,   100, 0,   255, 100, 100, 0,   255,
+        0,   0,   0, 255, 100, 0,   0,   255, 0,   0,   0, 255, 100, 0,   0,   255, 0,   100, 0, 255, 100, 100,
+        0,   255, 0, 100, 0,   255, 100, 100, 0,   255, 0, 0,   0,   255, 100, 0,   0,   255, 0, 0,   0,   255,
+        100, 0,   0, 255, 0,   100, 0,   255, 100, 100, 0, 255, 0,   100, 0,   255, 100, 100, 0, 255,
     };
     ImgResampler::Result result;
 
@@ -107,11 +107,16 @@ void TestImgResamplerValidatesInput()
     const unsigned char source[] = {0, 0, 0, 255};
     ImgResampler::Result result;
 
-    Check(!ImgResampler::DownscaleRgba8(source, sizeof(source), 1, 1, 2, 1, ImgResampler::AlphaMode::Straight,
-                                        &result),
+    Check(!ImgResampler::DownscaleRgba8(source, sizeof(source), 1, 1, 2, 1, ImgResampler::AlphaMode::Straight, &result),
           "area resampler rejects upscaling");
     Check(!ImgResampler::DownscaleRgba8(source, 3, 1, 1, 1, 1, ImgResampler::AlphaMode::Straight, &result),
           "area resampler rejects a short source stride");
+    Check(!ImgResampler::DownscaleRgba8(source, (std::numeric_limits<std::size_t>::max)(), 32769, 1, 1, 1,
+                                        ImgResampler::AlphaMode::Straight, &result),
+          "area resampler rejects source dimensions beyond its checked limit");
+    Check(!ImgResampler::DownscaleRgba8(source, 32768U * 4U, 32768, 32768, 32768, 32768,
+                                        ImgResampler::AlphaMode::Straight, &result),
+          "area resampler rejects output that exceeds its working-set limit");
 }
 
 void TestDisplaySizeCalculation()

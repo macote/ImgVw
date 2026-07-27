@@ -77,20 +77,32 @@ bool ImgJPEGDecoder::ConfigureOutput(unsigned int scale_numerator, unsigned int 
     jpeg_calc_output_dimensions(&decompressor_);
     output_width_ = static_cast<int>(decompressor_.output_width);
     output_height_ = static_cast<int>(decompressor_.output_height);
+    output_components_ = cmyk ? 4 : 3;
     return output_width_ > 0 && output_height_ > 0;
 }
 
 bool ImgJPEGDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up, ProgressCallback progress_callback,
                             void* progress_context)
 {
-    if (!created_ || buffer == nullptr || stride <= 0 || output_width_ <= 0 || output_height_ <= 0)
+    if (!created_ || buffer == nullptr || stride <= 0 || output_width_ <= 0 || output_height_ <= 0 ||
+        output_components_ <= 0 || output_width_ > (std::numeric_limits<int>::max)() / output_components_)
     {
         error_ = "Invalid JPEG decode buffer.";
         return false;
     }
 
+    const auto minimum_stride = output_width_ * output_components_;
+    const auto row_count = static_cast<std::size_t>(output_height_);
+    if (stride < minimum_stride || row_count > (std::numeric_limits<std::size_t>::max)() / sizeof(JSAMPROW) ||
+        (row_count > 1 &&
+         static_cast<std::size_t>(stride) > (std::numeric_limits<std::size_t>::max)() / (row_count - 1)))
+    {
+        error_ = "JPEG decode buffer stride is invalid.";
+        return false;
+    }
+
     DeleteRowPointers();
-    row_pointers_ = static_cast<JSAMPROW*>(std::malloc(sizeof(JSAMPROW) * static_cast<std::size_t>(output_height_)));
+    row_pointers_ = static_cast<JSAMPROW*>(std::malloc(sizeof(JSAMPROW) * row_count));
     if (row_pointers_ == nullptr)
     {
         error_ = "Could not allocate JPEG row pointers.";
@@ -130,7 +142,15 @@ bool ImgJPEGDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up, P
         const auto start_scanline = decompressor_.output_scanline;
         const auto remaining_scanlines = decompressor_.output_height - decompressor_.output_scanline;
         const auto scanline_count = remaining_scanlines > 16 ? 16 : remaining_scanlines;
-        jpeg_read_scanlines(&decompressor_, &row_pointers_[decompressor_.output_scanline], scanline_count);
+        const auto decoded_scanlines =
+            jpeg_read_scanlines(&decompressor_, &row_pointers_[decompressor_.output_scanline], scanline_count);
+        if (decoded_scanlines == 0)
+        {
+            error_ = "JPEG decoder did not produce the requested scanlines.";
+            jpeg_abort_decompress(&decompressor_);
+            DeleteRowPointers();
+            return false;
+        }
         if (progress_callback != nullptr && decompressor_.output_scanline != start_scanline)
         {
             const auto percent = static_cast<int>((decompressor_.output_scanline * 100) / decompressor_.output_height);
@@ -138,7 +158,12 @@ bool ImgJPEGDecoder::Decode(unsigned char* buffer, int stride, bool bottom_up, P
         }
     }
 
-    jpeg_finish_decompress(&decompressor_);
+    if (!jpeg_finish_decompress(&decompressor_))
+    {
+        error_ = "JPEG decoder did not finish decompression.";
+        DeleteRowPointers();
+        return false;
+    }
     DeleteRowPointers();
     return true;
 }

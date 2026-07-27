@@ -75,6 +75,7 @@ class ImgJPEGDecoder final
     int height_{};
     int output_width_{};
     int output_height_{};
+    int output_components_{};
     bool is_cmyk_{};
     const unsigned char* exif_data_{};
     std::size_t exif_size_{};

@@ -2,17 +2,6 @@
 
 #include <limits>
 
-namespace
-{
-std::runtime_error Win32Failure(const char* operation, DWORD error)
-{
-    std::stringstream message;
-    message << operation << " failed with error 0x" << std::hex << std::setw(8) << std::setfill('0') << std::uppercase
-            << error;
-    return std::runtime_error(message.str());
-}
-} // namespace
-
 void ImgBuffer::CreateTempFile()
 {
     if (tempfilename_.empty())
@@ -20,7 +9,7 @@ void ImgBuffer::CreateTempFile()
         TCHAR tempfilenamebuffer[MAX_PATH]{};
         if (!GetTempFileName(ImgSettings::GetInstance().temppath().c_str(), TEXT("ImgVw"), 0, tempfilenamebuffer))
         {
-            throw Win32Failure("ImgBuffer.CreateTempFile(GetTempFileName())", GetLastError());
+            throw ImgBufferError(ImgBufferStatus::TempFileNameFailed, GetLastError());
         }
 
         tempfilename_ = tempfilenamebuffer;
@@ -30,7 +19,7 @@ void ImgBuffer::CreateTempFile()
                                FILE_ATTRIBUTE_NORMAL, nullptr));
     if (!tempfile_.valid())
     {
-        throw Win32Failure("ImgBuffer.CreateTempFile(CreateFile())", GetLastError());
+        throw ImgBufferError(ImgBufferStatus::TempFileOpenFailed, GetLastError());
     }
 }
 
@@ -66,20 +55,20 @@ void ImgBuffer::WriteData(INT width, INT height, INT stride, const BYTE* buffer)
     LARGE_INTEGER beginning{};
     if (!SetFilePointerEx(tempfile_.get(), beginning, nullptr, FILE_BEGIN))
     {
-        throw Win32Failure("ImgBuffer.WriteData(SetFilePointerEx())", GetLastError());
+        throw ImgBufferError(ImgBufferStatus::SeekFailed, GetLastError());
     }
     DWORD byteswritten{};
     if (!WriteFile(tempfile_.get(), buffer, bytecount, &byteswritten, nullptr))
     {
-        throw Win32Failure("ImgBuffer.WriteData(WriteFile())", GetLastError());
+        throw ImgBufferError(ImgBufferStatus::WriteFailed, GetLastError());
     }
     if (byteswritten != bytecount)
     {
-        throw Win32Failure("ImgBuffer.WriteData(WriteFile())", ERROR_WRITE_FAULT);
+        throw ImgBufferError(ImgBufferStatus::WriteFailed, ERROR_WRITE_FAULT);
     }
     if (!SetEndOfFile(tempfile_.get()))
     {
-        throw Win32Failure("ImgBuffer.WriteData(SetEndOfFile())", GetLastError());
+        throw ImgBufferError(ImgBufferStatus::ResizeFailed, GetLastError());
     }
 
     width_ = width;

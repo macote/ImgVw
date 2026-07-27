@@ -1,6 +1,8 @@
 #include "ImgItemHelper.h"
 #include "ExifOrientation.h"
 #include <algorithm>
+#include <limits>
+#include <stdexcept>
 #include <vector>
 
 namespace
@@ -30,6 +32,45 @@ class SemaphoreGuard
   private:
     const CountingSemaphore& semaphore_;
     bool acquired_;
+};
+
+class BitmapLock final
+{
+  public:
+    BitmapLock(Gdiplus::Bitmap* bitmap, const Gdiplus::Rect& rectangle) : bitmap_(bitmap)
+    {
+        locked_ = bitmap_ != nullptr &&
+                  bitmap_->LockBits(&rectangle, Gdiplus::ImageLockModeRead, PixelFormat24bppRGB, &data_) == Gdiplus::Ok;
+    }
+    ~BitmapLock()
+    {
+        Unlock();
+    }
+    BitmapLock(const BitmapLock&) = delete;
+    BitmapLock& operator=(const BitmapLock&) = delete;
+    bool locked() const
+    {
+        return locked_;
+    }
+    const Gdiplus::BitmapData& data() const
+    {
+        return data_;
+    }
+    bool Unlock()
+    {
+        if (!locked_)
+        {
+            return true;
+        }
+
+        locked_ = false;
+        return bitmap_->UnlockBits(&data_) == Gdiplus::Ok;
+    }
+
+  private:
+    Gdiplus::Bitmap* bitmap_{};
+    Gdiplus::BitmapData data_{};
+    bool locked_{};
 };
 } // namespace
 
@@ -119,6 +160,11 @@ ImgBuffer ImgItemHelper::ResizeImage(Gdiplus::Bitmap* bitmap, INT targetwidth, I
 ImgBuffer ImgItemHelper::ResizeAndRotateImage(Gdiplus::Bitmap* bitmap, INT targetwidth, INT targetheight,
                                               Gdiplus::RotateFlipType rotateflip)
 {
+    if (bitmap == nullptr)
+    {
+        throw std::invalid_argument("ImgItemHelper.ResizeAndRotateImage() received a null bitmap.");
+    }
+
     INT newwidth{};
     INT newheight{};
     if (!CalculateDisplaySize(bitmap->GetWidth(), bitmap->GetHeight(), targetwidth, targetheight, &newwidth,
@@ -153,6 +199,11 @@ ImgBuffer ImgItemHelper::RotateImage(Gdiplus::Bitmap* bitmap, Gdiplus::RotateFli
 
 std::unique_ptr<Gdiplus::Bitmap> ImgItemHelper::Get24bppRGBBitmap(INT width, INT height, const PBYTE buffer)
 {
+    if (width <= 0 || height <= 0 || buffer == nullptr || width > ((std::numeric_limits<INT>::max)() - 3) / 3)
+    {
+        throw std::invalid_argument("ImgItemHelper.Get24bppRGBBitmap() received invalid bitmap data.");
+    }
+
     BITMAPINFO bitmapinfo{};
     bitmapinfo.bmiHeader.biCompression = BI_RGB;
     bitmapinfo.bmiHeader.biBitCount = 24;
@@ -161,20 +212,57 @@ std::unique_ptr<Gdiplus::Bitmap> ImgItemHelper::Get24bppRGBBitmap(INT width, INT
     bitmapinfo.bmiHeader.biPlanes = 1;
     bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 
-    return std::make_unique<Gdiplus::Bitmap>(&bitmapinfo, buffer);
+    auto bitmap = std::make_unique<Gdiplus::Bitmap>(&bitmapinfo, buffer);
+    if (bitmap->GetLastStatus() != Gdiplus::Ok)
+    {
+        throw std::runtime_error("ImgItemHelper.Get24bppRGBBitmap(Bitmap) failed.");
+    }
+
+    return bitmap;
 }
 
 ImgBuffer ImgItemHelper::GetBuffer(Gdiplus::Bitmap* bitmap)
 {
-    Gdiplus::BitmapData data{};
-    const Gdiplus::Rect rect(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
-    if (bitmap->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat24bppRGB, &data) != Gdiplus::Ok)
+    if (bitmap == nullptr || bitmap->GetWidth() == 0 || bitmap->GetHeight() == 0 ||
+        bitmap->GetWidth() > static_cast<UINT>((std::numeric_limits<INT>::max)()) ||
+        bitmap->GetHeight() > static_cast<UINT>((std::numeric_limits<INT>::max)()))
+    {
+        throw std::invalid_argument("ImgItemHelper.GetBuffer() received invalid bitmap dimensions.");
+    }
+
+    const Gdiplus::Rect rect(0, 0, static_cast<INT>(bitmap->GetWidth()), static_cast<INT>(bitmap->GetHeight()));
+    BitmapLock lock(bitmap, rect);
+    if (!lock.locked())
     {
         throw std::runtime_error("ImgItemHelper.GetBuffer(Bitmap.LockBits()) failed.");
     }
 
+    const auto& data = lock.data();
+    if (data.Scan0 == nullptr || data.Width == 0 || data.Height == 0 ||
+        data.Width > static_cast<UINT>((std::numeric_limits<INT>::max)()) ||
+        data.Height > static_cast<UINT>((std::numeric_limits<INT>::max)()) ||
+        data.Stride == (std::numeric_limits<INT>::min)())
+    {
+        throw std::runtime_error("ImgItemHelper.GetBuffer(Bitmap.LockBits()) returned invalid bitmap data.");
+    }
+
+    if (static_cast<std::size_t>(data.Width) > ((std::numeric_limits<std::size_t>::max)() - 3U) / 3U)
+    {
+        throw std::runtime_error("ImgItemHelper.GetBuffer(Bitmap.LockBits()) returned an unsupported bitmap layout.");
+    }
+
     const auto stride = data.Stride < 0 ? -data.Stride : data.Stride;
-    std::vector<BYTE> bottom_up_buffer(static_cast<std::size_t>(stride) * data.Height);
+    const auto minimum_stride = ((static_cast<std::size_t>(data.Width) * 3U) + 3U) & ~std::size_t(3U);
+    if (stride <= 0 || static_cast<std::size_t>(stride) < minimum_stride ||
+        static_cast<std::size_t>(stride) > (std::numeric_limits<DWORD>::max)() / data.Height ||
+        (data.Height > 1 && static_cast<std::size_t>(stride) >
+                                static_cast<std::size_t>((std::numeric_limits<ptrdiff_t>::max)()) / (data.Height - 1)))
+    {
+        throw std::runtime_error("ImgItemHelper.GetBuffer(Bitmap.LockBits()) returned an unsupported bitmap layout.");
+    }
+
+    const auto buffer_size = static_cast<std::size_t>(stride) * data.Height;
+    std::vector<BYTE> bottom_up_buffer(buffer_size);
     const auto source = static_cast<const BYTE*>(data.Scan0);
     for (UINT row = 0; row < data.Height; ++row)
     {
@@ -182,7 +270,7 @@ ImgBuffer ImgItemHelper::GetBuffer(Gdiplus::Bitmap* bitmap)
                    source + static_cast<ptrdiff_t>(row) * data.Stride, stride);
     }
 
-    if (bitmap->UnlockBits(&data) != Gdiplus::Ok)
+    if (!lock.Unlock())
     {
         throw std::runtime_error("ImgItemHelper.GetBuffer(Bitmap.UnlockBits()) failed.");
     }

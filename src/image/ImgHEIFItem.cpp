@@ -16,6 +16,18 @@
 namespace
 {
 constexpr std::size_t kMaximumIccProfileSize = 16U * 1024U * 1024U;
+constexpr int kMaximumHeifDimension = 8192;
+
+bool TryMultiply(std::size_t left, std::size_t right, std::size_t* result)
+{
+    if (result == nullptr || (right != 0 && left > (std::numeric_limits<std::size_t>::max)() / right))
+    {
+        return false;
+    }
+
+    *result = left * right;
+    return true;
+}
 
 struct ContextDeleter
 {
@@ -216,22 +228,39 @@ bool ConvertRgbaToBottomUpBgr(const std::vector<std::uint8_t>& embedded_profile,
                               std::vector<std::uint8_t>* output, int* output_stride)
 {
     const auto destination_stride = PaddedBgrStride(width);
-    if (source == nullptr || destination_stride == 0 || source_stride < static_cast<std::size_t>(width) * 4U ||
-        static_cast<std::size_t>(destination_stride) >
-            (std::numeric_limits<std::size_t>::max)() / static_cast<std::size_t>(height))
+    std::size_t minimum_source_stride{};
+    std::size_t destination_size{};
+    std::size_t last_source_row_offset{};
+    if (source == nullptr || output == nullptr || output_stride == nullptr || width <= 0 || height <= 0 ||
+        destination_stride == 0 || !TryMultiply(static_cast<std::size_t>(width), 4U, &minimum_source_stride) ||
+        source_stride < minimum_source_stride || source_stride > (std::numeric_limits<cmsUInt32Number>::max)() ||
+        !TryMultiply(static_cast<std::size_t>(destination_stride), static_cast<std::size_t>(height),
+                     &destination_size) ||
+        destination_size > (std::numeric_limits<DWORD>::max)() ||
+        !TryMultiply(source_stride, static_cast<std::size_t>(height - 1), &last_source_row_offset) ||
+        last_source_row_offset > (std::numeric_limits<std::size_t>::max)() - minimum_source_stride)
     {
         return false;
     }
 
-    output->assign(static_cast<std::size_t>(destination_stride) * height, 0);
-    std::vector<std::uint8_t> color_managed(static_cast<std::size_t>(destination_stride) * height, 0);
+    output->assign(destination_size, 0);
+    std::vector<std::uint8_t> color_managed;
+    if (!embedded_profile.empty())
+    {
+        color_managed.assign(destination_size, 0);
+    }
     const auto* transform_source = source;
     auto transform_source_stride = source_stride;
     std::vector<std::uint8_t> unpremultiplied;
     if (premultiplied && !embedded_profile.empty())
     {
-        transform_source_stride = static_cast<std::size_t>(width) * 4U;
-        unpremultiplied.resize(transform_source_stride * height);
+        transform_source_stride = minimum_source_stride;
+        std::size_t unpremultiplied_size{};
+        if (!TryMultiply(transform_source_stride, static_cast<std::size_t>(height), &unpremultiplied_size))
+        {
+            return false;
+        }
+        unpremultiplied.resize(unpremultiplied_size);
         for (int row_index = 0; row_index < height; ++row_index)
         {
             const auto source_row = source + static_cast<std::size_t>(row_index) * source_stride;
@@ -255,6 +284,7 @@ bool ConvertRgbaToBottomUpBgr(const std::vector<std::uint8_t>& embedded_profile,
         transform_source = unpremultiplied.data();
     }
     const auto color_transform_applied =
+        !color_managed.empty() &&
         TransformEmbeddedRgbProfile(embedded_profile, transform_source, transform_source_stride, width, height,
                                     color_managed.data(), destination_stride);
 
@@ -375,6 +405,14 @@ void ImgHEIFItem::Load()
             SetError(L"Could not allocate a libheif context.");
             return;
         }
+        auto* security_limits = heif_context_get_security_limits(context.get());
+        if (security_limits == nullptr)
+        {
+            SetError(L"Could not configure HEIF security limits.");
+            return;
+        }
+        security_limits->max_image_size_pixels =
+            static_cast<std::uint64_t>(kMaximumHeifDimension) * kMaximumHeifDimension;
 
         auto error = heif_context_read_from_memory_without_copy(context.get(), file_map.data(),
                                                                 file_map.filesize().LowPart, nullptr);

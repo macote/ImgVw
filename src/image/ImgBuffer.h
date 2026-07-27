@@ -4,10 +4,70 @@
 #include "ImgSettings.h"
 #include "Win32Handle.h"
 #include <Windows.h>
-#include <string>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+
+enum class ImgBufferStatus
+{
+    TempFileNameFailed,
+    TempFileOpenFailed,
+    SeekFailed,
+    WriteFailed,
+    ResizeFailed
+};
+
+class ImgBufferError final : public std::runtime_error
+{
+  public:
+    ImgBufferError(ImgBufferStatus status, DWORD win32_error)
+        : std::runtime_error(BuildMessage(status, win32_error)), status_(status), win32_error_(win32_error)
+    {
+    }
+
+    ImgBufferStatus status() const
+    {
+        return status_;
+    }
+
+    DWORD win32_error() const
+    {
+        return win32_error_;
+    }
+
+  private:
+    static std::string BuildMessage(ImgBufferStatus status, DWORD win32_error)
+    {
+        const char* operation = "Unknown";
+        switch (status)
+        {
+        case ImgBufferStatus::TempFileNameFailed:
+            operation = "GetTempFileName";
+            break;
+        case ImgBufferStatus::TempFileOpenFailed:
+            operation = "CreateFile";
+            break;
+        case ImgBufferStatus::SeekFailed:
+            operation = "SetFilePointerEx";
+            break;
+        case ImgBufferStatus::WriteFailed:
+            operation = "WriteFile";
+            break;
+        case ImgBufferStatus::ResizeFailed:
+            operation = "SetEndOfFile";
+            break;
+        }
+
+        std::stringstream message;
+        message << "ImgBuffer." << operation << "() failed with error 0x" << std::hex << std::setw(8)
+                << std::setfill('0') << std::uppercase << win32_error;
+        return message.str();
+    }
+
+    ImgBufferStatus status_;
+    DWORD win32_error_;
+};
 
 class ImgBuffer
 {

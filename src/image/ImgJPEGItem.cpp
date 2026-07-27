@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <limits>
+#include <string>
 
 namespace
 {
@@ -52,6 +53,28 @@ int PaddedStride(int width, int component_count)
     }
     return ((width * component_count) + 3) & ~3;
 }
+
+std::wstring Utf8ToWide(const std::string& text)
+{
+    if (text.empty())
+    {
+        return L"JPEG loading failed.";
+    }
+
+    const auto length = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    if (length <= 0)
+    {
+        return L"JPEG loading failed.";
+    }
+
+    std::wstring wide_text(static_cast<std::size_t>(length), L'\0');
+    if (MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), wide_text.data(), length) == 0)
+    {
+        return L"JPEG loading failed.";
+    }
+
+    return wide_text;
+}
 } // namespace
 
 ImgJPEGItem::ImgJPEGItem(std::wstring filepath, INT targetwidth, INT targetheight)
@@ -69,6 +92,11 @@ void ImgJPEGItem::UpdateDecodeProgress(int percent, void* context)
     }
 }
 
+void ImgJPEGItem::SetLoadError()
+{
+    SetError(Utf8ToWide(errorstring_));
+}
+
 void ImgJPEGItem::Load()
 {
     SetStatus(Status::Loading);
@@ -80,7 +108,8 @@ void ImgJPEGItem::Load()
         FileMapView jpegfilemap(filepath_, FileMapView::Mode::Read);
         if (jpegfilemap.filesize().HighPart > 0)
         {
-            SetError();
+            errorstring_ = "JPEG file exceeds the supported size.";
+            SetLoadError();
             goto done;
         }
 
@@ -94,7 +123,7 @@ void ImgJPEGItem::Load()
         if (!decoder.Initialize(jpegfilemap.data(), jpegfilemap.filesize().LowPart))
         {
             errorstring_ = decoder.error();
-            SetError();
+            SetLoadError();
             goto done;
         }
 
@@ -158,7 +187,7 @@ void ImgJPEGItem::Load()
         if (!decoder.ConfigureOutput(scalingfactor.numerator, scalingfactor.denominator, decoder.is_cmyk()))
         {
             errorstring_ = decoder.error();
-            SetError();
+            SetLoadError();
             goto done;
         }
 
@@ -170,22 +199,28 @@ void ImgJPEGItem::Load()
                 (std::numeric_limits<std::size_t>::max)() / static_cast<std::size_t>(decompressheight))
         {
             errorstring_ = "JPEG output dimensions exceed the supported buffer size.";
-            SetError();
+            SetLoadError();
             goto done;
         }
         const auto buffersize = static_cast<std::size_t>(stride) * decompressheight;
+        if (buffersize > (std::numeric_limits<DWORD>::max)())
+        {
+            errorstring_ = "JPEG output exceeds the supported display buffer size.";
+            SetLoadError();
+            goto done;
+        }
         buffer = reinterpret_cast<PBYTE>(HeapAlloc(heap_, 0, buffersize));
         if (buffer == nullptr)
         {
             errorstring_ = "Could not allocate JPEG output buffer.";
-            SetError();
+            SetLoadError();
             goto done;
         }
 
         if (!decoder.Decode(buffer, stride, true, showprogress ? UpdateDecodeProgress : nullptr, this))
         {
             errorstring_ = decoder.error();
-            SetError();
+            SetLoadError();
             goto done;
         }
 
@@ -195,7 +230,7 @@ void ImgJPEGItem::Load()
             if (newstride == 0)
             {
                 errorstring_ = "JPEG color-conversion stride exceeds the supported range.";
-                SetError();
+                SetLoadError();
                 goto done;
             }
             if (!TranformCMYK8ColorsToBGR8(decompresswidth, decompressheight, stride, newstride, &buffer))
@@ -222,9 +257,16 @@ void ImgJPEGItem::Load()
             pending_displaybuffer_.WriteData(decompresswidth, decompressheight, stride, buffer);
         }
     }
+    catch (const std::exception& error)
+    {
+        errorstring_ = error.what();
+        SetLoadError();
+        goto done;
+    }
     catch (...)
     {
-        SetError();
+        errorstring_ = "Unexpected JPEG loading failure.";
+        SetLoadError();
         goto done;
     }
 
