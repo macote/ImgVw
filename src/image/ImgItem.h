@@ -159,6 +159,10 @@ class ImgItem
         Status status{Status::Queued};
         std::shared_ptr<const DisplayFrame> frame;
         std::wstring errormessage;
+        INT imagewidth{};
+        INT imageheight{};
+        BOOL hasfilesize{};
+        ULONGLONG filesize{};
     };
 
   public:
@@ -301,6 +305,8 @@ class ImgItem
     void SetupDisplayParameters(BOOL topdownbitmap);
     void SetStatus(Status status);
     void SetError(std::wstring errormessage = {});
+    void SetImageDimensions(INT width, INT height);
+    void SetFileSize(ULONGLONG filesize);
     bool SignalLoadComplete();
     void OpenICCProfile(const BYTE* iccprofiledata, UINT iccprofiledatabytecount);
     BOOL IsICCProfileLoaded() const
@@ -327,6 +333,10 @@ class ImgItem
     Status status_{Status::Queued};
     std::shared_ptr<const DisplayFrame> displayframe_;
     std::wstring errormessage_;
+    INT imagewidth_{};
+    INT imageheight_{};
+    BOOL hasfilesize_{};
+    ULONGLONG filesize_{};
     ColorProfile iccprofile_;
     BOOL iccprofileloadfailed_{};
     CmykProfileSource cmykprofilesource_{CmykProfileSource::None};

@@ -275,11 +275,16 @@ void TestOverlayText()
     Check(OverlayText::FormatByteSize(104857600) == L"100 MB", "byte-size formatting rounds large values");
     Check(OverlayText::FormatPercent(1, 4) == L"25%", "percentage formatting uses whole percentages");
     Check(OverlayText::FormatPercent(1, 0) == L"0%", "percentage formatting handles an empty total");
-    Check(OverlayText::BuildItemInfo(L"image.jpg", true, false, 0) == L"image.jpg",
-          "ready image info omits loading progress");
-    Check(OverlayText::BuildItemInfo(L"image.jpg", false, true, 42) == L"[42%] image.jpg",
+    Check(OverlayText::BuildItemInfo(L"image.jpg", true, false, 0, 1920, 1080, true, 1048576) ==
+              L"image.jpg\r\n1920 x 1080 px; 1.0 MB",
+          "ready image info includes dimensions and file size");
+    Check(OverlayText::BuildItemInfo(L"image.jpg", true, false, 0, 1920, 1080, false, 0) ==
+              L"image.jpg\r\n1920 x 1080 px",
+          "ready image info omits unavailable file size");
+    Check(OverlayText::BuildItemInfo(L"image.jpg", false, true, 42, 1920, 1080, true, 1048576) ==
+              L"[42%] image.jpg",
           "loading image info includes progress");
-    Check(OverlayText::BuildItemInfo(L"image.jpg", false, false, 42) == L"[0%] image.jpg",
+    Check(OverlayText::BuildItemInfo(L"image.jpg", false, false, 42, 0, 0, false, 0) == L"[0%] image.jpg",
           "non-loading image info uses zero progress");
 }
 

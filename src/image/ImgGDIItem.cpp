@@ -7,6 +7,15 @@ void ImgGDIItem::Load()
 {
     SetStatus(Status::Loading);
 
+    WIN32_FILE_ATTRIBUTE_DATA fileattributes{};
+    if (GetFileAttributesEx(filepath_.c_str(), GetFileExInfoStandard, &fileattributes))
+    {
+        ULARGE_INTEGER filesize{};
+        filesize.HighPart = fileattributes.nFileSizeHigh;
+        filesize.LowPart = fileattributes.nFileSizeLow;
+        SetFileSize(filesize.QuadPart);
+    }
+
     const auto bitmap = std::make_unique<Gdiplus::Bitmap>(filepath_.c_str(), FALSE);
     lastgdiplusstatus_ = bitmap->GetLastStatus();
     if (lastgdiplusstatus_ != Gdiplus::Status::Ok || bitmap->GetWidth() == 0 || bitmap->GetHeight() == 0 ||
@@ -19,6 +28,7 @@ void ImgGDIItem::Load()
 
     width_ = static_cast<INT>(bitmap->GetWidth());
     height_ = static_cast<INT>(bitmap->GetHeight());
+    SetImageDimensions(width_, height_);
     if (width_ > targetwidth_ || height_ > targetheight_)
     {
         pending_displaybuffer_ = ImgItemHelper::ResizeImage(bitmap.get(), targetwidth_, targetheight_);

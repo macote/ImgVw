@@ -63,6 +63,10 @@ void ImgItem::Unload()
         status_ = Status::Queued;
         displayframe_.reset();
         errormessage_.clear();
+        imagewidth_ = 0;
+        imageheight_ = 0;
+        hasfilesize_ = FALSE;
+        filesize_ = 0;
     }
     ResetLoadingProgress();
     iccprofileloadfailed_ = FALSE;
@@ -139,6 +143,10 @@ void ImgItem::SetStatus(Status status)
     if (status == Status::Loading)
     {
         errormessage_.clear();
+        imagewidth_ = 0;
+        imageheight_ = 0;
+        hasfilesize_ = FALSE;
+        filesize_ = 0;
     }
 }
 
@@ -150,10 +158,24 @@ void ImgItem::SetError(std::wstring errormessage)
     status_ = Status::Error;
 }
 
+void ImgItem::SetImageDimensions(INT width, INT height)
+{
+    CriticalSectionLock lock(displaystatecriticalsection_);
+    imagewidth_ = width;
+    imageheight_ = height;
+}
+
+void ImgItem::SetFileSize(ULONGLONG filesize)
+{
+    CriticalSectionLock lock(displaystatecriticalsection_);
+    hasfilesize_ = TRUE;
+    filesize_ = filesize;
+}
+
 ImgItem::DisplayState ImgItem::GetDisplayState() const
 {
     CriticalSectionLock lock(displaystatecriticalsection_);
-    return DisplayState{status_, displayframe_, errormessage_};
+    return DisplayState{status_, displayframe_, errormessage_, imagewidth_, imageheight_, hasfilesize_, filesize_};
 }
 
 ImgBitmap ImgItem::GetDisplayBitmap() const

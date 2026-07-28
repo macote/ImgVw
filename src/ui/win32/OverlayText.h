@@ -57,7 +57,8 @@ inline std::wstring FormatPercent(std::size_t numerator, std::size_t denominator
     return text.str();
 }
 
-inline std::wstring BuildItemInfo(const std::wstring& filepath, bool ready, bool loading, int loading_percent)
+inline std::wstring BuildItemInfo(const std::wstring& filepath, bool ready, bool loading, int loading_percent,
+                                  int image_width, int image_height, bool has_file_size, unsigned long long file_size)
 {
     std::wstringstream text;
     if (!ready)
@@ -65,6 +66,22 @@ inline std::wstring BuildItemInfo(const std::wstring& filepath, bool ready, bool
         text << L"[" << (loading ? loading_percent : 0) << L"%] ";
     }
     text << filepath;
+    if (ready && ((image_width > 0 && image_height > 0) || has_file_size))
+    {
+        text << L"\r\n";
+        if (image_width > 0 && image_height > 0)
+        {
+            text << image_width << L" x " << image_height << L" px";
+            if (has_file_size)
+            {
+                text << L"; ";
+            }
+        }
+        if (has_file_size)
+        {
+            text << FormatByteSize(file_size);
+        }
+    }
     return text.str();
 }
 } // namespace OverlayText

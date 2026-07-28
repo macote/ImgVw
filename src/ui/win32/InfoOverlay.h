@@ -116,10 +116,12 @@ class InfoOverlay final
 
     static std::wstring BuildItemText(const ImgItem* item, const std::wstring& filepath)
     {
-        const auto ready = item != nullptr && item->status() == ImgItem::Status::Ready;
-        const auto loading = item != nullptr && item->status() == ImgItem::Status::Loading;
+        const auto state = item == nullptr ? ImgItem::DisplayState{} : item->GetDisplayState();
+        const auto ready = state.status == ImgItem::Status::Ready;
+        const auto loading = state.status == ImgItem::Status::Loading;
         const auto percent = loading ? (std::max)(item->loadingprogresspercent(), 0) : 0;
-        return OverlayText::BuildItemInfo(filepath, ready, loading, percent);
+        return OverlayText::BuildItemInfo(filepath, ready, loading, percent, state.imagewidth, state.imageheight,
+                                          state.hasfilesize != FALSE, state.filesize);
     }
 
     static std::wstring BuildStatsText(const InfoOverlayStatsSnapshot& snapshot);

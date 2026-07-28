@@ -1,5 +1,7 @@
 ## High Priority
 
+- Be OneDrive aware (confirm before download)
+
 ## Medium Priority
 
 - Storage management
@@ -8,13 +10,9 @@
 - Folder navigation
 - Thumbnails
 - Pan & Zoom
-- UI for information
-  - Image dimensions
-  - File size
 - UI for operations
   - Rotate
   - Resize
-- Review error handling
 
 ## Low Priority
 

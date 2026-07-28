@@ -394,6 +394,7 @@ void ImgHEIFItem::Load()
         }
 
         FileMapView file_map(filepath_, FileMapView::Mode::Read);
+        SetFileSize(static_cast<ULONGLONG>(file_map.filesize().QuadPart));
         if (file_map.filesize().HighPart != 0 || file_map.filesize().LowPart == 0)
         {
             SetError(L"HEIF file is empty or too large.");
@@ -439,6 +440,7 @@ void ImgHEIFItem::Load()
             SetError(L"HEIF primary image has invalid dimensions.");
             return;
         }
+        SetImageDimensions(width_, height_);
 
         std::vector<std::uint8_t> embedded_profile;
         const auto has_embedded_profile = ReadEmbeddedRgbProfile(handle.get(), &embedded_profile);

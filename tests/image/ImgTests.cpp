@@ -126,14 +126,20 @@ void TestGdiItemPreservesTopRowOrientation()
     const auto display_state = item.GetDisplayState();
     Check(display_state.status == ImgItem::Status::Ready && display_state.frame != nullptr,
           "GDI item publishes a complete display frame");
+    Check(display_state.imagewidth == 1 && display_state.imageheight == 2,
+          "GDI item publishes intrinsic image dimensions");
+    Check(display_state.hasfilesize && display_state.filesize == bmp.size(), "GDI item publishes the source file size");
     if (display_state.frame != nullptr)
     {
         Check(display_state.frame->width() == 1 && display_state.frame->height() == 2 &&
                   display_state.frame->offsetx() == 0 && display_state.frame->offsety() == 0,
               "published display frame contains coherent geometry");
         item.Unload();
-        Check(item.status() == ImgItem::Status::Queued && item.GetDisplayState().frame == nullptr,
+        const auto unloaded_state = item.GetDisplayState();
+        Check(unloaded_state.status == ImgItem::Status::Queued && unloaded_state.frame == nullptr,
               "unloading removes the published frame");
+        Check(unloaded_state.imagewidth == 0 && unloaded_state.imageheight == 0 && !unloaded_state.hasfilesize,
+              "unloading clears published image information");
 
         const auto bitmap = display_state.frame->GetBitmap();
         CompatibleDeviceContext dc(CreateCompatibleDC(nullptr));

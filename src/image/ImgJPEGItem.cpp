@@ -107,6 +107,7 @@ void ImgJPEGItem::Load()
     try
     {
         FileMapView jpegfilemap(filepath_, FileMapView::Mode::Read);
+        SetFileSize(static_cast<ULONGLONG>(jpegfilemap.filesize().QuadPart));
         if (jpegfilemap.filesize().HighPart > 0)
         {
             errorstring_ = "JPEG file exceeds the supported size.";
@@ -146,11 +147,13 @@ void ImgJPEGItem::Load()
         if (rotateflip == Gdiplus::Rotate90FlipNone || rotateflip == Gdiplus::Rotate270FlipNone ||
             rotateflip == Gdiplus::Rotate90FlipX || rotateflip == Gdiplus::Rotate270FlipX)
         {
+            SetImageDimensions(height_, width_);
             targetwidth = targetheight_;
             targetheight = targetwidth_;
         }
         else
         {
+            SetImageDimensions(width_, height_);
             targetwidth = targetwidth_;
             targetheight = targetheight_;
         }
