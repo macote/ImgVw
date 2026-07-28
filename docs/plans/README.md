@@ -5,6 +5,14 @@ complete or a smaller follow-up plan has replaced its remaining work.
 
 ## Active
 
+### Cloud file download consent
+
+`cloud_file_download_consent_plan.md`
+
+High priority. Detect online-only images without reading their content, gate header probes and every preload/load path,
+and show an ImgVw-native consent surface before retrieval. Modern Cloud Files APIs must be dynamically discovered so
+the portable executable remains compatible with Windows XP.
+
 ### Colour-management follow-up
 
 `color_management_follow_up_plan.md`
@@ -42,10 +50,11 @@ add Linux adapters and GTK4. The macOS portion remains a future phase.
 
 ## Recommended Order
 
-1. Complete shared JPEG/HEIF SDR colour transforms.
-2. Implement native PNG and integrate its colour metadata.
-3. Perform Store release preflight when a release candidate and external publishing inputs are available.
-4. Begin the portable-core migration only after the Win32 and image-pipeline boundaries are stable.
+1. Implement cloud file download consent and prevent unapproved content probes/preloads.
+2. Complete shared JPEG/HEIF SDR colour transforms.
+3. Implement native PNG and integrate its colour metadata.
+4. Perform Store release preflight when a release candidate and external publishing inputs are available.
+5. Begin the portable-core migration only after the Win32 and image-pipeline boundaries are stable.
 
 Store publication preparation can proceed in parallel with internal refactors, but final packaging must use a frozen,
 fully validated release candidate.
