@@ -22,6 +22,10 @@ class CursorController final
   public:
     CursorVisibilityAction SetVisible(bool visible)
     {
+        if (!auto_hide_enabled_ && !visible)
+        {
+            return CursorVisibilityAction::None;
+        }
         if (visibility_known_ && visible_ == visible)
         {
             return CursorVisibilityAction::None;
@@ -29,6 +33,18 @@ class CursorController final
         visibility_known_ = true;
         visible_ = visible;
         return visible ? CursorVisibilityAction::Show : CursorVisibilityAction::Hide;
+    }
+
+    CursorVisibilityAction SetAutoHideEnabled(bool enabled)
+    {
+        auto_hide_enabled_ = enabled;
+        if (enabled)
+        {
+            return CursorVisibilityAction::None;
+        }
+
+        idle_timer_armed_ = false;
+        return SetVisible(true);
     }
 
     bool SetCaptured(bool captured)
@@ -56,6 +72,10 @@ class CursorController final
 
         last_point_ = point;
         last_activity_counter_ = counter;
+        if (!auto_hide_enabled_)
+        {
+            return {SetVisible(true), false, false, 0};
+        }
         if (idle_timer_armed_)
         {
             return {SetVisible(true), false, false, 0};
@@ -100,6 +120,7 @@ class CursorController final
     bool captured_{};
     bool has_last_point_{};
     bool idle_timer_armed_{};
+    bool auto_hide_enabled_{true};
     POINTS last_point_{};
     LONGLONG last_activity_counter_{};
 };

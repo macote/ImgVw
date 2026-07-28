@@ -100,6 +100,18 @@ void TestCursorController()
     const auto idle = controller.OnIdleTimer(225, 1000, 100);
     Check(idle.visibility == CursorVisibilityAction::Hide && idle.cancel_idle_timer,
           "cursor idle policy hides once after the timeout");
+
+    Check(controller.SetAutoHideEnabled(false) == CursorVisibilityAction::Show,
+          "disabling auto-hide restores a hidden cursor");
+    Check(controller.SetVisible(false) == CursorVisibilityAction::None,
+          "disabled auto-hide rejects cursor hide requests");
+    const auto moved_while_disabled = controller.OnMouseMove(POINTS{13, 10}, 250);
+    Check(moved_while_disabled.visibility == CursorVisibilityAction::None && !moved_while_disabled.arm_idle_timer,
+          "disabled auto-hide leaves idle tracking disarmed");
+    Check(controller.SetAutoHideEnabled(true) == CursorVisibilityAction::None,
+          "enabling auto-hide preserves the visible cursor");
+    const auto moved_after_enabling = controller.OnMouseMove(POINTS{14, 10}, 275);
+    Check(moved_after_enabling.arm_idle_timer, "mouse activity rearms idle tracking after auto-hide is enabled");
 }
 
 void TestMonitorPlacement()

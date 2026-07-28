@@ -470,8 +470,8 @@ void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_s
         KillTimer(hwnd_, IDT_HIDEMOUSE);
         cursor_controller_.CancelIdleTimer();
         ApplyCursorCapture(false);
-        ApplyCursorVisibility(cursor_controller_.SetVisible(true));
     }
+    ApplyCursorVisibility(cursor_controller_.SetAutoHideEnabled(false));
 
     empty_state_view_.UpdateLayout(GetWindowDpi());
     InvalidateRect(hwnd_, nullptr, FALSE);
@@ -492,6 +492,8 @@ void ImgVwWindow::HideEmptyState()
     }
 
     empty_state_view_.Hide();
+    cursor_controller_.SetAutoHideEnabled(true);
+
     if (primarywindow_)
     {
         ApplyCursorCapture(true);
