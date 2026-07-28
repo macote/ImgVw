@@ -1,35 +1,9 @@
 # ImgVw Plan Index
 
-This index records which plans are active, pending, or historical. A plan moves to `archive/` when its implementation is
-complete or a smaller follow-up plan has replaced its remaining work.
+This index lists current plans. A plan moves to `archive/` when its implementation is complete or a smaller follow-up
+plan has replaced its remaining work.
 
-## Active
-
-### Portable core foundation
-
-`portable_core_foundation_plan.md`
-
-The initial CMake core boundary, portable command/error/frame/geometry types, native-header check, and focused tests
-exist on `codex/macos-portable-core`. Remaining work ports paths, pixel storage, decoders, services,
-browser/loader/cache behavior, and application control behind contracts shared by Windows, macOS, and Linux.
-
-### Native Windows frontend migration
-
-`windows_native_frontend_migration_plan.md`
-
-Adapt the shipping Win32 application to the shared core without rewriting it or dropping Windows XP compatibility.
-The plan owns Win32 services, immutable-frame-to-DIB presentation, staged `AppController` cutover, Visual Studio/MSYS
-integration, format fallback continuity, cloud-file consent, and the complete Windows regression/release matrix.
-
-### Native macOS AppKit frontend
-
-`macos_native_frontend_plan.md`
-
-The AppKit application bundle, Foundation directories adapter, placeholder window, Finder open-file delivery, and
-macOS target skeleton exist. Image loading is not connected. The plan tracks everything required for a fully working
-arm64 macOS viewer, including portable decode, controller integration, Core Graphics presentation, native workflows,
-color, Trash, accessibility, personal-tap preview distribution, a signed public Homebrew cask, notarization, and
-licensing.
+## Plans
 
 ### Cloud file download consent
 
@@ -58,8 +32,6 @@ Packaging inputs exist. Remaining work is release-specific and partly external: 
 support and privacy URLs, LGPL source/relink materials, signed-package compatibility tests, Partner Center submission,
 certification, certified acquisition, and publication verification.
 
-## Pending
-
 ### Native PNG through libpng
 
 `libpng_support_plan.md`
@@ -67,12 +39,40 @@ certification, certified acquisition, and publication verification.
 Vendor/build libpng, implement `ImgPNGItem`, integrate format dispatch and projects, add security limits and fixtures,
 then connect PNG colour metadata to the shared colour-management layer.
 
-### Native Linux GTK4 frontend
+### Portable core foundation
+
+`portable_core_foundation_plan.md`
+
+Establish a small CMake core boundary with portable command, error, frame, and geometry types, native-header checks,
+and focused tests. Then port paths, pixel storage, decoders, services, browser/loader/cache behavior, and application
+control behind contracts shared by every native implementation.
+
+The native implementation plans are children of the portable core foundation:
+
+#### Native Linux GTK4 frontend
 
 `linux_native_frontend_plan.md`
 
-Not started. After the shared core contracts are usable, add Linux filesystem/XDG/settings/Trash/dispatch adapters and
-a native GTK4 frontend with Wayland/X11 verification and installed-package resource handling.
+After the shared core contracts are usable, add Linux filesystem/XDG/settings/Trash/dispatch adapters and a native
+GTK4 frontend with Wayland/X11 verification and installed-package resource handling.
+
+#### Native macOS AppKit frontend
+
+`macos_native_frontend_plan.md`
+
+The AppKit application bundle, Foundation directories adapter, placeholder window, Finder open-file delivery, and
+macOS target skeleton exist. Image loading is not connected. The plan tracks everything required for a fully working
+arm64 macOS viewer, including portable decode, controller integration, Core Graphics presentation, native workflows,
+color, Trash, accessibility, personal-tap preview distribution, a signed public Homebrew cask, notarization, and
+licensing.
+
+#### Native Windows frontend migration
+
+`windows_native_frontend_migration_plan.md`
+
+Adapt the shipping Win32 application to the shared core without rewriting it or dropping Windows XP compatibility.
+The plan owns Win32 services, immutable-frame-to-DIB presentation, staged `AppController` cutover, Visual Studio/MSYS
+integration, format fallback continuity, cloud-file consent, and the complete Windows regression/release matrix.
 
 ## Recommended Order
 
