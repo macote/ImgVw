@@ -20,7 +20,7 @@ orientation and uses embedded color profiles when available, with color-manageme
 images.
 
 Use regular or randomized slideshows on one display or across multiple monitors. Recursive browsing can add supported
-images from subfolders when you need to explore a larger collection. Press Enter to keep the current file path visible
+images from subfolders when you need to explore a larger collection. Press Space to keep the current file path visible
 as images change, including a separate path on each slideshow monitor. Hold Ctrl+Alt to inspect loading and cache
 diagnostics across every display.
 
@@ -40,10 +40,9 @@ A small, fast, offline image viewer for browsing local images, folders, and slid
 ## What's new in this version
 
 ```text
-The welcome screen now has improved keyboard navigation, sensible empty-folder recovery focus, and a scalable logo.
-Random slideshows keep a stable cycle as images are added or deleted and avoid showing the same image on multiple
-monitors. Enter now toggles a persistent current-file overlay, while Ctrl+Alt shows improved diagnostics on every
-display.
+Multi-monitor slideshows now preload more efficiently, retain compatible caches across monitor changes, and report
+loading and cycle progress more accurately. ImgVw also improves empty-folder startup, image-loader shutdown, resource
+ownership, and validation of malformed or oversized JPEG data. Space now toggles the persistent current-file overlay.
 ```
 
 ## Product features

@@ -1,4 +1,4 @@
-## 1.11.0 (Unreleased)
+## 1.11.0 (2026-07-27)
 
 - Improve multi-monitor loading with shared caches and loader capacity per distinct target size, including asynchronous
   secondary-size preloading without duplicate queue work
