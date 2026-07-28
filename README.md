@@ -1,8 +1,8 @@
-<p align="center">
-  <img src="resources/ImgVw.svg" alt="ImgVw" width="240" />
-</p>
+![](resources/ImgVw.svg)
 
 ImgVw is a simple, fast and portable image viewer for Windows.
+
+[![Get it from Microsoft](https://get.microsoft.com/images/en-us%20dark.svg)](https://apps.microsoft.com/detail/9MV2QV7D9RGF?referrer=appbadge&mode=full)
 
 ## Features
 
