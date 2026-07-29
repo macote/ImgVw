@@ -1,3 +1,9 @@
+## 1.12.0 (2026-07-28)
+
+- Show intrinsic image dimensions and source file size in the information overlay
+- Add complete light- and dark-theme unplated MSIX icon variants for clearer Start and taskbar presentation
+- Add Microsoft Store download links to the project documentation
+
 ## 1.11.0 (2026-07-27)
 
 - Improve multi-monitor loading with shared caches and loader capacity per distinct target size, including asynchronous

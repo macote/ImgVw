@@ -40,9 +40,9 @@ A small, fast, offline image viewer for browsing local images, folders, and slid
 ## What's new in this version
 
 ```text
-Multi-monitor slideshows now preload more efficiently, retain compatible caches across monitor changes, and report
-loading and cycle progress more accurately. ImgVw also improves empty-folder startup, image-loader shutdown, resource
-ownership, and validation of malformed or oversized JPEG data. Space now toggles the persistent current-file overlay.
+The information overlay now shows an image's intrinsic dimensions and source file size after loading. Microsoft Store
+packages also include complete unplated icon variants for clearer Start and taskbar presentation on light and dark
+themes.
 ```
 
 ## Product features
