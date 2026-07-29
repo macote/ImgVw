@@ -36,6 +36,10 @@ requires signing it with a certificate whose subject matches `Publisher`.
 The Store package supports Windows 10 version 1809 (build 17763) and later. This packaging-only minimum does not alter
 the portable executable's Windows XP compatibility target.
 
+`Assets/` includes target-size `unplated` and `lightunplated` variants of `Square44x44Logo.png`. Windows resolves these
+qualified resources automatically for Start and taskbar surfaces; keep the transparent variants in sync with
+`resources/ImgVw.svg` when changing the application icon.
+
 ## Submission metadata
 
 Use `docs/store_listing_en-us.md` as the canonical English Partner Center listing and update text. Review its

@@ -86,8 +86,6 @@ foreach ($architecture in @("x86", "x64")) {
     Copy-Item -LiteralPath $binaries[$architecture] -Destination (Join-Path $stage "ImgVw.exe")
     Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE.md") -Destination $stage
     Copy-Item -LiteralPath $assets -Destination $stage -Recurse
-    Copy-Item -LiteralPath (Join-Path $stage "Assets\Square44x44Logo.png") `
-        -Destination (Join-Path $stage "Assets\Square44x44Logo.targetsize-44_altform-unplated.png")
 
     $manifest = $template.Replace("@IDENTITY_NAME@", (Escape-Xml $IdentityName)).
         Replace("@PUBLISHER@", (Escape-Xml $Publisher)).
