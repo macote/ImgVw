@@ -125,10 +125,15 @@ try {
     Add-StagedAsset -Assets $assets -Path $installerPath -ReleaseName "install-imgvw.ps1" `
         -StagingDir $stagingDir
 
-    $releaseExists = $true
-    & gh release view $Tag *> $null
-    if ($LASTEXITCODE -ne 0) {
-        $releaseExists = $false
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell can promote native stderr to a terminating error before LASTEXITCODE can be checked.
+        $ErrorActionPreference = "Continue"
+        & gh release view $Tag *> $null
+        $releaseExists = $LASTEXITCODE -eq 0
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
     }
 
     if ($releaseExists) {

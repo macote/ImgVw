@@ -36,8 +36,9 @@ requires signing it with a certificate whose subject matches `Publisher`.
 The Store package supports Windows 10 version 1809 (build 17763) and later. This packaging-only minimum does not alter
 the portable executable's Windows XP compatibility target.
 
-`Assets/` includes target-size `unplated` and `lightunplated` variants of `Square44x44Logo.png`. Windows resolves these
-qualified resources automatically for Start and taskbar surfaces; keep the transparent variants in sync with
+`Assets/` includes the complete target-size family for `Square44x44Logo.png`: 16, 20, 24, 30, 32, 36, 40, 48, 60,
+64, 72, 80, 96, and 256 pixels, each with default, `unplated`, and `lightunplated` variants. Windows resolves these
+qualified resources automatically for Start and taskbar surfaces; keep all transparent variants in sync with
 `resources/ImgVw.svg` when changing the application icon.
 
 ## Submission metadata

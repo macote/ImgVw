@@ -1,3 +1,9 @@
+## 1.12.1 (2026-07-30)
+
+- Complete the MSIX AppList icon family for reliable transparent icons across Windows shell surfaces and display scales
+- Reduce and vertically balance the transparent padding around Store and AppList icon artwork
+- Fix new-release detection in the GitHub release helper when run with Windows PowerShell
+
 ## 1.12.0 (2026-07-28)
 
 - Show intrinsic image dimensions and source file size in the information overlay
