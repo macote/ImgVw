@@ -66,6 +66,11 @@ foreach ($entry in $binaries.GetEnumerator()) {
 }
 
 $makeAppx = Find-MakeAppx
+$makePri = Join-Path (Split-Path -Parent $makeAppx) "MakePri.exe"
+if (-not (Test-Path -LiteralPath $makePri -PathType Leaf)) {
+    throw "MakePri.exe was not found beside MakeAppx.exe. Install the Windows 10 or Windows 11 SDK."
+}
+$priConfig = Join-Path $repoRoot "packaging\store\priconfig.xml"
 $output = Resolve-RepositoryPath $OutputDirectory
 $template = Get-Content -LiteralPath (Join-Path $repoRoot "packaging\store\Package.appxmanifest.in") -Raw
 $assets = Join-Path $repoRoot "packaging\store\Assets"
@@ -93,6 +98,13 @@ foreach ($architecture in @("x86", "x64")) {
         Replace("@VERSION@", $packageVersion).
         Replace("@ARCHITECTURE@", $architecture)
     [IO.File]::WriteAllText((Join-Path $stage "AppxManifest.xml"), $manifest, [Text.UTF8Encoding]::new($false))
+
+    # Windows needs a PRI index to resolve targetsize/altform assets instead of adding an accent backplate.
+    $priArguments = @(
+        "new", "/o", "/pr", $stage, "/cf", $priConfig,
+        "/mn", (Join-Path $stage "AppxManifest.xml"), "/of", (Join-Path $stage "resources.pri")
+    )
+    Invoke-Checked $makePri $priArguments
 
     $package = Join-Path $bundleInput "ImgVw_${packageVersion}_${architecture}.msix"
     Invoke-Checked $makeAppx @("pack", "/o", "/d", $stage, "/p", $package)

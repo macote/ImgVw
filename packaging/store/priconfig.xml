@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources targetOsVersion="10.0.0" majorVersion="1">
+    <!-- Keep all icon variants in the architecture package, without separate resource packs. -->
+    <index root="\" startIndexAt="Assets">
+        <default>
+            <qualifier name="Language" value="en-US" />
+        </default>
+        <indexer-config type="folder" foldernameAsQualifier="true" filenameAsQualifier="true"
+                        qualifierDelimiter="." />
+    </index>
+</resources>

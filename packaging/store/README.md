@@ -21,8 +21,8 @@ These values identify the Store product and must remain stable across updates. T
 secrets.
 
 The script reads the version from `resources/ImgVw.rc`, converts it to the required four-part MSIX version, verifies
-the version embedded in both executables, stages only `ImgVw.exe` and `LICENSE.md`, validates each manifest with
-`MakeAppx.exe`, and produces:
+the version embedded in both executables, stages `ImgVw.exe`, `LICENSE.md`, and the icon assets, generates
+`resources.pri` with `MakePri.exe`, validates each manifest with `MakeAppx.exe`, and produces:
 
 - `out/ImgVw_<version>_x86.msix`
 - `out/ImgVw_<version>_x64.msix`
@@ -38,8 +38,13 @@ the portable executable's Windows XP compatibility target.
 
 `Assets/` includes the complete target-size family for `Square44x44Logo.png`: 16, 20, 24, 30, 32, 36, 40, 48, 60,
 64, 72, 80, 96, and 256 pixels, each with default, `unplated`, and `lightunplated` variants. Windows resolves these
-qualified resources automatically for Start and taskbar surfaces; keep all transparent variants in sync with
-`resources/ImgVw.svg` when changing the application icon.
+qualified resources through the package's `resources.pri` index for Start and taskbar surfaces; keep all variants in
+sync with `resources/ImgVw.svg` when changing the application icon.
+
+`priconfig.xml` indexes the asset filenames and their `targetsize`/`altform` qualifiers into one resource index per
+architecture package. Copying qualified PNGs without this index leaves Windows unable to select the unplated icons,
+which can result in an accent-coloured taskbar backplate even with `BackgroundColor="transparent"` in the manifest.
+Both `MakePri.exe` and `MakeAppx.exe` must be installed in the same Windows SDK tool directory.
 
 ## Submission metadata
 

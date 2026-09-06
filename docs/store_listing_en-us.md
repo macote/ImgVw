@@ -40,9 +40,8 @@ A small, fast, offline image viewer for browsing local images, folders, and slid
 ## What's new in this version
 
 ```text
-Microsoft Store packages now include the complete AppList icon family for clearer transparent icons across Start,
-Search, and taskbar surfaces at every supported display scale. Store and AppList icon artwork is also larger and
-vertically centered within its transparent canvas.
+Fix icon resource indexing so Windows can select the transparent Start and taskbar icons instead of displaying
+an accent-colored background behind the artwork.
 ```
 
 ## Product features

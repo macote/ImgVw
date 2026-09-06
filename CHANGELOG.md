@@ -1,3 +1,8 @@
+## 1.12.2 (2026-09-06)
+
+- Generate the MSIX package resource index so Windows can select transparent unplated Start and taskbar icons
+- Require MakePri alongside MakeAppx when building Microsoft Store packages
+
 ## 1.12.1 (2026-07-30)
 
 - Complete the MSIX AppList icon family for reliable transparent icons across Windows shell surfaces and display scales
