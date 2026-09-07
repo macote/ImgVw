@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources targetOsVersion="10.0.0" majorVersion="1">
     <!-- Keep all icon variants in the architecture package, without separate resource packs. -->
-    <index root="\" startIndexAt="Assets">
+    <!-- Start at the package root so logical resource names retain the Assets/ directory. -->
+    <index root="\" startIndexAt="\">
         <default>
             <qualifier name="Language" value="en-US" />
         </default>

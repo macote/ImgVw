@@ -46,6 +46,12 @@ architecture package. Copying qualified PNGs without this index leaves Windows u
 which can result in an accent-coloured taskbar backplate even with `BackgroundColor="transparent"` in the manifest.
 Both `MakePri.exe` and `MakeAppx.exe` must be installed in the same Windows SDK tool directory.
 
+Index from the package root (`startIndexAt="\"`) to preserve `Assets/` in logical resource names. Starting at `Assets`
+flattens the index to `Files/Square44x44Logo.png`, which does not match the manifest's
+`Files/Assets/Square44x44Logo.png` lookup. The build runs `scripts/test-store-icon-resources.ps1` against a detailed PRI
+dump before packaging; it verifies every manifest logo URI and each shipped AppList variant's path and qualifiers.
+The diagnostic dumps remain in the output directory as `x86-resources.xml` and `x64-resources.xml`.
+
 ## Submission metadata
 
 Use `docs/store_listing_en-us.md` as the canonical English Partner Center listing and update text. Review its

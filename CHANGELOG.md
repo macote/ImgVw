@@ -1,3 +1,8 @@
+## 1.12.3 (2026-09-07)
+
+- Preserve the Assets directory in MSIX resource lookup paths so the manifest can resolve unplated icons
+- Validate manifest logo paths and AppList variant qualifiers before packaging to catch icon-index regressions
+
 ## 1.12.2 (2026-09-06)
 
 - Generate the MSIX package resource index so Windows can select transparent unplated Start and taskbar icons

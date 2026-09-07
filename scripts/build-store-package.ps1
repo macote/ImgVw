@@ -106,6 +106,15 @@ foreach ($architecture in @("x86", "x64")) {
     )
     Invoke-Checked $makePri $priArguments
 
+    # Keep the diagnostic dump outside the package so it cannot be indexed or shipped as an asset.
+    $priDump = Join-Path $output "$architecture-resources.xml"
+    $dumpArguments = @(
+        "dump", "/if", (Join-Path $stage "resources.pri"), "/of", $priDump, "/dt", "detailed", "/o"
+    )
+    Invoke-Checked $makePri $dumpArguments
+    $iconCheck = @{ ManifestPath = Join-Path $stage "AppxManifest.xml"; PriDumpPath = $priDump }
+    & (Join-Path $PSScriptRoot "test-store-icon-resources.ps1") @iconCheck
+
     $package = Join-Path $bundleInput "ImgVw_${packageVersion}_${architecture}.msix"
     Invoke-Checked $makeAppx @("pack", "/o", "/d", $stage, "/p", $package)
 }

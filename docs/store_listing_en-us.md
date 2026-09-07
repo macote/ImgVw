@@ -40,8 +40,8 @@ A small, fast, offline image viewer for browsing local images, folders, and slid
 ## What's new in this version
 
 ```text
-Fix icon resource indexing so Windows can select the transparent Start and taskbar icons instead of displaying
-an accent-colored background behind the artwork.
+Correct the icon lookup paths in Microsoft Store packages, addressing the accent-colored Start and taskbar icon
+background that persisted in version 1.12.2.
 ```
 
 ## Product features
