@@ -1,3 +1,7 @@
+## 1.12.4 (2026-11-13)
+
+- Add a command-line launch alias for the Microsoft Store installation
+
 ## 1.12.3 (2026-09-07)
 
 - Preserve the Assets directory in MSIX resource lookup paths so the manifest can resolve unplated icons

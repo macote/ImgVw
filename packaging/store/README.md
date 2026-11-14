@@ -36,6 +36,11 @@ requires signing it with a certificate whose subject matches `Publisher`.
 The Store package supports Windows 10 version 1809 (build 17763) and later. This packaging-only minimum does not alter
 the portable executable's Windows XP compatibility target.
 
+The package registers the `ImgVw.exe` app execution alias, allowing it to be launched from a terminal with an optional
+image or folder path. Windows manages the alias and removes it on uninstall. It can be enabled or disabled in Windows
+Settings under App execution aliases. Command lookup also depends on the user's WindowsApps directory being in PATH and
+may select another installation if it appears earlier in PATH.
+
 `Assets/` includes the complete target-size family for `Square44x44Logo.png`: 16, 20, 24, 30, 32, 36, 40, 48, 60,
 64, 72, 80, 96, and 256 pixels, each with default, `unplated`, and `lightunplated` variants. Windows resolves these
 qualified resources through the package's `resources.pri` index for Start and taskbar surfaces; keep all variants in

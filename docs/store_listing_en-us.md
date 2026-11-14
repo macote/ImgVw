@@ -40,8 +40,7 @@ A small, fast, offline image viewer for browsing local images, folders, and slid
 ## What's new in this version
 
 ```text
-Correct the icon lookup paths in Microsoft Store packages, addressing the accent-colored Start and taskbar icon
-background that persisted in version 1.12.2.
+Launch ImgVw from a terminal with the ImgVw command, optionally followed by an image or folder path.
 ```
 
 ## Product features
