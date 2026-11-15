@@ -59,6 +59,6 @@ The diagnostic dumps remain in the output directory as `x86-resources.xml` and `
 
 ## Submission metadata
 
-Use `docs/store_listing_en-us.md` as the canonical English Partner Center listing and update text. Review its
-description, product features, What's new section, and screenshot captions for every Store release. Keep the What's new
-text consistent with the corresponding release section in `CHANGELOG.md` before uploading the bundle.
+Use `docs/store_listing_en-us.md` and `docs/store_listing_fr.md` as the canonical Partner Center listing and update
+text. Review their descriptions, product features, What's new sections, and screenshot captions for every Store release.
+Keep the What's new text consistent with the corresponding release section in `CHANGELOG.md` before uploading the bundle.

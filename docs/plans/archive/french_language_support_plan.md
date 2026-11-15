@@ -4,7 +4,7 @@ Date: 2026-09-07
 
 ## Status and goal
 
-**Proposed; implementation has not started.** Ship English and French in the same portable Windows executable,
+**Implemented on `feature/french-language-support` (v1.13.0).** Ship English and French in the same portable Windows executable,
 preserving Windows XP compatibility, existing commands, and image-loading behavior. This plan is based on a review
 of the current source, resources, build inputs, tests, and Store manifest.
 

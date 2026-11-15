@@ -5,14 +5,6 @@ plan has replaced its remaining work.
 
 ## Plans
 
-### French language support
-
-`french_language_support_plan.md`
-
-Proposed. Add complete English/French UI catalogs, automatic language resolution and a saved override, deterministic
-resource fallback, translated layouts and pickers, and bilingual release verification while preserving Windows XP.
-Can proceed independently of the portable-core work; coordinate new cloud-consent text and Store metadata.
-
 ### Cloud file download consent
 
 `cloud_file_download_consent_plan.md`
