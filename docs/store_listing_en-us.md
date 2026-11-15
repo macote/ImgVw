@@ -40,7 +40,7 @@ A small, fast, offline image viewer for browsing local images, folders, and slid
 ## What's new in this version
 
 ```text
-Use ImgVw in English or Canadian French. Choose a language from the right-click menu or follow the Windows display language.
+Use ImgVw in English or French. Choose a language from the right-click menu or follow the Windows display language.
 ```
 
 ## Product features
