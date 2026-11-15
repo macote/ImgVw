@@ -32,7 +32,7 @@ BEGIN
         MENUITEM "Augmenter la vitesse du diaporama\tF7", IDR_INCSSS
         MENUITEM "Diminuer la vitesse du diaporama\tF8", IDR_DECSSS
         MENUITEM SEPARATOR
-        MENUITEM "Ajouter les fichiers des sous-dossiers\tF9", IDR_RECURSE
+        MENUITEM "Ajouter les images des sous-dossiers\tF9", IDR_RECURSE
         MENUITEM SEPARATOR
         MENUITEM "Sélectionner le profil ICC CMJN par défaut...\tF11", IDM_LOADICC
         MENUITEM "Utiliser le profil ICC CMJN intégré\tF12", IDM_USEBUILTINICC

@@ -32,7 +32,7 @@ BEGIN
         MENUITEM "Increase slideshow speed\tF7", IDR_INCSSS
         MENUITEM "Decrease slideshow speed\tF8", IDR_DECSSS
         MENUITEM SEPARATOR
-        MENUITEM "Add files found in subfolders\tF9", IDR_RECURSE
+        MENUITEM "Add images found in subfolders\tF9", IDR_RECURSE
         MENUITEM SEPARATOR
         MENUITEM "Select default CMYK profile...\tF11", IDM_LOADICC
         MENUITEM "Use built-in CMYK profile\tF12", IDM_USEBUILTINICC

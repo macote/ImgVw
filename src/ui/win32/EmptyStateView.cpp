@@ -474,7 +474,7 @@ std::wstring EmptyStateView::BuildPanelText() const
     return message_ + L"\r\n\r\n" + drag_hint;
 }
 
-INT EmptyStateView::MeasureButtonWidth(UINT dpi) const
+INT EmptyStateView::MeasureButtonWidth(UINT dpi)
 {
     auto max_width = WindowGeometry::ScaleForDpi(150, dpi);
     if (parent_ == nullptr)
@@ -489,9 +489,9 @@ INT EmptyStateView::MeasureButtonWidth(UINT dpi) const
     }
 
     SelectedGdiObject font_selection;
-    if (caption_font_.valid())
+    if (const auto font = GetTextFont(dpi); font != nullptr)
     {
-        font_selection = SelectedGdiObject(dc.get(), caption_font_.get());
+        font_selection = SelectedGdiObject(dc.get(), font);
     }
 
     const auto horizontal_padding = WindowGeometry::ScaleForDpi(24, dpi);
@@ -513,6 +513,37 @@ INT EmptyStateView::MeasureButtonWidth(UINT dpi) const
     }
 
     return max_width;
+}
+
+INT EmptyStateView::MeasurePanelWidth(UINT dpi)
+{
+    if (parent_ == nullptr)
+    {
+        return 0;
+    }
+
+    const auto text = BuildPanelText();
+    if (text.empty())
+    {
+        return 0;
+    }
+
+    WindowDeviceContext dc(parent_, GetDC(parent_));
+    if (!dc.valid())
+    {
+        return 0;
+    }
+
+    SelectedGdiObject font_selection;
+    if (const auto font = GetTextFont(dpi); font != nullptr)
+    {
+        font_selection = SelectedGdiObject(dc.get(), font);
+    }
+
+    const auto horizontal_padding = WindowGeometry::ScaleForDpi(8, dpi);
+    RECT measured{};
+    DrawTextW(dc.get(), text.c_str(), -1, &measured, DT_CALCRECT | DT_NOPREFIX);
+    return static_cast<INT>(measured.right - measured.left) + horizontal_padding * 2;
 }
 
 INT EmptyStateView::MeasurePanelHeight(INT panel_width, UINT dpi)
@@ -559,11 +590,13 @@ EmptyStateLayout::Layout EmptyStateView::CalculateLayout(const RECT& client_rect
             ? static_cast<INT>(logo_->GetHeight())
             : 0;
     const auto available_width = (std::max)(0, static_cast<INT>(client_rect.right) - WindowGeometry::ScaleForDpi(48, dpi));
-    const auto panel_width = (std::min)(available_width, WindowGeometry::ScaleForDpi(460, dpi));
+    const auto measured_panel_width = MeasurePanelWidth(dpi);
+    const auto panel_width =
+        (std::min)(available_width, (std::max)(WindowGeometry::ScaleForDpi(460, dpi), measured_panel_width));
     const auto measured_panel_height = MeasurePanelHeight(panel_width, dpi);
-    const EmptyStateLayout::Input layout_input{client_rect.right,       client_rect.bottom, dpi,        IsNoImages(),
-                                               IsSearchingSubfolders(), logo_width,         logo_height,
-                                               measured_panel_height};
+    const EmptyStateLayout::Input layout_input{client_rect.right,       client_rect.bottom,   dpi,
+                                               IsNoImages(),            IsSearchingSubfolders(), logo_width,
+                                               logo_height,             measured_panel_width,  measured_panel_height};
     return EmptyStateLayout::Calculate(layout_input);
 }
 

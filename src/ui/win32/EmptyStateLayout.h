@@ -15,6 +15,7 @@ struct Input
     BOOL searching_subfolders{};
     INT logo_source_width{};
     INT logo_source_height{};
+    INT minimum_panel_width{};
     INT minimum_panel_height{};
 };
 
@@ -32,12 +33,12 @@ inline Layout Calculate(const Input& input)
     const auto scale = [&input](INT value) { return WindowGeometry::ScaleForDpi(value, input.dpi); };
     Layout layout;
     const auto available_width = std::max(0, input.client_width - scale(48));
-    layout.panel_width = std::min(available_width, scale(460));
+    layout.panel_width = std::min(available_width, std::max(scale(460), input.minimum_panel_width));
     layout.panel_height = std::max(scale(input.no_images ? 132 : 96), input.minimum_panel_height);
 
     if (input.logo_source_width > 0 && input.logo_source_height > 0)
     {
-        layout.logo_width = MulDiv(layout.panel_width, 4, 5);
+        layout.logo_width = MulDiv(std::min(layout.panel_width, scale(460)), 4, 5);
         layout.logo_height = MulDiv(layout.logo_width, input.logo_source_height, input.logo_source_width);
     }
 

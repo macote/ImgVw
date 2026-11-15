@@ -55,7 +55,8 @@ class EmptyStateView
     void LoadLogo();
     void DestroyControls();
     std::wstring BuildPanelText() const;
-    INT MeasureButtonWidth(UINT dpi) const;
+    INT MeasureButtonWidth(UINT dpi);
+    INT MeasurePanelWidth(UINT dpi);
     INT MeasurePanelHeight(INT panel_width, UINT dpi);
     EmptyStateLayout::Layout CalculateLayout(const RECT& client_rect, UINT dpi);
     void ApplyButtonCaptions() const;
