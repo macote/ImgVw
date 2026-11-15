@@ -32,7 +32,9 @@ class EmptyStateView
 
     void Initialize(HWND parent, HINSTANCE instance);
     void Show(const std::wstring& message, bool no_images, bool show_search_subfolders);
+    void Show(UINT message_id, bool no_images, bool show_search_subfolders);
     void ShowSearchingSubfolders();
+    void RefreshLanguage(UINT dpi);
     void Hide();
     bool IsVisible() const;
     bool IsSearchingSubfolders() const;
@@ -40,7 +42,7 @@ class EmptyStateView
     const std::wstring& message() const;
     void RestoreFocus(UINT command) const;
     void ActivateFocusedButton() const;
-    void UpdateLayout(UINT dpi) const;
+    void UpdateLayout(UINT dpi);
     void Paint(HDC dc, UINT dpi, bool light_theme);
     void DrawButton(const DRAWITEMSTRUCT* draw_item, UINT dpi, bool light_theme);
     BOOL TranslateDialogMessage(MSG* message) const;
@@ -52,11 +54,17 @@ class EmptyStateView
     void CreateCaptionFont();
     void LoadLogo();
     void DestroyControls();
+    std::wstring BuildPanelText() const;
+    INT MeasureButtonWidth(UINT dpi) const;
+    INT MeasurePanelHeight(INT panel_width, UINT dpi);
+    EmptyStateLayout::Layout CalculateLayout(const RECT& client_rect, UINT dpi);
+    void ApplyButtonCaptions() const;
     void DrawPanelText(HDC dc, const RECT& panel_rect, const std::wstring& text, UINT text_format, UINT dpi,
                        bool light_theme, bool vertically_center_text) const;
     HFONT GetTextFont(UINT dpi);
 
     State state_{State::Hidden};
+    UINT message_id_{};
     std::wstring message_;
     HWND parent_{nullptr};
     HINSTANCE instance_{nullptr};

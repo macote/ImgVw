@@ -1,7 +1,9 @@
 #include "EmptyStateView.h"
 #include "CompatibleDeviceContext.h"
 #include "GlobalMemory.h"
+#include "Localization.h"
 #include "SelectedGdiObject.h"
+#include "WindowDeviceContext.h"
 
 #include <algorithm>
 #include <cstring>
@@ -43,14 +45,16 @@ void EmptyStateView::Initialize(HWND parent, HINSTANCE instance)
     LoadLogo();
 
     const auto button_style = WS_CHILD | WS_TABSTOP | BS_OWNERDRAW;
-    open_image_button_ = CreateWindow(L"BUTTON", L"Open &image...", button_style, 0, 0, 0, 0, parent,
-                                      CommandMenu(IDM_OPEN_IMAGE), instance, nullptr);
-    open_folder_button_ = CreateWindow(L"BUTTON", L"Open &folder...", button_style, 0, 0, 0, 0, parent,
-                                       CommandMenu(IDM_OPEN_FOLDER), instance, nullptr);
-    search_subfolders_button_ = CreateWindow(L"BUTTON", L"&Search subfolders", button_style, 0, 0, 0, 0, parent,
+    open_image_button_ =
+        CreateWindow(L"BUTTON", L"", button_style, 0, 0, 0, 0, parent, CommandMenu(IDM_OPEN_IMAGE), instance, nullptr);
+    open_folder_button_ = CreateWindow(L"BUTTON", L"", button_style, 0, 0, 0, 0, parent, CommandMenu(IDM_OPEN_FOLDER),
+                                         instance, nullptr);
+    search_subfolders_button_ = CreateWindow(L"BUTTON", L"", button_style, 0, 0, 0, 0, parent,
                                              CommandMenu(IDM_SEARCH_SUBFOLDERS), instance, nullptr);
     exit_button_ =
-        CreateWindow(L"BUTTON", L"E&xit", button_style, 0, 0, 0, 0, parent, CommandMenu(IDM_EXIT), instance, nullptr);
+        CreateWindow(L"BUTTON", L"", button_style, 0, 0, 0, 0, parent, CommandMenu(IDM_EXIT), instance, nullptr);
+
+    ApplyButtonCaptions();
 
     for (const auto button : {open_image_button_, open_folder_button_, search_subfolders_button_, exit_button_})
     {
@@ -64,7 +68,24 @@ void EmptyStateView::Initialize(HWND parent, HINSTANCE instance)
 void EmptyStateView::Show(const std::wstring& message, bool no_images, bool show_search_subfolders)
 {
     state_ = no_images ? State::NoImages : State::Empty;
+    message_id_ = 0;
     message_ = message;
+    ShowWindow(open_image_button_, SW_SHOW);
+    ShowWindow(open_folder_button_, SW_SHOW);
+    ShowWindow(search_subfolders_button_, show_search_subfolders ? SW_SHOW : SW_HIDE);
+    ShowWindow(exit_button_, SW_SHOW);
+    SetFocus(show_search_subfolders && search_subfolders_button_ != nullptr ? search_subfolders_button_
+                                                                            : open_image_button_);
+}
+
+void EmptyStateView::Show(UINT message_id, bool no_images, bool show_search_subfolders)
+{
+    state_ = no_images ? State::NoImages : State::Empty;
+    message_id_ = message_id;
+    if (!Localization::TryLoadString(instance_, message_id, Localization::GetLanguage(), message_))
+    {
+        message_ = Localization::GetString(message_id);
+    }
     ShowWindow(open_image_button_, SW_SHOW);
     ShowWindow(open_folder_button_, SW_SHOW);
     ShowWindow(search_subfolders_button_, show_search_subfolders ? SW_SHOW : SW_HIDE);
@@ -76,7 +97,11 @@ void EmptyStateView::Show(const std::wstring& message, bool no_images, bool show
 void EmptyStateView::ShowSearchingSubfolders()
 {
     state_ = State::SearchingSubfolders;
-    message_ = L"Searching subfolders for supported images...";
+    message_id_ = IDS_EMPTY_SEARCHING_SUBFOLDERS;
+    if (!Localization::TryLoadString(instance_, IDS_EMPTY_SEARCHING_SUBFOLDERS, Localization::GetLanguage(), message_))
+    {
+        message_ = L"Searching subfolders for supported images...";
+    }
     ShowWindow(open_image_button_, SW_HIDE);
     ShowWindow(open_folder_button_, SW_HIDE);
     ShowWindow(search_subfolders_button_, SW_HIDE);
@@ -84,9 +109,37 @@ void EmptyStateView::ShowSearchingSubfolders()
     SetFocus(exit_button_);
 }
 
+void EmptyStateView::RefreshLanguage(UINT dpi)
+{
+    ApplyButtonCaptions();
+    if (state_ == State::SearchingSubfolders)
+    {
+        if (!Localization::TryLoadString(instance_, IDS_EMPTY_SEARCHING_SUBFOLDERS, Localization::GetLanguage(),
+                                         message_))
+        {
+            message_ = L"Searching subfolders for supported images...";
+        }
+    }
+    else if (message_id_ != 0)
+    {
+        std::wstring updated;
+        if (Localization::TryLoadString(instance_, message_id_, Localization::GetLanguage(), updated))
+        {
+            message_ = std::move(updated);
+        }
+    }
+
+    UpdateLayout(dpi);
+    if (parent_ != nullptr && IsVisible())
+    {
+        InvalidateRect(parent_, nullptr, TRUE);
+    }
+}
+
 void EmptyStateView::Hide()
 {
     state_ = State::Hidden;
+    message_id_ = 0;
     message_.clear();
     for (const auto button : {open_image_button_, open_folder_button_, search_subfolders_button_, exit_button_})
     {
@@ -145,7 +198,7 @@ void EmptyStateView::ActivateFocusedButton() const
     }
 }
 
-void EmptyStateView::UpdateLayout(UINT dpi) const
+void EmptyStateView::UpdateLayout(UINT dpi)
 {
     if (parent_ == nullptr || open_image_button_ == nullptr || open_folder_button_ == nullptr)
     {
@@ -158,20 +211,14 @@ void EmptyStateView::UpdateLayout(UINT dpi) const
         return;
     }
 
-    const auto logo_width =
-        logo_ != nullptr && logo_->GetWidth() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
-            ? static_cast<INT>(logo_->GetWidth())
-            : 0;
-    const auto logo_height =
-        logo_ != nullptr && logo_->GetHeight() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
-            ? static_cast<INT>(logo_->GetHeight())
-            : 0;
-    const EmptyStateLayout::Input layout_input{client_rect.right,       client_rect.bottom, dpi,        IsNoImages(),
-                                               IsSearchingSubfolders(), logo_width,         logo_height};
-    const auto layout = EmptyStateLayout::Calculate(layout_input);
-    const auto button_width = WindowGeometry::ScaleForDpi(150, dpi);
+    const auto layout = CalculateLayout(client_rect, dpi);
+    const auto base_button_width = MeasureButtonWidth(dpi);
     const auto button_height = WindowGeometry::ScaleForDpi(28, dpi);
     const auto gap = WindowGeometry::ScaleForDpi(12, dpi);
+    const auto max_two_button_width =
+        (std::max)(WindowGeometry::ScaleForDpi(100, dpi),
+                   (static_cast<INT>(client_rect.right) - gap - WindowGeometry::ScaleForDpi(24, dpi)) / 2);
+    const auto button_width = (std::min)(base_button_width, max_two_button_width);
     const auto buttons_width = button_width * 2 + gap;
     const auto left = (client_rect.right - buttons_width) / 2;
     const auto top = layout.buttons_top;
@@ -219,14 +266,11 @@ void EmptyStateView::Paint(HDC dc, UINT dpi, bool light_theme)
         logo_ != nullptr && logo_->GetHeight() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
             ? static_cast<INT>(logo_->GetHeight())
             : 0;
-    const EmptyStateLayout::Input layout_input{client_rect.right,       client_rect.bottom, dpi,        IsNoImages(),
-                                               IsSearchingSubfolders(), logo_width,         logo_height};
-    const auto layout = EmptyStateLayout::Calculate(layout_input);
+    const auto layout = CalculateLayout(client_rect, dpi);
     const auto panel_left = (client_rect.right - layout.panel_width) / 2;
     const auto panel_top = layout.buttons_top - WindowGeometry::ScaleForDpi(20, dpi) - layout.panel_height;
     const RECT panel_rect{panel_left, panel_top, panel_left + layout.panel_width, panel_top + layout.panel_height};
-    const auto text =
-        IsSearchingSubfolders() ? message_ : message_ + L"\r\n\r\nYou can also drag an image or folder here.";
+    const auto text = BuildPanelText();
     DrawPanelText(dc, panel_rect, text, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX, dpi, light_theme, true);
 
     if (logo_ != nullptr && layout.logo_width > 0 && layout.logo_height > 0)
@@ -255,7 +299,7 @@ void EmptyStateView::DrawButton(const DRAWITEMSTRUCT* draw_item, UINT dpi, bool 
         return;
     }
 
-    wchar_t text[64]{};
+    wchar_t text[128]{};
     GetWindowText(draw_item->hwndItem, text, _countof(text));
     auto text_format = DT_CENTER | DT_SINGLELINE | DT_VCENTER;
     if ((draw_item->itemState & ODS_NOACCEL) != 0)
@@ -384,6 +428,143 @@ void EmptyStateView::DestroyControls()
             DestroyWindow(button);
         }
     }
+}
+
+void EmptyStateView::ApplyButtonCaptions() const
+{
+    struct ButtonLabel
+    {
+        HWND button;
+        UINT id;
+        const wchar_t* fallback;
+    };
+    const ButtonLabel labels[] = {
+        {open_image_button_, IDS_BTN_OPEN_IMAGE, L"Open &image..."},
+        {open_folder_button_, IDS_BTN_OPEN_FOLDER, L"Open &folder..."},
+        {search_subfolders_button_, IDS_BTN_SEARCH_SUBFOLDERS, L"&Search subfolders"},
+        {exit_button_, IDS_BTN_EXIT, L"E&xit"},
+    };
+    for (const auto& entry : labels)
+    {
+        if (entry.button == nullptr)
+        {
+            continue;
+        }
+        std::wstring text;
+        if (!Localization::TryLoadString(instance_, entry.id, Localization::GetLanguage(), text))
+        {
+            text = entry.fallback;
+        }
+        SetWindowTextW(entry.button, text.c_str());
+    }
+}
+
+std::wstring EmptyStateView::BuildPanelText() const
+{
+    if (IsSearchingSubfolders())
+    {
+        return message_;
+    }
+
+    std::wstring drag_hint;
+    if (!Localization::TryLoadString(instance_, IDS_EMPTY_DRAG_HINT, Localization::GetLanguage(), drag_hint))
+    {
+        drag_hint = L"You can also drag an image or folder here.";
+    }
+    return message_ + L"\r\n\r\n" + drag_hint;
+}
+
+INT EmptyStateView::MeasureButtonWidth(UINT dpi) const
+{
+    auto max_width = WindowGeometry::ScaleForDpi(150, dpi);
+    if (parent_ == nullptr)
+    {
+        return max_width;
+    }
+
+    WindowDeviceContext dc(parent_, GetDC(parent_));
+    if (!dc.valid())
+    {
+        return max_width;
+    }
+
+    SelectedGdiObject font_selection;
+    if (caption_font_.valid())
+    {
+        font_selection = SelectedGdiObject(dc.get(), caption_font_.get());
+    }
+
+    const auto horizontal_padding = WindowGeometry::ScaleForDpi(24, dpi);
+    for (const auto button : {open_image_button_, open_folder_button_, search_subfolders_button_, exit_button_})
+    {
+        if (button == nullptr)
+        {
+            continue;
+        }
+        wchar_t text[128]{};
+        const auto length = GetWindowTextW(button, text, _countof(text));
+        if (length <= 0)
+        {
+            continue;
+        }
+        RECT measured{};
+        DrawTextW(dc.get(), text, length, &measured, DT_CALCRECT | DT_SINGLELINE);
+        max_width = (std::max)(max_width, static_cast<INT>(measured.right - measured.left) + horizontal_padding);
+    }
+
+    return max_width;
+}
+
+INT EmptyStateView::MeasurePanelHeight(INT panel_width, UINT dpi)
+{
+    if (parent_ == nullptr || panel_width <= 0)
+    {
+        return 0;
+    }
+
+    const auto horizontal_padding = WindowGeometry::ScaleForDpi(8, dpi);
+    const auto vertical_padding = WindowGeometry::ScaleForDpi(6, dpi);
+    const auto available_text_width = panel_width - horizontal_padding * 2;
+    if (available_text_width <= 0)
+    {
+        return 0;
+    }
+
+    WindowDeviceContext dc(parent_, GetDC(parent_));
+    if (!dc.valid())
+    {
+        return 0;
+    }
+
+    SelectedGdiObject font_selection;
+    if (const auto font = GetTextFont(dpi); font != nullptr)
+    {
+        font_selection = SelectedGdiObject(dc.get(), font);
+    }
+
+    const auto text = BuildPanelText();
+    RECT measured{0, 0, available_text_width, 0};
+    DrawTextW(dc.get(), text.c_str(), -1, &measured, DT_CALCRECT | DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
+    return static_cast<INT>(measured.bottom - measured.top) + vertical_padding * 2;
+}
+
+EmptyStateLayout::Layout EmptyStateView::CalculateLayout(const RECT& client_rect, UINT dpi)
+{
+    const auto logo_width =
+        logo_ != nullptr && logo_->GetWidth() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
+            ? static_cast<INT>(logo_->GetWidth())
+            : 0;
+    const auto logo_height =
+        logo_ != nullptr && logo_->GetHeight() <= static_cast<UINT>((std::numeric_limits<INT>::max)())
+            ? static_cast<INT>(logo_->GetHeight())
+            : 0;
+    const auto available_width = (std::max)(0, static_cast<INT>(client_rect.right) - WindowGeometry::ScaleForDpi(48, dpi));
+    const auto panel_width = (std::min)(available_width, WindowGeometry::ScaleForDpi(460, dpi));
+    const auto measured_panel_height = MeasurePanelHeight(panel_width, dpi);
+    const EmptyStateLayout::Input layout_input{client_rect.right,       client_rect.bottom, dpi,        IsNoImages(),
+                                               IsSearchingSubfolders(), logo_width,         logo_height,
+                                               measured_panel_height};
+    return EmptyStateLayout::Calculate(layout_input);
 }
 
 void EmptyStateView::DrawPanelText(HDC dc, const RECT& panel_rect, const std::wstring& text, UINT text_format, UINT dpi,

@@ -1,4 +1,5 @@
 CXX ?= g++
+WINDRES ?= windres
 DUMPMACHINE = $(shell $(CXX) -dumpmachine)
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -Werror -Wno-missing-field-initializers -DUNICODE -D_UNICODE -DIMGVW_TESTING \
 	-DLIBHEIF_STATIC_BUILD -DLIBDE265_STATIC_BUILD \
@@ -17,7 +18,8 @@ HEADERS = $(wildcard *.h support/*.h unit/*.h ../src/app/*.h ../src/browse/*.h .
 TESTMAIN = support/TestHarness.cpp support/TestMain.cpp
 SOURCES = ImgVwTests.cpp concurrency/ConcurrencyTests.cpp image/ImgTests.cpp platform/PlatformTests.cpp \
 	ui/RendererTests.cpp \
-	unit/EmptyStateViewTests.cpp unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp unit/WindowPresentationTests.cpp \
+	unit/EmptyStateViewTests.cpp unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp unit/LocalizationTests.cpp \
+	unit/WindowPresentationTests.cpp \
 	support/JpegFixture.cpp support/TempFile.cpp support/TestHarness.cpp support/TestMain.cpp \
 	../src/browse/BrowsePath.cpp ../src/browse/BrowseSession.cpp ../src/browse/FolderScanner.cpp ../src/browse/ImgBrowser.cpp ../src/browse/ImgFileList.cpp ../src/browse/PreloadScheduler.cpp \
 	../src/image/ColorProfile.cpp \
@@ -27,13 +29,14 @@ SOURCES = ImgVwTests.cpp concurrency/ConcurrencyTests.cpp image/ImgTests.cpp pla
 	../src/image/ImgHEIFItem.cpp ../src/image/ImgItem.cpp ../src/image/ImgItemHelper.cpp \
 	../src/image/ImgJPEGDecoder.cpp ../src/image/ImgJPEGItem.cpp ../src/platform/win32/FileOperations.cpp \
 	../src/platform/win32/ImgHeaderProbe.cpp \
-	../src/ui/win32/EmptyStateView.cpp ../src/ui/win32/ImgRenderer.cpp
+	../src/ui/win32/EmptyStateView.cpp ../src/ui/win32/ImgRenderer.cpp ../src/ui/win32/Localization.cpp
 CORESOURCES = unit/CoreTests.cpp unit/EmptyStateViewTests.cpp unit/ImgPolicyTests.cpp unit/ImgFileListTests.cpp \
 	unit/WindowPresentationTests.cpp \
 	support/TempFile.cpp $(TESTMAIN) \
 	../src/browse/ImgFileList.cpp ../src/image/ExifOrientation.cpp ../src/image/ImgResampler.cpp \
 	../src/image/ImgFormatDetector.cpp ../src/image/ImgFormatResolver.cpp ../src/image/ImgBuffer.cpp \
-	../src/image/ImgItemHelper.cpp ../src/platform/win32/ImgHeaderProbe.cpp ../src/ui/win32/EmptyStateView.cpp
+	../src/image/ImgItemHelper.cpp ../src/platform/win32/ImgHeaderProbe.cpp ../src/ui/win32/EmptyStateView.cpp \
+	../src/ui/win32/Localization.cpp
 PLATFORMSOURCES = platform/PlatformTests.cpp support/TempFile.cpp $(TESTMAIN) \
 	../src/browse/BrowsePath.cpp ../src/image/ImgBuffer.cpp ../src/platform/win32/FileOperations.cpp
 IMAGESOURCES = image/ImgTests.cpp support/JpegFixture.cpp support/TempFile.cpp $(TESTMAIN) \
@@ -77,11 +80,16 @@ LDLIBS = -L$(JPEGLIBDIR) -L$(LCMSLIBDIR) -L$(HEIFLIBDIR) -L$(DE265LIBDIR) \
 
 all: $(TARGET)
 
+TESTRESOBJ = $(TARGETDIR)/TestResources.o
+
 $(TARGETDIR):
 	mkdir -p $@
 
-$(TARGET): $(SOURCES) $(HEADERS) | $(TARGETDIR)
-	$(CXX) $(CXXFLAGS) $(SOURCES) -o $@ $(LDLIBS)
+$(TESTRESOBJ): resources/TestResources.rc ../resources/ImgVw.rc ../resources/resource.h ../resources/lang/en.rc2 ../resources/lang/fr.rc2 | $(TARGETDIR)
+	$(WINDRES) --include-dir ../resources --language 0x0409 "$<" -o $@
+
+$(TARGET): $(SOURCES) $(HEADERS) $(TESTRESOBJ) | $(TARGETDIR)
+	$(CXX) $(CXXFLAGS) $(SOURCES) $(TESTRESOBJ) -o $@ $(LDLIBS)
 
 $(CORETARGET): $(CORESOURCES) $(HEADERS) | $(TARGETDIR)
 	$(CXX) $(CXXFLAGS) -DIMGVW_TEST_ENTRY=RunCoreTests $(CORESOURCES) -o $@ $(LDLIBS)

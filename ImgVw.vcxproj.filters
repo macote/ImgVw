@@ -199,6 +199,15 @@
     <ClInclude Include="src\ui\win32\InfoOverlayVisibility.h">
       <Filter>UI</Filter>
     </ClInclude>
+    <ClInclude Include="src\ui\win32\Localization.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\win32\UiLanguage.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\win32\UiLanguageSettings.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
     <ClInclude Include="src\ui\win32\MonitorPlacement.h">
       <Filter>UI</Filter>
     </ClInclude>
@@ -324,6 +333,9 @@
     <ClCompile Include="src\ui\win32\ImgVwWindow.cpp">
       <Filter>UI</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\win32\Localization.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
     <ClCompile Include="src\ui\win32\Window.cpp">
       <Filter>UI</Filter>
     </ClCompile>
@@ -333,6 +345,12 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="resources\color\CGATS21_CRPC5_LICENSE.txt">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resources\lang\en.rc2">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="resources\lang\fr.rc2">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

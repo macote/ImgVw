@@ -15,20 +15,34 @@
 
 #include "PathPicker.h"
 #include "ComPtr.h"
+#include "Localization.h"
+#include "resource.h"
 
 #include <ShlObj.h>
 #include <ShObjIdl.h>
 #include <commdlg.h>
+#include <string>
 
 namespace
 {
-constexpr COMDLG_FILTERSPEC kImageFileTypes[] = {
-    {L"Supported images", L"*.jpg;*.jpeg;*.png;*.heic;*.heif;*.hif;*.bmp;*.gif;*.ico;*.tif;*.tiff"},
-    {L"All files", L"*.*"},
-};
+constexpr wchar_t kSupportedImagePatterns[] =
+    L"*.jpg;*.jpeg;*.png;*.heic;*.heif;*.hif;*.bmp;*.gif;*.ico;*.tif;*.tiff";
+constexpr wchar_t kAllFilesPattern[] = L"*.*";
 
-constexpr wchar_t kLegacyImageFilter[] =
-    L"Supported images\0*.jpg;*.jpeg;*.png;*.heic;*.heif;*.hif;*.bmp;*.gif;*.ico;*.tif;*.tiff\0All files\0*.*\0";
+std::wstring BuildLegacyImageFilter(const std::wstring& supported_images_label, const std::wstring& all_files_label)
+{
+    std::wstring filter;
+    filter.append(supported_images_label);
+    filter.push_back(L'\0');
+    filter.append(kSupportedImagePatterns);
+    filter.push_back(L'\0');
+    filter.append(all_files_label);
+    filter.push_back(L'\0');
+    filter.append(kAllFilesPattern);
+    filter.push_back(L'\0');
+    filter.push_back(L'\0');
+    return filter;
+}
 
 PathPickerResult FailedResult(HRESULT error)
 {
@@ -72,7 +86,14 @@ PathPickerResult PathPicker::SelectImage(HWND owner) const
         return SelectImageLegacy(owner);
     }
 
-    const auto set_types_result = dialog->SetFileTypes(_countof(kImageFileTypes), kImageFileTypes);
+    const auto supported_images_label = Localization::GetString(IDS_PICKER_SUPPORTED_IMAGES);
+    const auto all_files_label = Localization::GetString(IDS_PICKER_ALL_FILES);
+    const COMDLG_FILTERSPEC image_file_types[] = {
+        {supported_images_label.c_str(), kSupportedImagePatterns},
+        {all_files_label.c_str(), kAllFilesPattern},
+    };
+
+    const auto set_types_result = dialog->SetFileTypes(_countof(image_file_types), image_file_types);
     if (FAILED(set_types_result))
     {
         return FailedResult(set_types_result);
@@ -183,15 +204,19 @@ PathPickerResult PathPicker::SelectFolder(HWND owner) const
 
 PathPickerResult PathPicker::SelectImageLegacy(HWND owner) const
 {
+    const auto filter = BuildLegacyImageFilter(Localization::GetString(IDS_PICKER_SUPPORTED_IMAGES),
+                                               Localization::GetString(IDS_PICKER_ALL_FILES));
+    const auto title = Localization::GetString(IDS_PICKER_OPEN_IMAGE_TITLE);
+
     wchar_t path[MAX_PATH]{};
     OPENFILENAME open_file_name{};
     open_file_name.lStructSize = sizeof(open_file_name);
     open_file_name.hwndOwner = owner;
-    open_file_name.lpstrFilter = kLegacyImageFilter;
+    open_file_name.lpstrFilter = filter.c_str();
     open_file_name.lpstrFile = path;
     open_file_name.nMaxFile = _countof(path);
     open_file_name.nFilterIndex = 1;
-    open_file_name.lpstrTitle = L"Open image";
+    open_file_name.lpstrTitle = title.c_str();
     open_file_name.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
 
     if (!GetOpenFileName(&open_file_name))
@@ -205,9 +230,11 @@ PathPickerResult PathPicker::SelectImageLegacy(HWND owner) const
 
 PathPickerResult PathPicker::SelectFolderLegacy(HWND owner) const
 {
+    const auto title = Localization::GetString(IDS_PICKER_OPEN_FOLDER_TITLE);
+
     BROWSEINFO browse_info{};
     browse_info.hwndOwner = owner;
-    browse_info.lpszTitle = L"Open folder";
+    browse_info.lpszTitle = title.c_str();
     browse_info.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
     browse_info.lpfn = BrowseForFolderCallback;
 

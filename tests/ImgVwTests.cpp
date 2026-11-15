@@ -7,5 +7,6 @@ void RunImgVwTests()
     RunConcurrencyTests();
     RunImagePolicyTests();
     RunImageTests();
+    RunLocalizationTests();
     RunUiTests();
 }

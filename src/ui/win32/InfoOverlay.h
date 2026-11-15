@@ -114,14 +114,15 @@ class InfoOverlay final
               UINT dpi, bool light_theme, UINT text_format = DT_LEFT | DT_NOPREFIX,
               COLORREF fallback_background = RGB(0, 0, 0), BOOL vertically_center_text = FALSE);
 
-    static std::wstring BuildItemText(const ImgItem* item, const std::wstring& filepath)
+    static std::wstring BuildItemText(const ImgItem* item, const std::wstring& filepath,
+                                      UiLanguage language = UiLanguage::English)
     {
         const auto state = item == nullptr ? ImgItem::DisplayState{} : item->GetDisplayState();
         const auto ready = state.status == ImgItem::Status::Ready;
         const auto loading = state.status == ImgItem::Status::Loading;
         const auto percent = loading ? (std::max)(item->loadingprogresspercent(), 0) : 0;
         return OverlayText::BuildItemInfo(filepath, ready, loading, percent, state.imagewidth, state.imageheight,
-                                          state.hasfilesize != FALSE, state.filesize);
+                                          state.hasfilesize != FALSE, state.filesize, language);
     }
 
     static std::wstring BuildStatsText(const InfoOverlayStatsSnapshot& snapshot);

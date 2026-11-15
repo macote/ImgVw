@@ -1,0 +1,120 @@
+/////////////////////////////////////////////////////////////////////////////
+// French (Canada) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_FRC)
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH_CANADIAN
+#pragma code_page(1252)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IMGPOPUP MENU
+BEGIN
+    POPUP "Root"
+    BEGIN
+        MENUITEM "Ouvrir une image...\tCtrl+O", IDM_OPEN_IMAGE
+        MENUITEM "Ouvrir un dossier...\tCtrl+Maj+O", IDM_OPEN_FOLDER
+        MENUITEM SEPARATOR
+        MENUITEM "Image suivante\tFlèche droite | Molette vers le bas", IDR_NEXT
+        MENUITEM "Image précédente\tFlèche gauche | Molette vers le haut", IDR_PREVIOUS
+        MENUITEM "Première image\tDébut", IDR_FIRST
+        MENUITEM "Dernière image\tFin", IDR_LAST
+        MENUITEM SEPARATOR
+        MENUITEM "Afficher ou masquer le nom du fichier\tEspace", IDR_TOGGLE_FILENAME
+        MENUITEM "Mettre à la corbeille\tSuppr", IDR_RECYCLE
+        MENUITEM SEPARATOR
+        MENUITEM "Activer ou désactiver le diaporama\tF3", IDR_TOGGLESS
+        MENUITEM "Activer ou désactiver le diaporama aléatoire\tF4", IDR_TOGGLESSR
+        MENUITEM "Activer ou désactiver le diaporama multiécran\tF5", IDR_TOGGLESS_MULTI
+        MENUITEM "Activer ou désactiver le diaporama aléatoire multiécran\tF6", IDR_TOGGLESS_MULTI_RANDOM
+        MENUITEM "Augmenter la vitesse du diaporama\tF7", IDR_INCSSS
+        MENUITEM "Diminuer la vitesse du diaporama\tF8", IDR_DECSSS
+        MENUITEM SEPARATOR
+        MENUITEM "Ajouter les fichiers des sous-dossiers\tF9", IDR_RECURSE
+        MENUITEM SEPARATOR
+        MENUITEM "Sélectionner le profil ICC CMJN par défaut...\tF11", IDM_LOADICC
+        MENUITEM "Utiliser le profil ICC CMJN intégré\tF12", IDM_USEBUILTINICC
+        MENUITEM SEPARATOR
+        POPUP "&Langue"
+        BEGIN
+            MENUITEM "&Système", IDM_LANGUAGE_SYSTEM
+            MENUITEM "&English", IDM_LANGUAGE_ENGLISH
+            MENUITEM "&Français", IDM_LANGUAGE_FRENCH
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&À propos...\tF1", IDM_ABOUT
+        MENUITEM SEPARATOR
+        MENUITEM "&Quitter\tÉchap", IDM_EXIT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 100, 75, 145, 62
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "À propos d'ImgVw"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDI_ICON, IDC_STATIC, 14, 14, 21, 20
+    LTEXT           "ImgVw v1.12.4", IDC_STATIC, 42, 14, 114, 8, SS_NOPREFIX
+    LTEXT           "", IDC_STATIC, 42, 26, 114, 8
+    DEFPUSHBUTTON   "OK", IDOK, 70, 41, 50, 14, WS_GROUP
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE                  "ImgVw"
+    IDC_IMGVW                      "IMGVW"
+    IDS_APP_ERROR_TITLE            "Erreur d'ImgVw"
+    IDS_ERROR_TEMP_DIR             "ImgVw n'a pas pu initialiser son dossier temporaire d'images (erreur 0x{0})."
+    IDS_EMPTY_BEGIN                "Ouvrez une image ou parcourez un dossier pour commencer."
+    IDS_EMPTY_PATH_OPEN_FAILED     "Impossible d'ouvrir le fichier ou le dossier sélectionné."
+    IDS_EMPTY_PICKER_OPEN_FAILED   "Impossible d'afficher la fenêtre de sélection de fichiers ou de dossiers."
+    IDS_DROP_SINGLE_ONLY           "Déposez une seule image ou un seul dossier à la fois."
+    IDS_EMPTY_NO_IMAGES            "Aucune image prise en charge n'a été trouvée dans ce dossier."
+    IDS_EMPTY_NO_IMAGES_SUBFOLDERS "Aucune image prise en charge n'a été trouvée dans ce dossier ou ses sous-dossiers."
+    IDS_EMPTY_SEARCHING_SUBFOLDERS "Recherche d'images prises en charge dans les sous-dossiers..."
+    IDS_EMPTY_DRAG_HINT            "Vous pouvez aussi faire glisser une image ou un dossier ici."
+    IDS_BTN_OPEN_IMAGE             "Ouvrir une &image..."
+    IDS_BTN_OPEN_FOLDER            "Ouvrir un &dossier..."
+    IDS_BTN_SEARCH_SUBFOLDERS      "&Rechercher dans les sous-dossiers"
+    IDS_BTN_EXIT                   "&Quitter"
+    IDS_PICKER_SUPPORTED_IMAGES    "Images prises en charge"
+    IDS_PICKER_ALL_FILES           "Tous les fichiers"
+    IDS_PICKER_OPEN_IMAGE_TITLE    "Ouvrir une image"
+    IDS_PICKER_OPEN_FOLDER_TITLE   "Ouvrir un dossier"
+    IDS_ICC_PICKER_TITLE           "Sélectionner le profil ICC CMJN par défaut..."
+    IDS_ICC_FILTER_PROFILE         "Profil ICC"
+    IDS_ICC_FILTER_ALL             "Tous les fichiers"
+    IDS_CMYK_ERROR_TITLE           "Erreur de profil CMJN"
+    IDS_CMYK_REMOVE_FAILED         "Impossible de supprimer le profil ICC CMJN enregistré."
+    IDS_CMYK_INVALID_TITLE         "Profil ICC CMJN invalide"
+    IDS_CMYK_INVALID_FILE          "Le fichier sélectionné n'est pas un profil ICC CMJN valide."
+    IDS_CMYK_STORE_FAILED          "Impossible d'enregistrer le profil ICC CMJN sélectionné."
+    IDS_LANGUAGE_SAVE_FAILED       "La préférence de langue n'a pas pu être enregistrée. Le choix s'appliquera uniquement à cette session."
+    IDS_STATS_SUMMARY              "Images trouvées : {0}; en cache : {1}; en attente : {2}; places libres : {3}/{4}"
+    IDS_STATS_FREE_SUFFIX          "; mémoire libre : {0}"
+    IDS_STATS_SLIDESHOW_LINE       "Mode : {0}; cycle : {1}/{2}"
+    IDS_STATS_SLIDESHOW_PERCENT_SUFFIX " ({0})"
+    IDS_STATS_MODE_RANDOM          "diaporama aléatoire"
+    IDS_STATS_MODE_SEQUENTIAL      "diaporama séquentiel"
+    IDS_STATS_COL_SIZE             "Dimensions"
+    IDS_STATS_COL_READY            "Prêtes"
+    IDS_STATS_COL_LOADED           "Chargées"
+    IDS_STATS_COL_LOADING          "Chargement"
+    IDS_STATS_COL_QUEUED           "En attente"
+    IDS_STATS_COL_ERRORS           "Erreurs"
+    IDS_STATS_COL_USED             "Mémoire"
+END
+
+#endif // French (Canada) resources

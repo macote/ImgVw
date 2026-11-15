@@ -15,6 +15,7 @@ struct Input
     BOOL searching_subfolders{};
     INT logo_source_width{};
     INT logo_source_height{};
+    INT minimum_panel_height{};
 };
 
 struct Layout
@@ -32,7 +33,7 @@ inline Layout Calculate(const Input& input)
     Layout layout;
     const auto available_width = std::max(0, input.client_width - scale(48));
     layout.panel_width = std::min(available_width, scale(460));
-    layout.panel_height = scale(input.no_images ? 132 : 96);
+    layout.panel_height = std::max(scale(input.no_images ? 132 : 96), input.minimum_panel_height);
 
     if (input.logo_source_width > 0 && input.logo_source_height > 0)
     {

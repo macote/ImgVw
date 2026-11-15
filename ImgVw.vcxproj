@@ -67,6 +67,11 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <PropertyGroup>
     <ImgVwIncludeDirectories>$(ProjectDir);$(ProjectDir)src\app;$(ProjectDir)src\browse;$(ProjectDir)src\image;$(ProjectDir)src\platform\win32;$(ProjectDir)src\ui\win32;$(ProjectDir)resources;$(ProjectDir)3rd-party\libjpeg-turbo;$(ProjectDir)3rd-party\Little-CMS;$(ProjectDir)3rd-party\libheif;$(ProjectDir)3rd-party\libde265;%(AdditionalIncludeDirectories)</ImgVwIncludeDirectories>
     <OutDir>$(ProjectDir)bin\vs\$(Platform)\$(Configuration)\</OutDir>
@@ -213,6 +218,7 @@
     <ClInclude Include="src\platform\win32\ProcessDpiAwareness.h" />
     <ClInclude Include="src\platform\win32\RegistryKey.h" />
     <ClInclude Include="src\platform\win32\SelectedGdiObject.h" />
+    <ClInclude Include="src\platform\win32\UiLanguageSettings.h" />
     <ClInclude Include="src\platform\win32\Win32Handle.h" />
     <ClInclude Include="src\platform\win32\WindowDeviceContext.h" />
     <ClInclude Include="src\ui\win32\ImgVwWindow.h" />
@@ -226,9 +232,11 @@
     <ClInclude Include="src\ui\win32\InfoOverlay.h" />
     <ClInclude Include="src\ui\win32\InfoOverlayStatsBuilder.h" />
     <ClInclude Include="src\ui\win32\InfoOverlayVisibility.h" />
+    <ClInclude Include="src\ui\win32\Localization.h" />
     <ClInclude Include="src\ui\win32\MonitorPlacement.h" />
     <ClInclude Include="src\ui\win32\MultiMonitorSlideShowCoordinator.h" />
     <ClInclude Include="src\ui\win32\SlideShowStateMachine.h" />
+    <ClInclude Include="src\ui\win32\UiLanguage.h" />
     <ClInclude Include="src\ui\win32\OverlayText.h" />
     <ClInclude Include="src\ui\win32\WindowGeometry.h" />
     <ClInclude Include="src\ui\win32\WindowDragController.h" />
@@ -266,11 +274,14 @@
     <ClCompile Include="src\ui\win32\DisplayPresenter.cpp" />
     <ClCompile Include="src\ui\win32\ImgRenderer.cpp" />
     <ClCompile Include="src\ui\win32\ImgVwWindow.cpp" />
+    <ClCompile Include="src\ui\win32\Localization.cpp" />
     <ClCompile Include="src\ui\win32\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\color\CGATS21_CRPC5.icc" />
     <None Include="resources\color\CGATS21_CRPC5_LICENSE.txt" />
+    <None Include="resources\lang\en.rc2" />
+    <None Include="resources\lang\fr.rc2" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources\ImgVw.rc" />

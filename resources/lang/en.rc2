@@ -1,0 +1,120 @@
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IMGPOPUP MENU
+BEGIN
+    POPUP "Root"
+    BEGIN
+        MENUITEM "Open image...\tCtrl+O", IDM_OPEN_IMAGE
+        MENUITEM "Open folder...\tCtrl+Shift+O", IDM_OPEN_FOLDER
+        MENUITEM SEPARATOR
+        MENUITEM "Next\tRight Arrow | Mouse Wheel Down", IDR_NEXT
+        MENUITEM "Previous\tLeft Arrow | Mouse Wheel Up", IDR_PREVIOUS
+        MENUITEM "First\tHome", IDR_FIRST
+        MENUITEM "Last\tEnd", IDR_LAST
+        MENUITEM SEPARATOR
+        MENUITEM "Toggle filename\tSpace", IDR_TOGGLE_FILENAME
+        MENUITEM "Delete\tDelete", IDR_RECYCLE
+        MENUITEM SEPARATOR
+        MENUITEM "Toggle slideshow\tF3", IDR_TOGGLESS
+        MENUITEM "Toggle random slideshow\tF4", IDR_TOGGLESSR
+        MENUITEM "Toggle multi-monitor slideshow\tF5", IDR_TOGGLESS_MULTI
+        MENUITEM "Toggle multi-monitor random slideshow\tF6", IDR_TOGGLESS_MULTI_RANDOM
+        MENUITEM "Increase slideshow speed\tF7", IDR_INCSSS
+        MENUITEM "Decrease slideshow speed\tF8", IDR_DECSSS
+        MENUITEM SEPARATOR
+        MENUITEM "Add files found in subfolders\tF9", IDR_RECURSE
+        MENUITEM SEPARATOR
+        MENUITEM "Select default CMYK profile...\tF11", IDM_LOADICC
+        MENUITEM "Use built-in CMYK profile\tF12", IDM_USEBUILTINICC
+        MENUITEM SEPARATOR
+        POPUP "&Language"
+        BEGIN
+            MENUITEM "&System", IDM_LANGUAGE_SYSTEM
+            MENUITEM "&English", IDM_LANGUAGE_ENGLISH
+            MENUITEM "&Français", IDM_LANGUAGE_FRENCH
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&About...\tF1", IDM_ABOUT
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit\tEscape", IDM_EXIT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 100, 75, 135, 62
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About ImgVw"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDI_ICON, IDC_STATIC, 14, 14, 21, 20
+    LTEXT           "ImgVw v1.12.4", IDC_STATIC, 42, 14, 114, 8, SS_NOPREFIX
+    LTEXT           "", IDC_STATIC, 42, 26, 114, 8
+    DEFPUSHBUTTON   "OK", IDOK, 65, 41, 50, 14, WS_GROUP
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE                  "ImgVw"
+    IDC_IMGVW                      "IMGVW"
+    IDS_APP_ERROR_TITLE            "ImgVw Error"
+    IDS_ERROR_TEMP_DIR             "ImgVw could not initialize its temporary image directory (error 0x{0})."
+    IDS_EMPTY_BEGIN                "Open an image or browse a folder to begin."
+    IDS_EMPTY_PATH_OPEN_FAILED     "The selected path could not be opened."
+    IDS_EMPTY_PICKER_OPEN_FAILED   "The file or folder picker could not be opened."
+    IDS_DROP_SINGLE_ONLY           "Drop one image or folder at a time."
+    IDS_EMPTY_NO_IMAGES            "No supported images were found in this folder."
+    IDS_EMPTY_NO_IMAGES_SUBFOLDERS "No supported images were found in this folder or its subfolders."
+    IDS_EMPTY_SEARCHING_SUBFOLDERS "Searching subfolders for supported images..."
+    IDS_EMPTY_DRAG_HINT            "You can also drag an image or folder here."
+    IDS_BTN_OPEN_IMAGE             "Open &image..."
+    IDS_BTN_OPEN_FOLDER            "Open &folder..."
+    IDS_BTN_SEARCH_SUBFOLDERS      "&Search subfolders"
+    IDS_BTN_EXIT                   "E&xit"
+    IDS_PICKER_SUPPORTED_IMAGES    "Supported images"
+    IDS_PICKER_ALL_FILES           "All files"
+    IDS_PICKER_OPEN_IMAGE_TITLE    "Open image"
+    IDS_PICKER_OPEN_FOLDER_TITLE   "Open folder"
+    IDS_ICC_PICKER_TITLE           "Select default CMYK ICC profile..."
+    IDS_ICC_FILTER_PROFILE         "ICC Profile"
+    IDS_ICC_FILTER_ALL             "All"
+    IDS_CMYK_ERROR_TITLE           "CMYK profile error"
+    IDS_CMYK_REMOVE_FAILED         "Could not remove the stored CMYK ICC profile."
+    IDS_CMYK_INVALID_TITLE         "Invalid CMYK ICC profile"
+    IDS_CMYK_INVALID_FILE          "The selected file is not a valid CMYK ICC profile."
+    IDS_CMYK_STORE_FAILED          "Could not store the selected CMYK ICC profile."
+    IDS_LANGUAGE_SAVE_FAILED       "The language preference could not be saved. It will apply for this session only."
+    IDS_STATS_SUMMARY              "Found: {0}; Cached: {1}; Queued: {2}; Slots: {3}/{4}"
+    IDS_STATS_FREE_SUFFIX          "; Free: {0}"
+    IDS_STATS_SLIDESHOW_LINE       "Mode: {0}; Cycle: {1} / {2}"
+    IDS_STATS_SLIDESHOW_PERCENT_SUFFIX " ({0})"
+    IDS_STATS_MODE_RANDOM          "Random slideshow"
+    IDS_STATS_MODE_SEQUENTIAL      "Sequential slideshow"
+    IDS_STATS_COL_SIZE             "Size"
+    IDS_STATS_COL_READY            "Ready"
+    IDS_STATS_COL_LOADED           "Loaded"
+    IDS_STATS_COL_LOADING          "Loading"
+    IDS_STATS_COL_QUEUED           "Queued"
+    IDS_STATS_COL_ERRORS           "Errors"
+    IDS_STATS_COL_USED             "Used"
+END
+
+#endif // English (United States) resources

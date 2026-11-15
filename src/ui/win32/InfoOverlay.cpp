@@ -1,8 +1,10 @@
 #include "InfoOverlay.h"
 
 #include "CompatibleDeviceContext.h"
+#include "Localization.h"
 #include "SelectedGdiObject.h"
 #include "WindowGeometry.h"
+#include "resource.h"
 
 #include <algorithm>
 #include <iomanip>
@@ -27,6 +29,7 @@ OverlayColors GetOverlayColors(bool light_theme)
 
 std::wstring InfoOverlay::BuildStatsText(const InfoOverlayStatsSnapshot& snapshot)
 {
+    const auto language = Localization::GetLanguage();
     std::wstringstream text;
     std::size_t cached{};
     std::size_t queued{};
@@ -40,46 +43,83 @@ std::wstring InfoOverlay::BuildStatsText(const InfoOverlayStatsSnapshot& snapsho
         maximum_slots += target.maximum_slots;
     }
 
-    text << L"Found: " << snapshot.found_images << L"; Cached: " << cached << L"; Queued: " << queued << L"; Slots: "
-         << free_slots << L"/" << maximum_slots;
+    text << Localization::FormatString(IDS_STATS_SUMMARY,
+                                       {std::to_wstring(snapshot.found_images), std::to_wstring(cached),
+                                        std::to_wstring(queued), std::to_wstring(free_slots),
+                                        std::to_wstring(maximum_slots)});
     if (snapshot.has_free_bytes)
     {
-        text << L"; Free: " << OverlayText::FormatByteSize(snapshot.free_bytes);
+        text << Localization::FormatString(IDS_STATS_FREE_SUFFIX,
+                                           {OverlayText::FormatByteSize(snapshot.free_bytes, language)});
     }
+
+    const auto col_size_header = Localization::GetString(IDS_STATS_COL_SIZE);
+    const auto col_ready_header = Localization::GetString(IDS_STATS_COL_READY);
+    const auto col_loaded_header = Localization::GetString(IDS_STATS_COL_LOADED);
+    const auto col_loading_header = Localization::GetString(IDS_STATS_COL_LOADING);
+    const auto col_queued_header = Localization::GetString(IDS_STATS_COL_QUEUED);
+    const auto col_errors_header = Localization::GetString(IDS_STATS_COL_ERRORS);
+    const auto col_used_header = Localization::GetString(IDS_STATS_COL_USED);
+
+    const auto col_size_width =
+        static_cast<std::streamsize>((std::max<std::size_t>)(12, col_size_header.size() + 2));
+    const auto col_ready_width =
+        static_cast<std::streamsize>((std::max<std::size_t>)(8, col_ready_header.size() + 2));
+    const auto col_loaded_width =
+        static_cast<std::streamsize>((std::max<std::size_t>)(10, col_loaded_header.size() + 2));
+    const auto col_loading_width =
+        static_cast<std::streamsize>((std::max<std::size_t>)(10, col_loading_header.size() + 2));
+    const auto col_queued_width =
+        static_cast<std::streamsize>((std::max<std::size_t>)(10, col_queued_header.size() + 2));
+    const auto col_errors_width =
+        static_cast<std::streamsize>((std::max<std::size_t>)(8, col_errors_header.size() + 2));
+    const auto col_used_width =
+        static_cast<std::streamsize>((std::max<std::size_t>)(13, col_used_header.size() + 3));
+
+    const auto separator_width = static_cast<std::size_t>(col_size_width + col_ready_width + col_loaded_width +
+                                                          col_loading_width + col_queued_width + col_errors_width +
+                                                          col_used_width);
+    const std::wstring separator(separator_width, L'-');
 
     if (snapshot.slideshow_running)
     {
-        text << L"\r\n--------------------------------------------------------------------------\r\n";
-        text << L"Mode: " << (snapshot.random_slideshow ? L"Random" : L"Sequential") << L" slideshow; Cycle: "
-             << snapshot.cycle_position << L" / " << snapshot.cycle_total;
+        const auto mode_label =
+            Localization::GetString(snapshot.random_slideshow ? IDS_STATS_MODE_RANDOM : IDS_STATS_MODE_SEQUENTIAL);
+        text << L"\r\n" << separator << L"\r\n";
+        text << Localization::FormatString(IDS_STATS_SLIDESHOW_LINE,
+                                           {mode_label, std::to_wstring(snapshot.cycle_position),
+                                            std::to_wstring(snapshot.cycle_total)});
         if (snapshot.cycle_total > 0)
         {
-            text << L" (" << OverlayText::FormatPercent(snapshot.cycle_position, snapshot.cycle_total) << L")";
+            text << Localization::FormatString(
+                IDS_STATS_SLIDESHOW_PERCENT_SUFFIX,
+                {OverlayText::FormatPercent(snapshot.cycle_position, snapshot.cycle_total, language)});
         }
     }
 
-    text << L"\r\n";
-    text << L"--------------------------------------------------------------------------\r\n";
-    text << std::left << std::setw(12) << L"Size" << std::right << std::setw(8) << L"Ready" << std::setw(10)
-         << L"Loaded" << std::setw(10) << L"Loading" << std::setw(10) << L"Queued" << std::setw(8) << L"Errors"
-         << std::setw(10) << L"Used" << std::setw(3) << L"" << L"\r\n";
-    text << L"--------------------------------------------------------------------------\r\n";
+    text << L"\r\n" << separator << L"\r\n";
+    text << std::left << std::setw(col_size_width) << col_size_header << std::right << std::setw(col_ready_width)
+         << col_ready_header << std::setw(col_loaded_width) << col_loaded_header << std::setw(col_loading_width)
+         << col_loading_header << std::setw(col_queued_width) << col_queued_header << std::setw(col_errors_width)
+         << col_errors_header << std::setw(col_used_width - 3) << col_used_header << std::setw(3) << L"" << L"\r\n";
+    text << separator << L"\r\n";
 
     for (const auto& target : snapshot.targets)
     {
         const auto total = target.queued + target.loading + target.ready + target.error;
         std::wstringstream size;
         size << target.width << L"x" << target.height;
-        text << std::left << std::setw(12) << size.str() << std::right << std::setw(8)
-             << OverlayText::FormatPercent(target.ready, total) << std::setw(10) << target.ready << std::setw(10)
-             << target.loading << std::setw(10) << target.queued << std::setw(8) << target.error;
-        OverlayText::WriteByteSizeColumn(text, target.used_bytes, 13);
+        text << std::left << std::setw(col_size_width) << size.str() << std::right << std::setw(col_ready_width)
+             << OverlayText::FormatPercent(target.ready, total, language) << std::setw(col_loaded_width)
+             << target.ready << std::setw(col_loading_width) << target.loading << std::setw(col_queued_width)
+             << target.queued << std::setw(col_errors_width) << target.error;
+        OverlayText::WriteByteSizeColumn(text, target.used_bytes, col_used_width, language);
         text << L"\r\n";
     }
 
     if (!snapshot.current_item_text.empty())
     {
-        text << L"--------------------------------------------------------------------------\r\n";
+        text << separator << L"\r\n";
         text << snapshot.current_item_text;
     }
     return text.str();

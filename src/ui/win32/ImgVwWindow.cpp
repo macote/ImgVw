@@ -3,8 +3,10 @@
 #include "BrowsePath.h"
 #include "CompatibleDeviceContext.h"
 #include "GdiObject.h"
+#include "Localization.h"
 #include "RegistryKey.h"
 #include "SelectedGdiObject.h"
+#include "UiLanguageSettings.h"
 #include "WindowDeviceContext.h"
 
 #include <Windowsx.h>
@@ -183,11 +185,11 @@ LRESULT ImgVwWindow::OnCreate()
     }
     if (browse_state_.path().empty())
     {
-        ShowEmptyState(L"Open an image or browse a folder to begin.", FALSE);
+        ShowEmptyState(IDS_EMPTY_BEGIN, FALSE);
     }
     else if (!InitializeBrowser(browse_state_.path()))
     {
-        ShowEmptyState(L"The selected path could not be opened.", FALSE);
+        ShowEmptyState(IDS_EMPTY_PATH_OPEN_FAILED, FALSE);
     }
 
     return FALSE;
@@ -302,11 +304,12 @@ BOOL ImgVwWindow::OpenPath(const std::wstring& path)
     {
         if (was_empty)
         {
-            ShowEmptyState(L"The selected path could not be opened.", FALSE);
+            ShowEmptyState(IDS_EMPTY_PATH_OPEN_FAILED, FALSE);
         }
         else
         {
-            MessageBox(hwnd_, L"The selected path could not be opened.", L"ImgVw Error", MB_OK | MB_ICONERROR);
+            MessageBoxW(hwnd_, Localization::GetString(IDS_EMPTY_PATH_OPEN_FAILED).c_str(),
+                        Localization::GetString(IDS_APP_ERROR_TITLE).c_str(), MB_OK | MB_ICONERROR);
         }
         return FALSE;
     }
@@ -384,11 +387,12 @@ void ImgVwWindow::SelectPath(const PathPickerResult& result)
     {
         if (IsEmptyStateVisible())
         {
-            ShowEmptyState(L"The file or folder picker could not be opened.", FALSE);
+            ShowEmptyState(IDS_EMPTY_PICKER_OPEN_FAILED, FALSE);
         }
         else
         {
-            MessageBox(hwnd_, L"The file or folder picker could not be opened.", L"ImgVw Error", MB_OK | MB_ICONERROR);
+            MessageBoxW(hwnd_, Localization::GetString(IDS_EMPTY_PICKER_OPEN_FAILED).c_str(),
+                        Localization::GetString(IDS_APP_ERROR_TITLE).c_str(), MB_OK | MB_ICONERROR);
         }
         return;
     }
@@ -408,7 +412,8 @@ void ImgVwWindow::HandleDroppedFiles(HDROP drop)
     if (count != 1)
     {
         DragFinish(drop);
-        MessageBox(hwnd_, L"Drop one image or folder at a time.", L"ImgVw", MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(hwnd_, Localization::GetString(IDS_DROP_SINGLE_ONLY).c_str(),
+                    Localization::GetString(IDS_APP_TITLE).c_str(), MB_OK | MB_ICONINFORMATION);
         return;
     }
 
@@ -456,7 +461,7 @@ BOOL ImgVwWindow::HasImages()
     return browse_state_.browser_initialized() && browser_.HasFiles();
 }
 
-void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders)
+void ImgVwWindow::ShowEmptyState(UINT message_id, BOOL show_search_subfolders)
 {
     if (owner_ != nullptr)
     {
@@ -464,7 +469,7 @@ void ImgVwWindow::ShowEmptyState(const std::wstring& message, BOOL show_search_s
     }
 
     const auto was_visible = IsEmptyStateVisible();
-    empty_state_view_.Show(message, browse_state_.browser_initialized(), show_search_subfolders != FALSE);
+    empty_state_view_.Show(message_id, browse_state_.browser_initialized(), show_search_subfolders != FALSE);
     if (!was_visible)
     {
         KillTimer(hwnd_, IDT_HIDEMOUSE);
@@ -724,7 +729,7 @@ bool ImgVwWindow::DisplayFileInformation(HDC dc, const RECT& paintrect, const Im
     }
 
     const auto overlaydrawn = IsInfoOverlayVisible();
-    auto text = InfoOverlay::BuildItemText(item, filepath);
+    auto text = InfoOverlay::BuildItemText(item, filepath, Localization::GetLanguage());
     RECT overlayrect{};
     if (info_overlay_.stats_visible())
     {
@@ -774,7 +779,7 @@ bool ImgVwWindow::DisplayLoadingProgress(HDC dc, const RECT& paintrect, const Im
         return false;
     }
 
-    const auto text = InfoOverlay::BuildItemText(item, filepath);
+    const auto text = InfoOverlay::BuildItemText(item, filepath, Localization::GetLanguage());
     const auto overlayrect = info_overlay_.CalculateRectangle(dc, text, GetWindowDpi(), clientwidth_, clientheight_);
     FillRect(dc, &paintrect, backgroundbrush_.get());
     info_overlay_.Draw(dc, overlayrect, text, {}, GetWindowDpi(), systemlighttheme_ != FALSE);
@@ -936,7 +941,8 @@ std::wstring ImgVwWindow::BuildLoaderStatsOverlayText()
     const auto currentpath = browser_.GetCurrentFilePath();
     if (!currentpath.empty())
     {
-        context.current_item_text = InfoOverlay::BuildItemText(currentitem.get(), currentpath);
+        context.current_item_text =
+            InfoOverlay::BuildItemText(currentitem.get(), currentpath, Localization::GetLanguage());
     }
     return InfoOverlay::BuildStatsText(InfoOverlayStatsBuilder::Build(sharedstats, targetstats, context));
 }
@@ -987,7 +993,8 @@ void ImgVwWindow::RefreshLoaderStatsOverlay()
     const auto currentitem = browser_.GetCurrentItem();
     const auto text = info_overlay_.stats_visible()
                           ? BuildLoaderStatsOverlayText()
-                          : InfoOverlay::BuildItemText(currentitem.get(), browser_.GetCurrentFilePath());
+                          : InfoOverlay::BuildItemText(currentitem.get(), browser_.GetCurrentFilePath(),
+                                                       Localization::GetLanguage());
     if (text.empty())
     {
         ClearInfoOverlay();
@@ -1062,8 +1069,8 @@ void ImgVwWindow::UseBuiltInICCProfile()
     const auto result = ImgItem::ResetDefaultICCProfile();
     if (!result.Succeeded())
     {
-        MessageBox(hwnd_, L"Could not remove the stored CMYK ICC profile.", L"CMYK profile error",
-                   MB_OK | MB_ICONERROR);
+        MessageBoxW(hwnd_, Localization::GetString(IDS_CMYK_REMOVE_FAILED).c_str(),
+                    Localization::GetString(IDS_CMYK_ERROR_TITLE).c_str(), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -1667,9 +1674,7 @@ void ImgVwWindow::HandleStartupExitConditions()
     const auto stats = browser_.GetStats();
     if (stats.found_images == 0)
     {
-        ShowEmptyState(browse_state_.browse_subfolders()
-                           ? L"No supported images were found in this folder or its subfolders."
-                           : L"No supported images were found in this folder.",
+        ShowEmptyState(browse_state_.browse_subfolders() ? IDS_EMPTY_NO_IMAGES_SUBFOLDERS : IDS_EMPTY_NO_IMAGES,
                        browse_state_.browse_subfolders() ? FALSE : TRUE);
     }
     else if (IsEmptyStateVisible())
@@ -1835,15 +1840,27 @@ BOOL ImgVwWindow::SelectDefaultICCProfile()
     TCHAR szFile[MAX_PATH]{};
     BOOL profile_selected = FALSE;
 
+    std::wstring icc_filter;
+    icc_filter.append(Localization::GetString(IDS_ICC_FILTER_PROFILE));
+    icc_filter.push_back(L'\0');
+    icc_filter.append(L"*.icc");
+    icc_filter.push_back(L'\0');
+    icc_filter.append(Localization::GetString(IDS_ICC_FILTER_ALL));
+    icc_filter.push_back(L'\0');
+    icc_filter.append(L"*.*");
+    icc_filter.push_back(L'\0');
+    icc_filter.push_back(L'\0');
+    const auto icc_title = Localization::GetString(IDS_ICC_PICKER_TITLE);
+
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hwnd_;
     ofn.lpstrFile = szFile;
     ofn.lpstrFile[0] = '\0';
     ofn.nMaxFile = _countof(szFile);
-    ofn.lpstrFilter = L"ICC Profile\0*.icc\0All\0*.*\0";
+    ofn.lpstrFilter = icc_filter.c_str();
     ofn.nFilterIndex = 1;
-    ofn.lpstrTitle = L"Select default CMYK ICC profile...";
+    ofn.lpstrTitle = icc_title.c_str();
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
     ofn.lpstrInitialDir = nullptr;
@@ -1855,8 +1872,8 @@ BOOL ImgVwWindow::SelectDefaultICCProfile()
         const auto validation = ImgItem::ValidateCMYKICCProfile(ofn.lpstrFile);
         if (!validation.Succeeded())
         {
-            MessageBox(hwnd_, L"The selected file is not a valid CMYK ICC profile.", L"Invalid CMYK ICC profile",
-                       MB_OK | MB_ICONERROR);
+            MessageBoxW(hwnd_, Localization::GetString(IDS_CMYK_INVALID_FILE).c_str(),
+                        Localization::GetString(IDS_CMYK_INVALID_TITLE).c_str(), MB_OK | MB_ICONERROR);
         }
         else
         {
@@ -1876,8 +1893,8 @@ BOOL ImgVwWindow::SelectDefaultICCProfile()
 
             if (!profile_selected)
             {
-                MessageBox(hwnd_, L"Could not store the selected CMYK ICC profile.", L"CMYK profile error",
-                           MB_OK | MB_ICONERROR);
+                MessageBoxW(hwnd_, Localization::GetString(IDS_CMYK_STORE_FAILED).c_str(),
+                            Localization::GetString(IDS_CMYK_ERROR_TITLE).c_str(), MB_OK | MB_ICONERROR);
             }
         }
     }
@@ -1913,33 +1930,73 @@ void ImgVwWindow::UpdateContextMenuForImageAvailability(HMENU menu)
 
 void ImgVwWindow::HandleContextMenu(LPARAM lParam)
 {
-    RECT rc;
-    POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-
-    GetClientRect(hwnd_, &rc);
-    ScreenToClient(hwnd_, &pt);
-
-    if (PtInRect(&rc, pt))
+    RECT rc{};
+    if (!GetClientRect(hwnd_, &rc))
     {
-        ClientToScreen(hwnd_, &pt);
+        return;
+    }
 
-        const auto root = LoadMenu(hinst_, L"IMGPOPUP");
+    POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    if (pt.x == -1 && pt.y == -1)
+    {
+        pt = {rc.right / 2, rc.bottom / 2};
+        const auto focused = GetFocus();
+        RECT focused_rect{};
+        if (IsChild(hwnd_, focused) && GetWindowRect(focused, &focused_rect))
+        {
+            POINT focused_center{focused_rect.left + (focused_rect.right - focused_rect.left) / 2,
+                                 focused_rect.top + (focused_rect.bottom - focused_rect.top) / 2};
+            if (ScreenToClient(hwnd_, &focused_center) && PtInRect(&rc, focused_center))
+            {
+                pt = focused_center;
+            }
+        }
+    }
+    else if (!ScreenToClient(hwnd_, &pt))
+    {
+        return;
+    }
+
+    if (PtInRect(&rc, pt) && ClientToScreen(hwnd_, &pt))
+    {
+        const auto root = Localization::LoadPopupMenu(L"IMGPOPUP");
         const auto popup = GetSubMenu(root, 0);
-        UpdateContextMenuForMonitorCount(popup);
-        UpdateContextMenuForImageAvailability(popup);
-
-        const auto restore_viewer_cursor = !IsEmptyStateVisible();
-        if (restore_viewer_cursor)
+        if (popup != nullptr)
         {
-            ApplyCursorVisibility(cursor_controller_.SetVisible(true));
-        }
-        TrackPopupMenu(popup, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd_, nullptr);
-        if (restore_viewer_cursor)
-        {
-            ApplyCursorVisibility(cursor_controller_.SetVisible(false));
+            UpdateContextMenuForMonitorCount(popup);
+            UpdateContextMenuForImageAvailability(popup);
+            UINT selected_language_id = IDM_LANGUAGE_SYSTEM;
+            switch (Localization::GetPreference())
+            {
+            case UiLanguagePreference::English:
+                selected_language_id = IDM_LANGUAGE_ENGLISH;
+                break;
+            case UiLanguagePreference::French:
+                selected_language_id = IDM_LANGUAGE_FRENCH;
+                break;
+            case UiLanguagePreference::System:
+            default:
+                selected_language_id = IDM_LANGUAGE_SYSTEM;
+                break;
+            }
+            CheckMenuRadioItem(popup, IDM_LANGUAGE_SYSTEM, IDM_LANGUAGE_FRENCH, selected_language_id, MF_BYCOMMAND);
+
+            const auto restore_viewer_cursor = !IsEmptyStateVisible();
+            if (restore_viewer_cursor)
+            {
+                ApplyCursorVisibility(cursor_controller_.SetVisible(true));
+            }
+            TrackPopupMenu(popup, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd_, nullptr);
+            if (restore_viewer_cursor)
+            {
+                ApplyCursorVisibility(cursor_controller_.SetVisible(false));
+            }
         }
 
-        DestroyMenu(root);
+        if (root != nullptr)
+        {
+            DestroyMenu(root);
+        }
     }
 }
 
@@ -1968,6 +2025,48 @@ BOOL CALLBACK ImgVwWindow::AboutDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wPara
 void ImgVwWindow::CloseWindow()
 {
     PostMessage(hwnd_, WM_CLOSE, 0, 0);
+}
+
+void ImgVwWindow::RefreshLanguageForWindow()
+{
+    if (owner_ == nullptr)
+    {
+        empty_state_view_.RefreshLanguage(GetWindowDpi());
+    }
+    if (IsInfoOverlayVisible())
+    {
+        RefreshLoaderStatsOverlay();
+    }
+}
+
+void ImgVwWindow::ChangeUiLanguage(UiLanguagePreference preference)
+{
+    if (owner_ != nullptr)
+    {
+        owner_->ChangeUiLanguage(preference);
+        return;
+    }
+
+    const auto new_language = ResolveUiLanguage(preference, UiLanguageSettings::DetectSystemUiLanguage());
+    Localization::SetLanguage(preference, new_language);
+
+    RefreshLanguageForWindow();
+    for (const auto window_id : multi_monitor_slideshow_.secondary_windows())
+    {
+        const auto window = ResolveSlideShowWindow(window_id);
+        if (window != nullptr)
+        {
+            window->RefreshLanguageForWindow();
+        }
+    }
+
+    if (!UiLanguageSettings::SaveLanguagePreference(preference))
+    {
+        ApplyCursorVisibility(cursor_controller_.SetVisible(true));
+        MessageBoxW(hwnd_, Localization::GetString(IDS_LANGUAGE_SAVE_FAILED).c_str(),
+                    Localization::GetString(IDS_APP_TITLE).c_str(), MB_OK | MB_ICONWARNING);
+        ApplyCursorVisibility(cursor_controller_.SetVisible(IsEmptyStateVisible() != FALSE));
+    }
 }
 
 void ImgVwWindow::OnNCDestroy()
@@ -2010,8 +2109,17 @@ LRESULT ImgVwWindow::HandleCommand(UINT command, UINT notification, LPARAM lpara
         break;
     case IDM_ABOUT:
         ApplyCursorVisibility(cursor_controller_.SetVisible(true));
-        DialogBox(hinst_, MAKEINTRESOURCE(IDD_ABOUTBOX), hwnd_, reinterpret_cast<DLGPROC>(AboutDialogProc));
+        Localization::RunModalDialog(IDD_ABOUTBOX, hwnd_, reinterpret_cast<DLGPROC>(AboutDialogProc));
         ApplyCursorVisibility(cursor_controller_.SetVisible(IsEmptyStateVisible() != FALSE));
+        break;
+    case IDM_LANGUAGE_SYSTEM:
+        ChangeUiLanguage(UiLanguagePreference::System);
+        break;
+    case IDM_LANGUAGE_ENGLISH:
+        ChangeUiLanguage(UiLanguagePreference::English);
+        break;
+    case IDM_LANGUAGE_FRENCH:
+        ChangeUiLanguage(UiLanguagePreference::French);
         break;
     case IDR_ENTER:
         ActivateEmptyStateButton();

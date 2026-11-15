@@ -1,0 +1,9 @@
+#include "../../resources/ImgVw.rc"
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+STRINGTABLE
+BEGIN
+    2000 "English fallback test"
+END

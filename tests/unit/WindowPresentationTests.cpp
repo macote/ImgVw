@@ -286,6 +286,26 @@ void TestOverlayText()
           "loading image info includes progress");
     Check(OverlayText::BuildItemInfo(L"image.jpg", false, false, 42, 0, 0, false, 0) == L"[0%] image.jpg",
           "non-loading image info uses zero progress");
+
+    Check(OverlayText::FormatByteSize(0, UiLanguage::French) == L"0\u00A0o",
+          "French byte-size formatting handles zero bytes");
+    Check(OverlayText::FormatByteSize(999, UiLanguage::French) == L"999\u00A0o",
+          "French byte-size formatting uses octet unit");
+    Check(OverlayText::FormatByteSize(1024, UiLanguage::French) == L"1,0\u00A0Ko",
+          "French byte-size formatting uses decimal comma and Ko");
+    Check(OverlayText::FormatByteSize(104857600, UiLanguage::French) == L"100\u00A0Mo",
+          "French byte-size formatting rounds large Mo values");
+    Check(OverlayText::FormatByteSize(1099511627776ULL, UiLanguage::French) == L"1,0\u00A0To",
+          "French byte-size formatting handles terabyte boundary");
+    Check(OverlayText::FormatPercent(1, 4, UiLanguage::French) == L"25\u00A0%",
+          "French percentage formatting uses a nonbreaking space");
+    Check(OverlayText::BuildItemInfo(L"C:\\Photos\\été & café\\画像.jpg", true, false, 0, 1920, 1080, true, 1048576,
+                                     UiLanguage::French) ==
+              L"C:\\Photos\\été & café\\画像.jpg\r\n1920 x 1080\u00A0px; 1,0\u00A0Mo",
+          "French item info preserves accents, ampersands, and non-Latin paths");
+    Check(OverlayText::BuildItemInfo(L"image.jpg", false, true, 42, 0, 0, false, 0, UiLanguage::French) ==
+              L"[42\u00A0%] image.jpg",
+          "French loading info uses spaced percent");
 }
 
 void TestInfoOverlayProgressActions()

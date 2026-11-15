@@ -16,6 +16,7 @@
 #include "MonitorPlacement.h"
 #include "MultiMonitorSlideShowCoordinator.h"
 #include "SlideShowStateMachine.h"
+#include "UiLanguage.h"
 #include "WindowGeometry.h"
 #include "WindowDragController.h"
 #include "Window.h"
@@ -105,9 +106,11 @@ class ImgVwWindow final : public Window
     void SelectPath(const PathPickerResult& result);
     void HandleDroppedFiles(HDROP drop);
     void BrowseEmptyStateSubFolders();
-    void ShowEmptyState(const std::wstring& message, BOOL show_search_subfolders);
+    void ShowEmptyState(UINT message_id, BOOL show_search_subfolders);
     void ShowSearchingSubfoldersState();
     void HideEmptyState();
+    void ChangeUiLanguage(UiLanguagePreference preference);
+    void RefreshLanguageForWindow();
     BOOL IsEmptyStateVisible() const;
     BOOL IsSearchingSubfolders() const;
     BOOL HasImages();
