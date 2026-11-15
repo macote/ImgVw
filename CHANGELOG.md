@@ -1,3 +1,8 @@
+## 1.13.0 (2026-11-15)
+
+- Add a Canadian French interface for all French Windows display languages
+- Add a Language menu to follow the Windows setting or choose English or French immediately
+
 ## 1.12.4 (2026-11-13)
 
 - Add a command-line launch alias for the Microsoft Store installation

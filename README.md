@@ -13,6 +13,7 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 - Embedded and fallback ICC color management for CMYK JPEG images
 - Regular and random slideshows, including multi-monitor playback
 - Drag the viewer between monitors with monitor-aware placement and edge snapping
+- English and Canadian French interface
 - Works on Windows XP and later
 
 ## Usage
@@ -20,6 +21,10 @@ ImgVw is a simple, fast and portable image viewer for Windows.
 Pass a file or folder as an argument, or launch ImgVw without arguments and choose an image or folder from the start
 screen. You can also change to a different image or folder from the right-click menu while viewing, or drag one image
 or folder into the window.
+
+Open the context menu and choose **Language** to select **System**, **English**, or **Français**. The change applies
+immediately and is saved for future launches. **System** uses Canadian French for any French Windows display language
+and English for other display languages. Windows controls the language of its own dialog buttons and shell prompts.
 
 |            Shortcut             | Description                                    |
 | :-----------------------------: | :--------------------------------------------- |

@@ -70,8 +70,8 @@ IDR_WELCOME_LOGO        RCDATA                  "ImgVwWelcome.png"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,12,4,0
- PRODUCTVERSION 1,12,4,0
+ FILEVERSION 1,13,0,0
+ PRODUCTVERSION 1,13,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -87,10 +87,10 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "FileDescription", "ImgVw"
-            VALUE "FileVersion", "1.12.4"
+            VALUE "FileVersion", "1.13.0"
             VALUE "LegalCopyright", "Marc-André Côté"
             VALUE "ProductName", "ImgVw"
-            VALUE "ProductVersion", "1.12.4"
+            VALUE "ProductVersion", "1.13.0"
         END
     END
     BLOCK "VarFileInfo"
